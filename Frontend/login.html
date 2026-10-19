@@ -1,0 +1,257 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ورود | سامانه مجتمع فنی تهران دیباگران تبریز</title>
+  <link rel="stylesheet" href="assets/css/style.css">
+  <link rel="stylesheet" href="assets/css/responsive.css">
+  <link rel="stylesheet" href="assets/css/dark.css">
+  <style>
+    body {
+      min-height: 100vh;
+      background: var(--ink-900);
+      position: relative;
+      overflow-x: hidden;
+    }
+
+    .aurora {
+      position: fixed;
+      inset: 0;
+      z-index: 0;
+      overflow: hidden;
+    }
+
+    .aurora span {
+      position: absolute;
+      border-radius: 50%;
+      filter: blur(90px);
+      opacity: .35;
+    }
+
+    .aurora span:nth-child(1) {
+      width: 520px;
+      height: 520px;
+      background: var(--teal-500);
+      top: -160px;
+      right: -120px;
+    }
+
+    .aurora span:nth-child(2) {
+      width: 460px;
+      height: 460px;
+      background: var(--gold-500);
+      bottom: -160px;
+      left: -140px;
+      opacity: .22;
+    }
+
+    .aurora span:nth-child(3) {
+      width: 300px;
+      height: 300px;
+      background: var(--navy-700);
+      top: 40%;
+      left: 20%;
+      opacity: .5;
+    }
+
+    .login-shell {
+      position: relative;
+      z-index: 1;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+    }
+
+    .login-grid {
+      display: grid;
+      grid-template-columns: 1.1fr 1fr;
+      max-width: 960px;
+      width: 100%;
+      border-radius: 28px;
+      overflow: hidden;
+      box-shadow: 0 30px 80px rgba(0, 0, 0, .45);
+    }
+
+    .login-side {
+      background: linear-gradient(160deg, var(--navy-800), var(--navy-700) 60%, #0d1c33);
+      color: #fff;
+      padding: 48px 42px;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      position: relative;
+    }
+
+    .login-side .mohr {
+      --mohr-color: var(--gold-500);
+      margin-bottom: 26px;
+    }
+
+    .login-side h2 {
+      font-size: 24px;
+      line-height: 1.5;
+      margin-bottom: 10px;
+    }
+
+    .login-side p {
+      color: #B9C4DA;
+      font-size: 13.5px;
+      line-height: 2;
+    }
+
+    .login-side .quote {
+      margin-top: auto;
+      padding-top: 26px;
+      border-top: 1px solid rgba(255, 255, 255, .12);
+      font-size: 12.5px;
+      color: #9BAAC6;
+    }
+
+    .login-form-wrap {
+      background: var(--surface);
+      padding: 46px 40px;
+    }
+
+    .login-form-wrap .brand {
+      border: none;
+      padding: 0 0 28px;
+      margin-bottom: 0;
+      justify-content: flex-start;
+    }
+
+    .login-form-wrap .brand-text b {
+      color: var(--text);
+    }
+
+    .login-form-wrap .brand-text span {
+      color: var(--text-soft);
+      opacity: 1;
+    }
+
+
+    .row-between {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 20px;
+    }
+
+    .forgot-link {
+      font-size: 12.5px;
+      color: var(--primary);
+      font-weight: 700;
+    }
+
+    @media (max-width:820px) {
+      .login-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .login-side {
+        display: none;
+      }
+    }
+  </style>
+</head>
+
+<body>
+
+  <div class="aurora"><span></span><span></span><span></span></div>
+  <p>&lArr;</p>
+
+  <div class="login-shell">
+    <div class="login-grid glass">
+      <div class="login-side">
+        <div class="mohr">
+          <div class="mohr-inner"><img class="mohr-avatar" src="/assets/img/logo.jpeg" alt="logo" srcset=""></div>
+        </div>
+        <div>
+          <h2>سامانه جامع سنجش و آزمون‌های آنلاین</h2>
+          <p>مدیریت دپارتمان‌ها، اساتید، دانشجویان و برگزاری آزمون‌های آنلاین با گزارش‌گیری لحظه‌ای </p>
+        </div>
+        <div class="quote">« دقت در سنجش، پایه‌ی عدالت در آموزش است »</div>
+      </div>
+
+      <div class="login-form-wrap">
+        <div class="brand">
+          <div style="width: 50px; height: 50px;"></div>
+          <div class="brand-text"><b>سامانه مجتمع فنی تهران دیباگران تبریز</b><span>ورود به حساب کاربری</span></div>
+        </div>
+
+        <form id="loginForm" novalidate>
+          <div class="field" id="fieldUser">
+            <label for="username">نام کاربری یا ایمیل</label>
+            <div class="input-group">
+              <svg class="field-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <circle cx="12" cy="8" r="3.5" />
+                <path d="M5 20c0-3.9 3.1-7 7-7s7 3.1 7 7" />
+              </svg>
+              <input class="input" style="padding-right:44px" type="text" id="username"
+                placeholder="مثلاً: sara.mohammadi">
+            </div>
+            <span class="error-msg">⚠ لطفاً نام کاربری خود را وارد کنید</span>
+          </div>
+
+          <div class="field" id="fieldPass">
+            <label for="password">رمز عبور</label>
+            <div class="input-group">
+              <input class="input" style="padding-left:44px" type="password" id="password" placeholder="••••••••">
+              <button type="button" class="toggle-visibility" data-toggle-password="password"
+                aria-label="نمایش رمز عبور">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7-10-7-10-7Z" />
+                  <circle cx="12" cy="12" r="3" />
+                </svg>
+              </button>
+            </div>
+            <span class="error-msg">⚠ رمز عبور باید حداقل ۶ کاراکتر باشد</span>
+          </div>
+
+          <div class="row-between">
+            <label class="checkbox-row"><input type="checkbox" checked> مرا به خاطر بسپار</label>
+            <a href="#" class="forgot-link" data-modal-open="forgotModal">فراموشی رمز عبور؟</a>
+          </div>
+
+          <button type="submit" class="btn btn-primary btn-block" id="loginBtn">
+            <span id="loginBtnText">ورود به سامانه</span>
+          </button>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- Forgot password modal -->
+  <div class="modal-overlay" id="forgotModal">
+    <div class="modal-box">
+      <div class="modal-head">
+        <h3 style="font-size:16px">بازیابی رمز عبور</h3>
+        <button class="icon-btn" data-modal-close>✕</button>
+      </div>
+      <div class="modal-body">
+        <p class="text-soft text-sm mt-8" style="margin-bottom:16px">بازیابی خودکار هنوز فعال نیست. برای بازنشانی رمز عبور با مدیر سامانه تماس بگیرید.</p>
+        <div class="field"><label>ایمیل</label><input class="input" type="email" placeholder="you@example.com"></div>
+      </div>
+      <div class="modal-foot">
+        <button class="btn btn-primary" id="sendResetBtn" data-password-reset-unavailable>ارسال لینک بازیابی</button>
+        <button class="btn btn-outline" data-modal-close>انصراف</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="assets/js/theme.js"></script>
+  <script src="assets/js/app.js"></script>
+  <script src="assets/js/api.js"></script>
+  <script>
+    // Authentication and role routing are handled by assets/js/api.js from the API response.
+    document.getElementById("sendResetBtn")?.addEventListener("click", () => {
+      document.getElementById("forgotModal").classList.remove("show");
+      showToast("لینک بازیابی رمز عبور ارسال شد", "ok");
+    });
+  </script>
+</body>
+
+</html>

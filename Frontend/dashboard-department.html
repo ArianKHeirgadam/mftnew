@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>داشبورد دپارتمان | سامانه سنجش</title>
+<link rel="stylesheet" href="assets/css/style.css">
+<link rel="stylesheet" href="assets/css/responsive.css">
+<link rel="stylesheet" href="assets/css/dark.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.4/chart.umd.min.js"></script>
+</head>
+<body data-role="department" data-active="dashboard">
+<div class="app-shell">
+  <div id="sidebar-root"></div>
+  <div class="main-col">
+    <div id="topbar-root" data-title="داشبورد دپارتمان"></div>
+    <main class="content fade-in">
+      <div class="page-head">
+        <div>
+          <div class="breadcrumb">سامانه سنجش <span>/</span> <b>دپارتمان مهندسی کامپیوتر</b></div>
+          <h1>داشبورد دپارتمان مهندسی کامپیوتر</h1>
+        </div>
+        <span class="badge badge-info">دسترسی محدود به این دپارتمان</span>
+      </div>
+
+      <div class="stat-grid">
+        <div class="card stat-card" style="--stat-tint:var(--teal-500)">
+          <div class="stat-ring" style="--p:80"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="m12 3 9 4.5-9 4.5-9-4.5Z"/><path d="M7 10v5c0 1.7 2.2 3 5 3s5-1.3 5-3v-5"/></svg></div>
+          <div class="stat-body"><b data-count="420" data-metric="students">۰</b><span>دانشجویان دپارتمان</span></div>
+        </div>
+        <div class="card stat-card" style="--stat-tint:var(--gold-500)">
+          <div class="stat-ring" style="--p:65"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="8" r="3.2"/><path d="M5 20c0-3.6 3.1-6.5 7-6.5s7 2.9 7 6.5"/></svg></div>
+          <div class="stat-body"><b data-count="38" data-metric="teachers">۰</b><span>اساتید دپارتمان</span></div>
+        </div>
+        <div class="card stat-card" style="--stat-tint:var(--danger)">
+          <div class="stat-ring" style="--p:44"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M7 3h8l4 4v14H7z"/><path d="M15 3v4h4M9 12h6M9 16h6"/></svg></div>
+          <div class="stat-body"><b data-count="14" data-metric="exams">۰</b><span>کل آزمون‌ها</span></div>
+        </div>
+        <div class="card stat-card" style="--stat-tint:var(--ok)">
+          <div class="stat-ring" style="--p:90"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 10h16M4 10 12 4l8 6M6 10v9M18 10v9"/></svg></div>
+          <div class="stat-body"><b data-count="1240" data-metric="questions">۰</b><span>سوالات بانک سوال</span></div>
+        </div>
+      </div>
+
+      <div class="grid-2">
+        <div class="card card-pad">
+          <div class="section-title"><h3>روند برگزاری آزمون‌ها</h3></div>
+          <div style="height:250px"><canvas id="chartActivity"></canvas></div>
+        </div>
+        <div class="card card-pad">
+          <div class="section-title"><h3>وضعیت کلی دپارتمان</h3></div>
+          <ul style="display:flex;flex-direction:column;gap:16px">
+            <li><div class="flex justify-between text-sm mt-8"><span>ظرفیت پذیرش تکمیل‌شده</span><b>—</b></div><div class="progress mt-8"><i style="width:0%"></i></div></li>
+            <li><div class="flex justify-between text-sm"><span>نرخ قبولی آزمون‌های ترم</span><b>—</b></div><div class="progress mt-8"><i style="width:0%;background:var(--gold-500)"></i></div></li>
+            <li><div class="flex justify-between text-sm"><span>پیشرفت تصحیح برگه‌های تشریحی</span><b>—</b></div><div class="progress mt-8"><i style="width:0%"></i></div></li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="card card-pad mt-24">
+        <div class="section-title"><h3>آزمون‌های اخیر دپارتمان</h3><a href="create-exam.html" class="btn btn-primary btn-sm">+ آزمون جدید</a></div>
+        <div class="table-wrap">
+          <table class="dt">
+            <thead><tr><th>عنوان آزمون</th><th>استاد</th><th>تاریخ</th><th>شرکت‌کننده</th><th>وضعیت</th><th></th></tr></thead>
+            <tbody id="departmentExamsBody">
+              <tr><td>ساختار داده و الگوریتم — میان‌ترم</td><td>دکتر کریمی</td><td>۱۴۰۴/۰۵/۱۲</td><td>۱۱۰ نفر</td><td><span class="badge badge-ok">برگزار شده</span></td><td><a href="results.html" class="btn btn-ghost btn-sm">نتایج</a></td></tr>
+              <tr><td>پایگاه داده — کوییز هفتگی</td><td>مهندس صادقی</td><td>۱۴۰۴/۰۵/۱۸</td><td>۹۸ نفر</td><td><span class="badge badge-warn">در حال برگزاری</span></td><td><a href="results.html" class="btn btn-ghost btn-sm">نتایج</a></td></tr>
+              <tr><td>هوش مصنوعی — پایان‌ترم</td><td>دکتر حسینی</td><td>۱۴۰۴/۰۵/۲۵</td><td>—</td><td><span class="badge badge-muted">زمان‌بندی شده</span></td><td><a href="create-exam.html" class="btn btn-ghost btn-sm">ویرایش</a></td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </main>
+  </div>
+</div>
+<script src="assets/js/theme.js"></script>
+<script src="assets/js/app.js"></script>
+<script src="assets/js/api.js"></script>
+<script src="assets/js/dashboard.js"></script>
+</body>
+</html>

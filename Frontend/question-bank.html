@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>بانک سوالات | سامانه سنجش</title>
+<link rel="stylesheet" href="assets/css/style.css">
+<link rel="stylesheet" href="assets/css/responsive.css">
+<link rel="stylesheet" href="assets/css/dark.css">
+</head>
+<body data-role="teacher" data-active="bank">
+<div class="app-shell">
+  <div id="sidebar-root"></div>
+  <div class="main-col">
+    <div id="topbar-root" data-title="بانک سوالات"></div>
+    <main class="content fade-in">
+      <div class="page-head">
+        <div>
+          <div class="breadcrumb">سامانه سنجش <span>/</span> <b>بانک سوالات</b></div>
+          <h1>بانک سوالات</h1>
+        </div>
+        <div class="flex gap-8">
+          <button class="btn btn-outline"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3v12m0 0 4-4m-4 4-4-4M4 21h16"/></svg> ورود سوالات (Import)</button>
+          <button class="btn btn-outline"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 15V3m0 12 4-4m-4 4-4-4M4 21h16"/></svg> خروجی (Export)</button>
+          <button class="btn btn-primary" data-modal-open="questionModal">+ سوال جدید</button>
+        </div>
+      </div>
+
+      <div class="tabs" data-tabs>
+        <button class="tab-btn active" data-tab="tabAll">همه (۱۲۴۰)</button>
+        <button class="tab-btn" data-tab="tabMcq">چهارگزینه‌ای (۹۸۰)</button>
+        <button class="tab-btn" data-tab="tabEssay">تشریحی (۲۶۰)</button>
+      </div>
+
+      <div class="card card-pad">
+        <div class="table-toolbar">
+          <div class="search-box"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.2-3.2"/></svg><input type="text" placeholder="جستجو در متن سوال..."></div>
+          <select class="select" style="width:auto"><option>همه دسته‌بندی‌ها</option><option>الگوریتم</option><option>ساختمان داده</option><option>پایگاه داده</option></select>
+          <select class="select" style="width:auto"><option>همه سطوح دشواری</option><option>آسان</option><option>متوسط</option><option>سخت</option></select>
+        </div>
+
+        <div id="tabAll" class="tab-panel active">
+          <div class="table-wrap">
+            <table class="dt">
+              <thead><tr><th>متن سوال</th><th>دسته‌بندی</th><th>نوع</th><th>سطح دشواری</th><th>عملیات</th></tr></thead>
+              <tbody>
+                <tr><td style="max-width:340px">پیچیدگی زمانی الگوریتم کویک‌سورت در بدترین حالت چیست؟</td><td>الگوریتم</td><td><span class="badge badge-info">چهارگزینه‌ای</span></td><td><span class="badge badge-warn">متوسط</span></td><td class="flex gap-8"><button class="btn btn-outline btn-sm" data-modal-open="questionModal">ویرایش</button><button class="btn btn-danger btn-sm">حذف</button></td></tr>
+                <tr><td style="max-width:340px">الگوریتم کاراتسوبا را برای ضرب دو عدد ۴ رقمی شرح دهید.</td><td>الگوریتم</td><td><span class="badge badge-muted">تشریحی</span></td><td><span class="badge badge-danger">سخت</span></td><td class="flex gap-8"><button class="btn btn-outline btn-sm" data-modal-open="questionModal">ویرایش</button><button class="btn btn-danger btn-sm">حذف</button></td></tr>
+                <tr><td style="max-width:340px">کدام ساختار داده برای پیاده‌سازی صف اولویت مناسب‌تر است؟</td><td>ساختمان داده</td><td><span class="badge badge-info">چهارگزینه‌ای</span></td><td><span class="badge badge-ok">آسان</span></td><td class="flex gap-8"><button class="btn btn-outline btn-sm" data-modal-open="questionModal">ویرایش</button><button class="btn btn-danger btn-sm">حذف</button></td></tr>
+                <tr><td style="max-width:340px">نرمال‌سازی پایگاه داده تا فرم نرمال سوم را با مثال توضیح دهید.</td><td>پایگاه داده</td><td><span class="badge badge-muted">تشریحی</span></td><td><span class="badge badge-warn">متوسط</span></td><td class="flex gap-8"><button class="btn btn-outline btn-sm" data-modal-open="questionModal">ویرایش</button><button class="btn btn-danger btn-sm">حذف</button></td></tr>
+              </tbody>
+            </table>
+          </div>
+          <div class="pagination"><button>«</button><button class="active">۱</button><button>۲</button><button>۳</button><button>»</button></div>
+        </div>
+        <div id="tabMcq" class="tab-panel"><p class="text-soft text-sm" style="padding:20px 0">نمایش سوالات چهارگزینه‌ای...</p></div>
+        <div id="tabEssay" class="tab-panel"><p class="text-soft text-sm" style="padding:20px 0">نمایش سوالات تشریحی...</p></div>
+      </div>
+    </main>
+  </div>
+</div>
+
+<div class="modal-overlay" id="questionModal">
+  <div class="modal-box" style="width:min(620px,100%)">
+    <div class="modal-head"><h3 style="font-size:16px">افزودن / ویرایش سوال</h3><button class="icon-btn" data-modal-close>✕</button></div>
+    <div class="modal-body">
+      <div class="field"><label>متن سوال</label><textarea class="textarea" rows="3" placeholder="متن سوال را وارد کنید..." data-question-text></textarea></div>
+      <div class="grid-2" style="grid-template-columns:1fr 1fr">
+        <div class="field"><label>نوع سوال</label><select class="select" id="qType"><option value="MultipleChoice">چهارگزینه‌ای</option><option value="Essay">تشریحی</option></select></div>
+        <div class="field"><label>سطح دشواری</label><select class="select" data-question-difficulty><option value="Easy">آسان</option><option value="Medium" selected>متوسط</option><option value="Hard">سخت</option></select></div>
+      </div>
+      <div class="field"><label>دسته‌بندی</label><select class="select" data-question-category><option>الگوریتم</option><option>ساختمان داده</option><option>پایگاه داده</option></select></div>
+      <div id="mcqOptions">
+        <label style="font-size:12.5px;font-weight:700;display:block;margin-bottom:7px">گزینه‌ها</label>
+        <div class="field"><div class="checkbox-row"><input type="radio" name="correct" checked><input class="input" data-question-option placeholder="گزینه ۱ (صحیح)" style="flex:1"></div></div>
+        <div class="field"><div class="checkbox-row"><input type="radio" name="correct"><input class="input" data-question-option placeholder="گزینه ۲" style="flex:1"></div></div>
+        <div class="field"><div class="checkbox-row"><input type="radio" name="correct"><input class="input" data-question-option placeholder="گزینه ۳" style="flex:1"></div></div>
+        <div class="field"><div class="checkbox-row"><input type="radio" name="correct"><input class="input" data-question-option placeholder="گزینه ۴" style="flex:1"></div></div>
+      </div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-primary" data-question-save>ذخیره سوال</button>
+      <button class="btn btn-outline" data-modal-close>انصراف</button>
+    </div>
+  </div>
+</div>
+
+<script src="assets/js/theme.js"></script>
+<script src="assets/js/app.js"></script>
+<script src="assets/js/api.js"></script>
+<script>
+  document.getElementById("qType").addEventListener("change", function(){
+    document.getElementById("mcqOptions").style.display = this.value === "MultipleChoice" ? "block" : "none";
+  });
+</script>
+</body>
+</html>

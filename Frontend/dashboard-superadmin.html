@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>داشبورد مدیر کل | سامانه سنجش</title>
+<link rel="stylesheet" href="assets/css/style.css">
+<link rel="stylesheet" href="assets/css/responsive.css">
+<link rel="stylesheet" href="assets/css/dark.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.4/chart.umd.min.js"></script>
+</head>
+<body data-role="superadmin" data-active="dashboard">
+<div class="app-shell">
+  <div id="sidebar-root"></div>
+
+  <div class="main-col">
+    <div id="topbar-root" data-title="داشبورد مدیر کل"></div>
+
+    <main class="content fade-in">
+      <div class="page-head">
+        <div>
+          <div class="breadcrumb">سامانه سنجش <span>/</span> <b>داشبورد مدیر کل</b></div>
+          <h1>خوش آمدید، دکتر رضایی 👋</h1>
+        </div>
+        <div class="flex gap-8">
+          <button class="btn btn-outline"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 20V10M10 20V4M16 20v-7M4 20h16"/></svg> گزارش کامل</button>
+          <a href="departments.html" class="btn btn-primary">+ افزودن دپارتمان</a>
+        </div>
+      </div>
+
+      <div class="stat-grid">
+        <div class="card stat-card" style="--stat-tint:var(--teal-500)">
+          <div class="stat-ring" style="--p:64"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 21V5a1 1 0 0 1 1-1h9a1 1 0 0 1 1 1v16"/><path d="M15 10h4a1 1 0 0 1 1 1v10"/></svg></div>
+          <div class="stat-body"><b data-count="14" data-metric="departments">۰</b><span>دپارتمان فعال</span></div>
+        </div>
+        <div class="card stat-card" style="--stat-tint:var(--gold-500)">
+          <div class="stat-ring" style="--p:88"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="m12 3 9 4.5-9 4.5-9-4.5Z"/><path d="M7 10v5c0 1.7 2.2 3 5 3s5-1.3 5-3v-5"/></svg></div>
+          <div class="stat-body"><b data-count="4820" data-metric="students">۰</b><span>دانشجویان</span></div>
+        </div>
+        <div class="card stat-card" style="--stat-tint:var(--teal-500)">
+          <div class="stat-ring" style="--p:70"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="8" r="3.2"/><path d="M5 20c0-3.6 3.1-6.5 7-6.5s7 2.9 7 6.5"/></svg></div>
+          <div class="stat-body"><b data-count="312" data-metric="teachers">۰</b><span>اساتید</span></div>
+        </div>
+        <div class="card stat-card" style="--stat-tint:var(--danger)">
+          <div class="stat-ring" style="--p:40"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M7 3h8l4 4v14H7z"/><path d="M15 3v4h4M9 12h6M9 16h6"/></svg></div>
+          <div class="stat-body"><b data-count="86" data-metric="exams">۰</b><span>کل آزمون‌ها</span></div>
+        </div>
+        <div class="card stat-card" style="--stat-tint:var(--gold-500)">
+          <div class="stat-ring" style="--p:95"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 10h16M4 10 12 4l8 6M6 10v9M18 10v9"/></svg></div>
+          <div class="stat-body"><b data-count="9540" data-metric="questions">۰</b><span>سوالات بانک سوال</span></div>
+        </div>
+        <div class="card stat-card" style="--stat-tint:var(--ok)">
+          <div class="stat-ring" style="--p:55"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="9"/><path d="M8 12h.01M12 12h.01M16 12h.01"/></svg></div>
+          <div class="stat-body"><b data-count="632" data-metric="users">۰</b><span>کل کاربران</span></div>
+        </div>
+      </div>
+
+      <div class="grid-2">
+        <div class="card card-pad">
+          <div class="section-title"><h3>فعالیت آزمون‌ها در هفته جاری</h3><span class="badge badge-info">هفتگی</span></div>
+          <div style="height:260px"><canvas id="chartActivity"></canvas></div>
+        </div>
+        <div class="card card-pad">
+          <div class="section-title"><h3>توزیع دانشجویان بر اساس دپارتمان</h3></div>
+          <div style="height:260px"><canvas id="chartDepartments"></canvas></div>
+        </div>
+      </div>
+
+      <div class="grid-2 mt-24">
+        <div class="card card-pad">
+          <div class="section-title"><h3>فعالیت‌های اخیر</h3><a href="reports.html" class="btn btn-ghost btn-sm">مشاهده همه</a></div>
+          <ul id="dashboardRecentActivity" style="display:flex;flex-direction:column;gap:14px"><li class="text-soft">در حال دریافت فعالیت‌های اخیر...</li></ul>
+        </div>
+        <div class="card card-pad">
+          <div class="section-title"><h3>اعلان‌ها</h3><span class="badge badge-danger" id="dashboardUnreadCount">۰ خوانده‌نشده</span></div>
+          <ul id="dashboardRecentNotifications" style="display:flex;flex-direction:column;gap:12px"><li class="text-soft">در حال دریافت اعلان‌ها...</li></ul>
+        </div>
+      </div>
+    </main>
+  </div>
+</div>
+
+<script src="assets/js/theme.js"></script>
+<script src="assets/js/app.js"></script>
+<script src="assets/js/api.js"></script>
+<script src="assets/js/dashboard.js"></script>
+</body>
+</html>

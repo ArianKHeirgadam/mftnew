@@ -1,0 +1,29 @@
+/* ==========================================================================
+   Dark mode — activated via [data-theme="dark"] on <html>
+   ========================================================================== */
+:root[data-theme="dark"]{
+  --bg:#0B1220;
+  --surface:#121B2E;
+  --surface-2:#182640;
+  --text:#E7ECF6;
+  --text-soft:#8D9AB4;
+  --border:#233252;
+  --primary:var(--teal-400);
+  --primary-2:#5EEAD4;
+  --sidebar-bg:#0B1220;
+  --shadow-sm:0 2px 12px rgba(0,0,0,.35);
+  --shadow-md:0 16px 40px rgba(0,0,0,.45);
+  --shadow-glass:0 10px 34px rgba(0,0,0,.5);
+}
+:root[data-theme="dark"] .sidebar{
+  background:linear-gradient(180deg,#0B1220,#0E1729);
+  border-inline-start:1px solid var(--border);
+}
+:root[data-theme="dark"] .topbar{
+  background:color-mix(in srgb, var(--surface) 60%, transparent);
+}
+:root[data-theme="dark"] .brand-mark{
+  box-shadow:0 0 0 3px rgba(201,162,39,.28), 0 0 22px rgba(45,212,191,.25);
+}
+:root[data-theme="dark"] .btn-primary{color:var(--ink-900);}
+:root[data-theme="dark"] ::selection{background:var(--teal-400);color:var(--ink-900);}

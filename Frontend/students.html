@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>مدیریت دانشجویان | سامانه سنجش</title>
+<link rel="stylesheet" href="assets/css/style.css">
+<link rel="stylesheet" href="assets/css/responsive.css">
+<link rel="stylesheet" href="assets/css/dark.css">
+</head>
+<body data-role="superadmin" data-active="students">
+<div class="app-shell">
+  <div id="sidebar-root"></div>
+  <div class="main-col">
+    <div id="topbar-root" data-title="دانشجویان"></div>
+    <main class="content fade-in">
+      <div class="page-head">
+        <div>
+          <div class="breadcrumb">سامانه سنجش <span>/</span> <b>مدیریت دانشجویان</b></div>
+          <h1>دانشجویان</h1>
+        </div>
+        <button class="btn btn-primary" data-modal-open="studentModal">+ افزودن دانشجو</button>
+      </div>
+
+      <div class="card card-pad">
+        <div class="table-toolbar">
+          <div class="search-box"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.2-3.2"/></svg><input type="text" placeholder="جستجو بر اساس نام یا شماره دانشجویی..."></div>
+          <select class="select" style="width:auto"><option>همه دپارتمان‌ها</option><option>کامپیوتر</option><option>برق</option><option>عمران</option></select>
+          <select class="select" style="width:auto"><option>همه وضعیت‌ها</option><option>فعال</option><option>مشروط</option><option>مرخصی</option></select>
+          <div class="topbar-spacer"></div>
+          <span class="text-soft text-sm">۴,۸۲۰ دانشجو</span>
+        </div>
+
+        <div class="table-wrap">
+          <table class="dt">
+            <thead><tr><th>دانشجو</th><th>شماره دانشجویی</th><th>دپارتمان</th><th>مقطع</th><th>معدل</th><th>وضعیت</th><th>عملیات</th></tr></thead>
+            <tbody id="studentsBody">
+              <tr><td><div class="row-user"><div class="mohr sm"><div class="mohr-inner"><b>سم</b></div></div><div><b>سارا محمدی</b><span>ورودی ۱۴۰۲</span></div></div></td><td>۹۹۱۲۳۴۵۶۷۸</td><td>مهندسی کامپیوتر</td><td>کارشناسی</td><td>۱۷.۲</td><td><span class="badge badge-ok">فعال</span></td><td class="flex gap-8"><button class="btn btn-outline btn-sm" data-modal-open="studentModal">ویرایش</button><button class="btn btn-danger btn-sm">حذف</button></td></tr>
+              <tr><td><div class="row-user"><div class="mohr sm gold"><div class="mohr-inner"><b>حر</b></div></div><div><b>حسین رضوانی</b><span>ورودی ۱۴۰۱</span></div></div></td><td>۹۸۱۱۲۲۳۳۴۴</td><td>مهندسی برق</td><td>کارشناسی</td><td>۱۵.۸</td><td><span class="badge badge-ok">فعال</span></td><td class="flex gap-8"><button class="btn btn-outline btn-sm" data-modal-open="studentModal">ویرایش</button><button class="btn btn-danger btn-sm">حذف</button></td></tr>
+              <tr><td><div class="row-user"><div class="mohr sm"><div class="mohr-inner"><b>ما</b></div></div><div><b>مریم اکبری</b><span>ورودی ۱۴۰۰</span></div></div></td><td>۹۷۱۰۹۸۷۶۵۴</td><td>مهندسی عمران</td><td>کارشناسی ارشد</td><td>۱۸.۴</td><td><span class="badge badge-warn">مشروط</span></td><td class="flex gap-8"><button class="btn btn-outline btn-sm" data-modal-open="studentModal">ویرایش</button><button class="btn btn-danger btn-sm">حذف</button></td></tr>
+              <tr><td><div class="row-user"><div class="mohr sm"><div class="mohr-inner"><b>عن</b></div></div><div><b>علی نوری</b><span>ورودی ۱۴۰۲</span></div></div></td><td>۹۹۰۵۵۴۴۳۳۲</td><td>مهندسی کامپیوتر</td><td>کارشناسی</td><td>۱۳.۵</td><td><span class="badge badge-muted">مرخصی تحصیلی</span></td><td class="flex gap-8"><button class="btn btn-outline btn-sm" data-modal-open="studentModal">ویرایش</button><button class="btn btn-danger btn-sm">حذف</button></td></tr>
+              <tr><td><div class="row-user"><div class="mohr sm"><div class="mohr-inner"><b>نف</b></div></div><div><b>نگار فرهادی</b><span>ورودی ۱۴۰۳</span></div></div></td><td>۰۰۱۲۲۳۳۴۴۵</td><td>مکانیک</td><td>کارشناسی</td><td>۱۹.۱</td><td><span class="badge badge-ok">فعال</span></td><td class="flex gap-8"><button class="btn btn-outline btn-sm" data-modal-open="studentModal">ویرایش</button><button class="btn btn-danger btn-sm">حذف</button></td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="pagination">
+          <button>«</button><button class="active">۱</button><button>۲</button><button>۳</button><button>...</button><button>۴۸</button><button>»</button>
+        </div>
+      </div>
+    </main>
+  </div>
+</div>
+
+<div class="modal-overlay" id="studentModal">
+  <div class="modal-box" style="width:min(560px,100%)">
+    <div class="modal-head"><h3 style="font-size:16px">افزودن / ویرایش دانشجو</h3><button class="icon-btn" data-modal-close>✕</button></div>
+    <div class="modal-body">
+      <div class="field"><label>نام کاربری</label><input class="input" type="text" data-username-field placeholder="نام کاربری یکتا"></div>
+      <div class="field"><label>رمز اولیه (حداقل ۸ کاراکتر)</label><input class="input" type="password" placeholder="رمز اولیه"></div>
+      <div class="flex items-center gap-16 mt-8" style="margin-bottom:20px">
+        <div class="mohr" style="--mohr-size:64px"><div class="mohr-inner"><b>سم</b></div></div>
+        <button class="btn btn-outline btn-sm">آپلود تصویر پروفایل</button>
+      </div>
+      <div class="grid-2" style="grid-template-columns:1fr 1fr">
+        <div class="field"><label>نام و نام خانوادگی</label><input class="input" type="text" data-fullname-field placeholder="سارا محمدی"></div>
+        <div class="field"><label>شماره دانشجویی</label><input class="input" type="text" placeholder="۹۹۱۲۳۴۵۶۷۸"></div>
+        <div class="field"><label>دپارتمان</label><select class="select" data-department-field><option value="">انتخاب دپارتمان</option><option>مهندسی کامپیوتر</option><option>مهندسی برق</option><option>مهندسی عمران</option></select></div>
+        <div class="field"><label>وضعیت</label><select class="select"><option>فعال</option><option>مشروط</option><option>مرخصی تحصیلی</option></select></div>
+      </div>
+    </div>
+    <div class="field"><label class="checkbox-row"><input type="checkbox" data-user-active checked> حساب فعال باشد</label></div>
+    <div class="grid-2" style="grid-template-columns:1fr 1fr"><div class="field"><label>ایمیل</label><input class="input" type="email" placeholder="user@example.com"></div><div class="field"><label>شماره تماس</label><input class="input" type="tel" placeholder="09xxxxxxxxx"></div></div>
+    <div class="modal-foot">
+      <button class="btn btn-primary" data-user-save>ذخیره</button>
+      <button class="btn btn-outline" data-modal-close>انصراف</button>
+    </div>
+  </div>
+</div>
+
+<script src="assets/js/theme.js"></script>
+<script src="assets/js/app.js"></script>
+<script src="assets/js/api.js"></script>
+</body>
+</html>

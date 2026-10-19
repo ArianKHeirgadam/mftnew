@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>داشبورد استاد | سامانه سنجش</title>
+<link rel="stylesheet" href="assets/css/style.css">
+<link rel="stylesheet" href="assets/css/responsive.css">
+<link rel="stylesheet" href="assets/css/dark.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.4/chart.umd.min.js"></script>
+</head>
+<body data-role="teacher" data-active="dashboard">
+<div class="app-shell">
+  <div id="sidebar-root"></div>
+  <div class="main-col">
+    <div id="topbar-root" data-title="داشبورد استاد"></div>
+    <main class="content fade-in">
+      <div class="page-head">
+        <div>
+          <div class="breadcrumb">سامانه سنجش <span>/</span> <b>داشبورد استاد</b></div>
+          <h1>خوش آمدید، دکتر کریمی 👋</h1>
+        </div>
+        <a href="create-exam.html" class="btn btn-primary">+ ساخت آزمون جدید</a>
+      </div>
+
+      <div class="stat-grid">
+        <div class="card stat-card" style="--stat-tint:var(--teal-500)">
+          <div class="stat-ring" style="--p:75"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 10h16M4 10 12 4l8 6M6 10v9M18 10v9"/></svg></div>
+          <div class="stat-body"><b data-count="286" data-metric="questions">۰</b><span>سوال ساخته‌شده</span></div>
+        </div>
+        <div class="card stat-card" style="--stat-tint:var(--gold-500)">
+          <div class="stat-ring" style="--p:60"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M7 3h8l4 4v14H7z"/><path d="M15 3v4h4M9 12h6M9 16h6"/></svg></div>
+          <div class="stat-body"><b data-count="9" data-metric="exams">۰</b><span>کل آزمون‌ها</span></div>
+        </div>
+        <div class="card stat-card" style="--stat-tint:var(--danger)">
+          <div class="stat-ring" style="--p:30"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 3a9 9 0 1 0 9 9"/><path d="m9 12 2 2 4-5M21 3v6h-6"/></svg></div>
+          <div class="stat-body"><b data-count="42" data-metric="attempts">۰</b><span>تلاش‌های آزمون</span></div>
+        </div>
+        <div class="card stat-card" style="--stat-tint:var(--ok)">
+          <div class="stat-ring" style="--p:95"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="m12 3 9 4.5-9 4.5-9-4.5Z"/><path d="M7 10v5c0 1.7 2.2 3 5 3s5-1.3 5-3v-5"/></svg></div>
+          <div class="stat-body"><b data-count="211" data-metric="students">۰</b><span>دانشجویان تحت آموزش</span></div>
+        </div>
+      </div>
+
+      <div class="grid-2">
+        <div class="card card-pad">
+          <div class="section-title"><h3>آزمون‌های ارسال‌شده برای تصحیح</h3><span class="badge badge-danger" id="mftPendingGradeCount">۰ مورد</span></div>
+          <ul id="teacherPendingPlaceholder" style="display:flex;flex-direction:column;gap:12px"><li class="text-soft">صف تصحیح از API بارگذاری می‌شود.</li></ul>
+        </div>
+        <div class="card card-pad">
+          <div class="section-title"><h3>آزمون‌های زمان‌بندی‌شده</h3><a href="create-exam.html" class="btn btn-ghost btn-sm">مدیریت</a></div>
+          <ul id="mftUpcomingExams" style="display:flex;flex-direction:column;gap:14px"><li class="text-soft">در حال دریافت آزمون‌ها...</li></ul>
+        </div>
+      </div>
+    </main>
+  </div>
+</div>
+
+<div class="modal-overlay" id="gradeModal">
+  <div class="modal-box">
+    <div class="modal-head"><h3 style="font-size:16px">تصحیح پاسخ تشریحی</h3><button class="icon-btn" data-modal-close>✕</button></div>
+    <div class="modal-body">
+      <p class="text-sm text-soft" style="margin-bottom:12px" id="gradeExamTitle">در حال دریافت اطلاعات پاسخ...</p>
+      <div class="card-pad card" id="gradeAnswerDetails" style="background:var(--surface-2);font-size:13px;line-height:2;margin-bottom:16px;max-height:280px;overflow:auto">پاسخ دانشجو</div>
+      <div class="field"><label>نمره (از ۲۰)</label><input class="input" type="number" min="0" step="0.25" data-grade-score placeholder="نمره"></div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-primary" data-grade-save>ثبت نمره</button>
+      <button class="btn btn-outline" data-modal-close>بعداً</button>
+    </div>
+  </div>
+</div>
+
+<script src="assets/js/theme.js"></script>
+<script src="assets/js/app.js"></script>
+<script src="assets/js/api.js"></script>
+<script src="assets/js/dashboard.js"></script>
+</body>
+</html>

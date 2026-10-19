@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ساخت آزمون | سامانه سنجش</title>
+<link rel="stylesheet" href="assets/css/style.css">
+<link rel="stylesheet" href="assets/css/responsive.css">
+<link rel="stylesheet" href="assets/css/dark.css">
+<style>
+  .wizard-steps{display:flex;align-items:center;gap:6px;margin-bottom:26px;overflow-x:auto;padding-bottom:4px;}
+  .wstep{display:flex;align-items:center;gap:10px;flex-shrink:0;}
+  .wstep .num{
+    width:32px;height:32px;border-radius:99px;display:flex;align-items:center;justify-content:center;
+    background:var(--surface-2);color:var(--text-soft);font-weight:800;font-size:13px;border:2px solid transparent;
+    transition:all .25s;
+  }
+  .wstep.active .num{background:var(--primary);color:#fff;}
+  .wstep.done .num{background:color-mix(in srgb, var(--ok) 15%, transparent);color:var(--ok);border-color:var(--ok);}
+  .wstep span{font-size:12.5px;font-weight:700;color:var(--text-soft);white-space:nowrap;}
+  .wstep.active span{color:var(--text);}
+  .wstep-line{width:36px;height:2px;background:var(--border);flex-shrink:0;}
+  .wpanel{display:none;animation:fadeUp .3s ease;}
+  .wpanel.active{display:block;}
+  .choice-card{
+    border:1.5px solid var(--border);border-radius:var(--r-md);padding:16px;cursor:pointer;transition:.2s;
+    display:flex;align-items:center;gap:12px;
+  }
+  .choice-card:hover{border-color:var(--primary);}
+  .choice-card.selected{border-color:var(--primary);background:color-mix(in srgb, var(--primary) 6%, transparent);}
+  .choice-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:12px;}
+  .qpick-row{display:flex;align-items:center;gap:12px;padding:12px 0;border-bottom:1px solid var(--border);}
+</style>
+</head>
+<body data-role="teacher" data-active="exams">
+<div class="app-shell">
+  <div id="sidebar-root"></div>
+  <div class="main-col">
+    <div id="topbar-root" data-title="ساخت آزمون"></div>
+    <main class="content fade-in">
+      <div class="page-head">
+        <div>
+          <div class="breadcrumb">سامانه سنجش <span>/</span> <b>ساخت آزمون جدید</b></div>
+          <h1>ساخت آزمون جدید</h1>
+        </div>
+      </div>
+
+      <div class="wizard-steps" id="wizardSteps"></div>
+
+      <div class="card card-pad">
+        <!-- Step 1: Department -->
+        <div class="wpanel active" id="step1">
+          <h3 style="margin-bottom:16px">دپارتمان را انتخاب کنید</h3>
+          <div class="choice-grid" id="deptChoices">
+            <div class="choice-card selected" data-value="کامپیوتر"><div class="mohr sm"><div class="mohr-inner"><b>ک</b></div></div><b>مهندسی کامپیوتر</b></div>
+            <div class="choice-card" data-value="برق"><div class="mohr sm gold"><div class="mohr-inner"><b>ب</b></div></div><b>مهندسی برق</b></div>
+            <div class="choice-card" data-value="عمران"><div class="mohr sm"><div class="mohr-inner"><b>ع</b></div></div><b>مهندسی عمران</b></div>
+          </div>
+        </div>
+
+        <!-- Step 2: Teacher -->
+        <div class="wpanel" id="step2">
+          <h3 style="margin-bottom:16px">استاد مربوطه را انتخاب کنید</h3>
+          <div class="choice-grid" id="teacherChoices">
+            <div class="choice-card selected" data-value="دکتر کریمی"><div class="mohr sm"><div class="mohr-inner"><b>دک</b></div></div><b>دکتر کریمی</b></div>
+            <div class="choice-card" data-value="مهندس صادقی"><div class="mohr sm gold"><div class="mohr-inner"><b>مص</b></div></div><b>مهندس صادقی</b></div>
+          </div>
+        </div>
+
+        <!-- Step 3: Questions -->
+        <div class="wpanel" id="step3">
+          <div class="flex justify-between items-center" style="margin-bottom:16px">
+            <h3>انتخاب سوالات</h3>
+            <label class="checkbox-row"><input type="checkbox" id="randomToggle"> انتخاب تصادفی سوالات از بانک سوال</label>
+          </div>
+          <div id="manualPick">
+            <div class="qpick-row"><input type="checkbox" checked><span style="flex:1">پیچیدگی زمانی الگوریتم کویک‌سورت در بدترین حالت چیست؟</span><span class="badge badge-info">چهارگزینه‌ای</span></div>
+            <div class="qpick-row"><input type="checkbox" checked><span style="flex:1">کدام ساختار داده برای پیاده‌سازی صف اولویت مناسب‌تر است؟</span><span class="badge badge-info">چهارگزینه‌ای</span></div>
+            <div class="qpick-row"><input type="checkbox"><span style="flex:1">الگوریتم کاراتسوبا را برای ضرب دو عدد ۴ رقمی شرح دهید.</span><span class="badge badge-muted">تشریحی</span></div>
+          </div>
+          <div id="randomPick" style="display:none">
+            <div class="field"><label>تعداد سوالات چهارگزینه‌ای</label><input class="input" id="randomMcqCount" type="number" min="0" value="15"></div>
+            <div class="field"><label>تعداد سوالات تشریحی</label><input class="input" id="randomEssayCount" type="number" min="0" value="2"></div>
+          </div>
+        </div>
+
+        <!-- Step 4: Duration & Passing score -->
+        <div class="wpanel" id="step4">
+          <h3 style="margin-bottom:16px">اطلاعات آزمون، مدت زمان و نمره قبولی</h3>
+          <div class="field"><label>عنوان آزمون</label><input class="input" id="examTitle" required placeholder="مثلاً آزمون میان‌ترم"></div>
+          <div class="field"><label>درس / موضوع</label><input class="input" id="examSubject" placeholder="نام درس"></div>
+          <div class="field"><label>توضیحات</label><textarea class="textarea" id="examDescription" rows="2" placeholder="توضیحات اختیاری"></textarea></div>
+          <div class="grid-2" style="grid-template-columns:1fr 1fr">
+            <div class="field"><label>مدت زمان آزمون (دقیقه)</label><input class="input" id="examDuration" type="number" min="1" max="600" value="45"></div>
+            <div class="field"><label>نمره قبولی (از ۲۰)</label><input class="input" id="examPassingScore" type="number" min="0" max="20" step="0.25" value="10"></div>
+          </div>
+          <div class="checkbox-row"><input type="checkbox" id="allowQuestionNavigation" checked> امکان جابجایی بین سوالات فعال باشد</div>
+        </div>
+
+        <!-- Step 5: Schedule -->
+        <div class="wpanel" id="step5">
+          <h3 style="margin-bottom:16px">زمان‌بندی آزمون</h3>
+          <div class="grid-2" style="grid-template-columns:1fr 1fr">
+            <div class="field"><label>تاریخ برگزاری</label><input class="input" id="examDate" type="date"></div>
+            <div class="field"><label>ساعت شروع</label><input class="input" id="examTime" type="time" value="10:00"></div>
+          </div>
+        </div>
+
+        <!-- Step 6: Preview -->
+        <div class="wpanel" id="step6">
+          <h3 style="margin-bottom:16px">پیش‌نمایش و انتشار</h3>
+          <div class="alert alert-info" style="margin-bottom:16px">پیش از انتشار، اطلاعات زیر را بررسی کنید.</div>
+          <ul style="display:flex;flex-direction:column;gap:10px;font-size:13.5px">
+            <li class="flex justify-between" style="border-bottom:1px solid var(--border);padding-bottom:8px"><span class="text-soft">دپارتمان</span><b id="prevDept">—</b></li>
+            <li class="flex justify-between" style="border-bottom:1px solid var(--border);padding-bottom:8px"><span class="text-soft">استاد</span><b id="prevTeacher">—</b></li>
+            <li class="flex justify-between" style="border-bottom:1px solid var(--border);padding-bottom:8px"><span class="text-soft">تعداد سوالات</span><b id="prevQuestionCount">۰ سوال</b></li>
+            <li class="flex justify-between"><span class="text-soft">مدت زمان</span><b id="prevDuration">۴۵ دقیقه</b></li>
+            <li class="flex justify-between"><span class="text-soft">نمره قبولی</span><b id="prevPassingScore">۱۰ از ۲۰</b></li>
+          </ul>
+        </div>
+
+        <div class="flex justify-between" style="margin-top:26px;border-top:1px solid var(--border);padding-top:20px">
+          <button class="btn btn-outline" id="wizPrev">مرحله قبل</button>
+          <button class="btn btn-primary" id="wizNext">مرحله بعد</button>
+        </div>
+      </div>
+    </main>
+  </div>
+</div>
+
+<script src="assets/js/theme.js"></script>
+<script src="assets/js/app.js"></script>
+<script src="assets/js/api.js"></script>
+<script>
+  const STEPS = ["دپارتمان", "استاد", "سوالات", "اطلاعات آزمون", "زمان‌بندی", "پیش‌نمایش"];
+  let current = 1;
+  function renderSteps() {
+    document.getElementById("wizardSteps").innerHTML = STEPS.map((label, index) => {
+      const number = index + 1;
+      const state = number < current ? "done" : number === current ? "active" : "";
+      return `<div class="wstep ${state}"><div class="num">${number < current ? "✓" : number}</div><span>${label}</span></div>${index < STEPS.length - 1 ? '<div class="wstep-line"></div>' : ''}`;
+    }).join("");
+  }
+  function showStep(number) {
+    current = number;
+    document.querySelectorAll(".wpanel").forEach(panel => panel.classList.toggle("active", panel.id === `step${number}`));
+    document.getElementById("wizPrev").disabled = number === 1;
+    document.getElementById("wizNext").textContent = number === STEPS.length ? "انتشار آزمون" : "مرحله بعد";
+    renderSteps();
+    if (number === 6) {
+      const randomMode = document.getElementById("randomToggle").checked;
+      const selectedCount = randomMode
+        ? Number(document.getElementById("randomMcqCount").value || 0) + Number(document.getElementById("randomEssayCount").value || 0)
+        : document.querySelectorAll('#manualPick input[type=checkbox]:checked').length;
+      document.getElementById("prevQuestionCount").textContent = `${selectedCount} سوال${randomMode ? ' (تصادفی)' : ''}`;
+      document.getElementById("prevDuration").textContent = `${document.getElementById("examDuration").value || 0} دقیقه`;
+      document.getElementById("prevPassingScore").textContent = `${document.getElementById("examPassingScore").value || 0} از ۲۰`;
+    }
+  }
+  document.addEventListener("click", event => {
+    const card = event.target.closest(".choice-card");
+    if (!card) return;
+    card.parentElement.querySelectorAll(".choice-card").forEach(item => item.classList.remove("selected"));
+    card.classList.add("selected");
+    if (card.parentElement.id === "deptChoices") document.getElementById("prevDept").textContent = card.dataset.value || card.textContent.trim();
+    if (card.parentElement.id === "teacherChoices") document.getElementById("prevTeacher").textContent = card.dataset.value || card.textContent.trim();
+  });
+  document.getElementById("randomToggle").addEventListener("change", event => {
+    document.getElementById("manualPick").style.display = event.target.checked ? "none" : "block";
+    document.getElementById("randomPick").style.display = event.target.checked ? "block" : "none";
+  });
+  document.getElementById("wizPrev").addEventListener("click", () => { if (current > 1) showStep(current - 1); });
+  document.getElementById("wizNext").addEventListener("click", async () => {
+    if (current < STEPS.length) {
+      if (current === 4 && !document.getElementById("examTitle").value.trim()) return showToast("عنوان آزمون را وارد کنید.", "warn");
+      showStep(current + 1);
+      return;
+    }
+    const api = window.MftApi;
+    if (!api) return showToast("اتصال API آماده نیست.", "danger");
+    const department = document.querySelector("#deptChoices .choice-card.selected");
+    let questionIds = [...document.querySelectorAll('#manualPick input[type="checkbox"]:checked')].map(input => Number(input.value)).filter(Number.isFinite);
+    if (document.getElementById("randomToggle").checked) {
+      const pool = [...document.querySelectorAll('#manualPick input[type="checkbox"]')];
+      const mcqCount = Math.max(0, Number(document.getElementById("randomMcqCount").value) || 0);
+      const essayCount = Math.max(0, Number(document.getElementById("randomEssayCount").value) || 0);
+      const pickRandom = items => items.sort(() => Math.random() - 0.5);
+      const mcq = pickRandom(pool.filter(input => /multiplechoice|mcq/i.test(input.dataset.questionType || ''))).slice(0, mcqCount);
+      const essay = pickRandom(pool.filter(input => /essay|text|descriptive/i.test(input.dataset.questionType || ''))).slice(0, essayCount);
+      questionIds = [...mcq, ...essay].map(input => Number(input.value));
+    }
+    const selectedTeacher = document.querySelector("#teacherChoices .choice-card.selected");
+    const durationMinutes = Number(document.getElementById("examDuration").value);
+    if (!document.getElementById("examTitle").value.trim()) return showToast("عنوان آزمون را وارد کنید.", "warn");
+    if (!Number.isInteger(durationMinutes) || durationMinutes < 1) return showToast("مدت آزمون باید حداقل یک دقیقه باشد.", "warn");
+    if (!questionIds.length) return showToast("حداقل یک سؤال برای آزمون انتخاب کنید؛ تعداد تصادفی را هم بررسی کنید.", "warn");
+    let startsAt = null;
+    const date = document.getElementById("examDate").value;
+    const time = document.getElementById("examTime").value;
+    if (date) startsAt = new Date(`${date}T${time || "00:00"}`).toISOString();
+    try {
+      await api.request("/exams", { method: "POST", body: JSON.stringify({
+        title: document.getElementById("examTitle").value.trim(),
+        subject: document.getElementById("examSubject").value.trim() || null,
+        description: document.getElementById("examDescription").value.trim() || null,
+        durationMinutes, passingScore: Number(document.getElementById("examPassingScore").value || 0), allowQuestionNavigation: document.getElementById("allowQuestionNavigation").checked, startsAt, endsAt: null, isPublished: true,
+        departmentId: department?.dataset.id ? Number(department.dataset.id) : null,
+        createdByUserId: selectedTeacher?.dataset.id ? Number(selectedTeacher.dataset.id) : null,
+        questionIds
+      }) });
+      showToast("آزمون با موفقیت ذخیره و منتشر شد.", "ok");
+      setTimeout(() => location.href = "dashboard-teacher.html", 700);
+    } catch (error) { showToast(error.message || "ذخیره آزمون ناموفق بود.", "danger"); }
+  });
+  showStep(1);
+</script>
+</body>
+</html>

@@ -1,0 +1,63 @@
+/* ==========================================================================
+   Responsive rules — Desktop first, breaking down to tablet & mobile
+   ========================================================================== */
+
+/* Tablet */
+@media (max-width:1100px){
+  .grid-2{grid-template-columns:1fr;}
+  .content{padding:20px;}
+}
+
+/* Small tablet / large mobile: sidebar becomes an overlay drawer */
+@media (max-width:900px){
+  .sidebar{
+    position:fixed;right:0;top:0;height:100vh;
+    transform:translateX(105%);
+    box-shadow:var(--shadow-md);
+    width:280px !important;
+  }
+  .sidebar.mobile-open{transform:translateX(0);}
+  .sidebar.collapsed .brand-text,
+  .sidebar.collapsed .nav-label,
+  .sidebar.collapsed .nav-section-title,
+  .sidebar.collapsed .sidebar-foot-text{display:block;}
+  .sidebar.collapsed .nav-link{justify-content:flex-start;}
+  .scrim{
+    position:fixed;inset:0;background:rgba(11,18,32,.5);z-index:39;
+    display:none;
+  }
+  .scrim.show{display:block;}
+  .menu-toggle{display:flex !important;}
+  .search-box{display:none;}
+  .content{padding:16px;}
+  .page-head{align-items:flex-start;}
+  .stat-grid{grid-template-columns:repeat(2,1fr);}
+}
+
+.menu-toggle{display:none;}
+
+/* Mobile */
+@media (max-width:600px){
+  .stat-grid{grid-template-columns:1fr 1fr;}
+  .stat-card{padding:14px;gap:10px;}
+  .stat-body b{font-size:19px;}
+  .topbar{padding:0 14px;gap:10px;}
+  .profile-chip .who{display:none;}
+  .card-pad{padding:16px;}
+  .page-head h1{font-size:19px;}
+  table.dt{min-width:560px;}
+  .modal-box{border-radius:var(--r-md);}
+  .exam-layout{grid-template-columns:1fr !important;}
+  .exam-nav-panel{order:-1;}
+}
+
+@media (max-width:420px){
+  .stat-grid{grid-template-columns:1fr;}
+}
+
+/* Print (exam result page) */
+@media print{
+  .sidebar,.topbar,.no-print{display:none !important;}
+  .content{padding:0;max-width:100%;}
+  body{background:#fff;}
+}

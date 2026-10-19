@@ -1,0 +1,244 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>تنظیمات | سامانه سنجش</title>
+  <link rel="stylesheet" href="assets/css/style.css">
+  <link rel="stylesheet" href="assets/css/responsive.css">
+  <link rel="stylesheet" href="assets/css/dark.css">
+  <style>
+    .switch {
+      position: relative;
+      width: 44px;
+      height: 25px;
+      flex-shrink: 0;
+    }
+
+    .switch input {
+      opacity: 0;
+      width: 0;
+      height: 0;
+    }
+
+    .switch .track {
+      position: absolute;
+      inset: 0;
+      background: var(--border);
+      border-radius: 99px;
+      transition: .25s;
+      cursor: pointer;
+    }
+
+    .switch .track::before {
+      content: '';
+      position: absolute;
+      width: 19px;
+      height: 19px;
+      /* left: 3px; */
+      top: 3px;
+      background: #fff;
+      border-radius: 99px;
+      transition: .25s;
+      box-shadow: 0 1px 3px rgba(0, 0, 0, .3);
+    }
+
+    .switch input:checked+.track {
+      background: var(--primary);
+    }
+
+    .switch input:checked+.track::before {
+      transform: translateX(-24px);
+    }
+
+    .setting-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 16px 0;
+      border-bottom: 1px solid var(--border);
+      gap: 16px;
+    }
+
+    .setting-row:last-child {
+      border-bottom: none;
+    }
+
+    .setting-row b {
+      display: block;
+      font-size: 13.5px;
+    }
+
+    .setting-row span {
+      font-size: 12px;
+      color: var(--text-soft);
+    }
+  </style>
+</head>
+
+<body data-role="superadmin" data-active="settings">
+  <div class="app-shell">
+    <div id="sidebar-root"></div>
+    <div class="main-col">
+      <div id="topbar-root" data-title="تنظیمات"></div>
+      <main class="content fade-in">
+        <div class="page-head">
+          <div>
+            <div class="breadcrumb">سامانه سنجش <span>/</span> <b>تنظیمات</b></div>
+            <h1>تنظیمات سامانه</h1>
+          </div>
+        </div>
+
+        <div class="grid-2">
+          <div>
+            <div class="card card-pad">
+              <div class="section-title">
+                <h3>ظاهر و زبان</h3>
+              </div>
+              <div class="setting-row">
+                <div><b>حالت نمایش</b><span>پوسته روشن یا تیره سامانه</span></div>
+                <label class="switch"><input type="checkbox" id="darkSwitch"><span class="track"></span></label>
+              </div>
+              <div class="setting-row">
+                <div><b>زبان سامانه</b><span>زبان پیش‌فرض رابط کاربری</span></div>
+                <select class="select" style="width:160px">
+                  <option>فارسی</option>
+                  <option>English</option>
+                </select>
+              </div>
+              <div class="setting-row">
+                <div><b>جهت متن</b><span>راست‌به‌چپ برای فارسی و عربی</span></div>
+                <select class="select" style="width:160px">
+                  <option>راست‌ به‌ چپ (RTL)</option>
+                  <option>چپ‌ به‌راست (LTR)</option>
+                </select>
+              </div>
+            </div>
+
+            <div class="card card-pad mt-24">
+              <div class="section-title">
+                <h3>امنیت</h3>
+              </div>
+              <div class="setting-row">
+                <div><b>احراز هویت دو مرحله‌ای</b><span>افزایش امنیت با کد پیامکی</span></div><label
+                  class="switch"><input type="checkbox" checked><span class="track"></span></label>
+              </div>
+              <div class="setting-row">
+                <div><b>خروج خودکار پس از عدم فعالیت</b><span>پس از ۳۰ دقیقه بی‌فعالیتی</span></div><label
+                  class="switch"><input type="checkbox" checked><span class="track"></span></label>
+              </div>
+              <div class="setting-row">
+                <div><b>اعلان ورود از دستگاه جدید</b><span>ارسال ایمیل هشدار</span></div><label class="switch"><input
+                    type="checkbox" checked><span class="track"></span></label>
+              </div>
+            </div>
+
+            <div class="card card-pad mt-24">
+              <div class="section-title">
+                <h3>پشتیبان‌گیری و بازیابی</h3>
+              </div>
+              <div class="setting-row">
+                <div><b>پشتیبان‌گیری خودکار روزانه</b><span>ساعت ۰۳:۰۰ بامداد هر شب</span></div><label
+                  class="switch"><input type="checkbox" checked><span class="track"></span></label>
+              </div>
+              <div class="flex gap-8 mt-16">
+                <button class="btn btn-outline" data-backup-unavailable>تهیه نسخه
+                  پشتیبان</button>
+                <button class="btn btn-outline" data-modal-open="restoreModal">بازیابی از فایل</button>
+              </div>
+            </div>
+          </div>
+
+          <div>
+            <div class="card card-pad">
+              <div class="section-title">
+                <h3>دسترسی‌ها و نقش‌ها</h3>
+              </div>
+              <div class="table-wrap">
+                <table class="dt">
+                  <thead>
+                    <tr>
+                      <th>نقش</th>
+                      <th>مدیریت کاربران</th>
+                      <th>مدیریت آزمون</th>
+                      <th>گزارش‌گیری</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr>
+                      <td>مدیر کل</td>
+                      <td><span class="badge badge-ok">کامل</span></td>
+                      <td><span class="badge badge-ok">کامل</span></td>
+                      <td><span class="badge badge-ok">کامل</span></td>
+                    </tr>
+                    <tr>
+                      <td>مدیر دپارتمان</td>
+                      <td><span class="badge badge-warn">محدود</span></td>
+                      <td><span class="badge badge-ok">کامل</span></td>
+                      <td><span class="badge badge-warn">محدود</span></td>
+                    </tr>
+                    <tr>
+                      <td>استاد</td>
+                      <td><span class="badge badge-muted">ندارد</span></td>
+                      <td><span class="badge badge-warn">محدود</span></td>
+                      <td><span class="badge badge-muted">ندارد</span></td>
+                    </tr>
+                    <tr>
+                      <td>دانشجو</td>
+                      <td><span class="badge badge-muted">ندارد</span></td>
+                      <td><span class="badge badge-muted">ندارد</span></td>
+                      <td><span class="badge badge-muted">ندارد</span></td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            <div class="card card-pad mt-24">
+              <div class="section-title">
+                <h3>تنظیمات سامانه</h3>
+              </div>
+              <div class="field"><label>نام سامانه</label><input class="input" type="text" value="سامانه سنجش" data-setting-key="system.name"></div>
+              <div class="field"><label>ایمیل پشتیبانی</label><input class="input" type="email"
+                  value="support@sanjesh.example.com" data-setting-key="system.supportEmail"></div>
+              <div class="field"><label>حداکثر حجم آپلود فایل (مگابایت)</label><input class="input" type="number"
+                  value="20" data-setting-key="system.maxUploadMb"></div>
+              <button class="btn btn-primary" data-settings-save>ذخیره تنظیمات</button>
+            </div>
+          </div>
+        </div>
+      </main>
+    </div>
+  </div>
+
+  <div class="modal-overlay" id="restoreModal">
+    <div class="modal-box">
+      <div class="modal-head">
+        <h3 style="font-size:16px">بازیابی از فایل پشتیبان</h3><button class="icon-btn" data-modal-close>✕</button>
+      </div>
+      <div class="modal-body">
+        <div class="alert alert-warn" style="margin-bottom:16px">بازیابی، تمام داده‌های فعلی را با نسخه پشتیبان جایگزین
+          می‌کند.</div>
+        <div class="field"><label>انتخاب فایل پشتیبان (.zip)</label><input class="input" type="file"></div>
+      </div>
+      <div class="modal-foot">
+        <button class="btn btn-danger"
+          data-restore-unavailable>شروع
+          بازیابی</button>
+        <button class="btn btn-outline" data-modal-close>انصراف</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="assets/js/theme.js"></script>
+  <script src="assets/js/app.js"></script>
+<script src="assets/js/api.js"></script>
+  <script>
+    const darkSwitch = document.getElementById("darkSwitch");
+    darkSwitch.checked = document.documentElement.getAttribute("data-theme") === "dark";
+    darkSwitch.addEventListener("change", () => document.querySelector("[data-theme-toggle]").click());
+  </script>
+</body>
+
+</html>

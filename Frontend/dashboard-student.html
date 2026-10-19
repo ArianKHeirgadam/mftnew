@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>داشبورد دانشجو | سامانه سنجش</title>
+  <link rel="stylesheet" href="assets/css/style.css">
+  <link rel="stylesheet" href="assets/css/responsive.css">
+  <link rel="stylesheet" href="assets/css/dark.css">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.4/chart.umd.min.js"></script>
+</head>
+
+<body data-role="student" data-active="dashboard">
+
+  <div class="app-shell">
+    <div id="sidebar-root"></div>
+    <div class="main-col">
+      <div id="topbar-root" data-title="داشبورد دانشجو"></div>
+      <main class="content fade-in">
+        <div class="page-head">
+          <div>
+            <div class="breadcrumb">سامانه سنجش <span>/</span> <b>داشبورد دانشجو</b></div>
+            <h1>سلام سارا، موفق باشی! 🌟</h1>
+          </div>
+          <span class="badge badge-info">دپارتمان مهندسی کامپیوتر — ورودی ۱۴۰۲</span>
+        </div>
+
+        <div class="grid-2">
+          <div class="card card-pad"
+            style="background:linear-gradient(135deg,var(--navy-800),var(--navy-700));color:#fff;border:none">
+            <div class="flex items-center justify-between">
+              <div>
+                <div class="eyebrow" style="color:var(--gold-300)">آزمون پیش رو</div>
+                <h2 style="font-size:20px;margin-top:8px">ساختمان داده و الگوریتم — میان‌ترم</h2>
+                <p style="color:#B9C4DA;font-size:13px;margin-top:8px">فردا، ساعت ۱۰:۰۰ صبح — مدت زمان: ۴۵ دقیقه — سالن
+                  مجازی ۲</p>
+                <a href="online-exam.html" class="btn btn-gold mt-16">ورود به آزمون</a>
+              </div>
+              <div class="mohr lg gold">
+                <div class="mohr-inner"><b>۲۴</b><span>ساعت مانده</span></div>
+              </div>
+            </div>
+          </div>
+          <div class="card card-pad">
+            <div class="section-title">
+              <h3>روند نمرات من</h3>
+            </div>
+            <div style="height:200px"><canvas id="chartPerformance"></canvas></div>
+          </div>
+        </div>
+
+        <div class="stat-grid mt-24">
+          <div class="card stat-card" style="--stat-tint:var(--teal-500)">
+            <div class="stat-ring" style="--p:80"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                stroke-width="1.8">
+                <path d="M12 3a9 9 0 1 0 9 9" />
+                <path d="m9 12 2 2 4-5M21 3v6h-6" />
+              </svg></div>
+            <div class="stat-body"><b data-count="18" data-metric="completed">۰</b><span>آزمون گذرانده‌شده</span></div>
+          </div>
+          <div class="card stat-card" style="--stat-tint:var(--gold-500)">
+            <div class="stat-ring" style="--p:87"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                stroke-width="1.8">
+                <path d="M4 10h16M4 10 12 4l8 6M6 10v9M18 10v9" />
+              </svg></div>
+            <div class="stat-body"><b data-count="17" data-metric="averageScore">۰</b><span>معدل کل (از ۲۰)</span></div>
+          </div>
+          <div class="card stat-card" style="--stat-tint:var(--ok)">
+            <div class="stat-ring" style="--p:100"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                stroke-width="1.8">
+                <path d="m12 3 9 4.5-9 4.5-9-4.5Z" />
+                <path d="M7 10v5c0 1.7 2.2 3 5 3s5-1.3 5-3v-5" />
+              </svg></div>
+            <div class="stat-body"><b data-count="100" data-metric="attempts">۰</b><span>تعداد تلاش‌های آزمون</span></div>
+          </div>
+        </div>
+
+        <div class="card card-pad mt-24">
+          <div class="section-title">
+            <h3>آزمون‌های در دسترس</h3>
+          </div>
+          <div class="table-wrap">
+            <table class="dt">
+              <thead>
+                <tr>
+                  <th>عنوان آزمون</th>
+                  <th>درس</th>
+                  <th>تاریخ</th>
+                  <th>مدت زمان</th>
+                  <th>وضعیت</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td>میان‌ترم</td>
+                  <td>ساختمان داده و الگوریتم</td>
+                  <td>فردا — ۱۰:۰۰</td>
+                  <td>۴۵ دقیقه</td>
+                  <td><span class="badge badge-warn">آماده شروع</span></td>
+                  <td><a href="online-exam.html" class="btn btn-primary btn-sm">ورود</a></td>
+                </tr>
+                <tr>
+                  <td>کوییز هفتگی</td>
+                  <td>پایگاه داده</td>
+                  <td>۱۸ مرداد — ۱۴:۰۰</td>
+                  <td>۲۰ دقیقه</td>
+                  <td><span class="badge badge-muted">زمان‌بندی شده</span></td>
+                  <td><button class="btn btn-outline btn-sm" disabled>در انتظار</button></td>
+                </tr>
+                <tr>
+                  <td>پایان‌ترم</td>
+                  <td>هوش مصنوعی</td>
+                  <td>۱۴۰۴/۰۵/۲۵</td>
+                  <td>۹۰ دقیقه</td>
+                  <td><span class="badge badge-muted">زمان‌بندی شده</span></td>
+                  <td><button class="btn btn-outline btn-sm" disabled>در انتظار</button></td>
+                </tr>
+                <tr>
+                  <td>میان‌ترم</td>
+                  <td>معماری کامپیوتر</td>
+                  <td>گذشته</td>
+                  <td>۶۰ دقیقه</td>
+                  <td><span class="badge badge-ok">اعلام نمره</span></td>
+                  <td><a href="results.html" class="btn btn-ghost btn-sm">نتیجه</a></td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </main>
+    </div>
+  </div>
+  <script src="assets/js/theme.js"></script>
+  <script src="assets/js/app.js"></script>
+<script src="assets/js/api.js"></script>
+  <script src="assets/js/dashboard.js"></script>
+</body>
+
+</html>

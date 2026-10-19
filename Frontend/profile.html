@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>پروفایل | سامانه سنجش</title>
+<link rel="stylesheet" href="assets/css/style.css">
+<link rel="stylesheet" href="assets/css/responsive.css">
+<link rel="stylesheet" href="assets/css/dark.css">
+</head>
+<body data-role="student" data-active="profile">
+<div class="app-shell">
+  <div id="sidebar-root"></div>
+  <div class="main-col">
+    <div id="topbar-root" data-title="پروفایل"></div>
+    <main class="content fade-in">
+      <div class="page-head">
+        <div>
+          <div class="breadcrumb">سامانه سنجش <span>/</span> <b>پروفایل من</b></div>
+          <h1>پروفایل کاربری</h1>
+        </div>
+      </div>
+
+      <div class="card card-pad flex items-center gap-16" style="flex-wrap:wrap">
+        <div class="mohr lg gold"><div class="mohr-inner"><b>سم</b></div></div>
+        <div style="flex:1;min-width:220px">
+          <h2 style="font-size:19px" data-profile-name>پروفایل من</h2>
+          <p class="text-soft text-sm mt-8" data-profile-summary>اطلاعات حساب کاربری از سرور دریافت می‌شود.</p>
+          <div class="flex gap-8 mt-16"><button class="btn btn-primary btn-sm">تغییر تصویر پروفایل</button><button class="btn btn-outline btn-sm">حذف تصویر</button></div>
+        </div>
+        <span class="badge badge-ok">حساب کاربری فعال</span>
+      </div>
+
+      <div class="tabs mt-24" data-tabs>
+        <button class="tab-btn active" data-tab="tInfo">اطلاعات شخصی</button>
+        <button class="tab-btn" data-tab="tPass">تغییر رمز عبور</button>
+        <button class="tab-btn" data-tab="tActivity">تاریخچه فعالیت</button>
+        <button class="tab-btn" data-tab="tSecurity">امنیت حساب</button>
+      </div>
+
+      <div class="card card-pad">
+        <div id="tInfo" class="tab-panel active">
+          <div class="grid-2" style="grid-template-columns:1fr 1fr">
+            <div class="field"><label>نام و نام خانوادگی</label><input class="input" type="text" value="سارا محمدی"></div>
+            <div class="field"><label>ایمیل</label><input class="input" type="email" value="sara.mohammadi@example.com"></div>
+            <div class="field"><label>شماره تماس</label><input class="input" type="tel" value="۰۹۱۲۳۴۵۶۷۸۹"></div>
+            <div class="field"><label>دپارتمان</label><input class="input" type="text" value="مهندسی کامپیوتر" disabled></div>
+          </div>
+          <button class="btn btn-primary" >ذخیره تغییرات</button>
+        </div>
+
+        <div id="tPass" class="tab-panel">
+          <div class="field" style="max-width:380px"><label>رمز عبور فعلی</label><input class="input" type="password" placeholder="••••••••"></div>
+          <div class="field" style="max-width:380px"><label>رمز عبور جدید</label><input class="input" type="password" placeholder="••••••••"></div>
+          <div class="field" style="max-width:380px"><label>تکرار رمز عبور جدید</label><input class="input" type="password" placeholder="••••••••"></div>
+          <button class="btn btn-primary" >تغییر رمز عبور</button>
+        </div>
+
+        <div id="tActivity" class="tab-panel">
+          <ul style="display:flex;flex-direction:column;gap:14px"><li class="text-soft">تاریخچه فعالیت تا زمان راه‌اندازی سرویس ممیزی در دسترس نیست.</li></ul>
+        </div>
+
+        <div id="tSecurity" class="tab-panel">
+          <div class="table-wrap">
+            <table class="dt">
+              <thead><tr><th>مورد</th><th>مقدار</th></tr></thead>
+              <tbody><tr><td>نقش کاربری</td><td data-profile-role>—</td></tr><tr><td>دپارتمان</td><td data-profile-department>—</td></tr><tr><td>وضعیت نشست</td><td>فعال تا انقضای توکن</td></tr></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+</div>
+<script src="assets/js/theme.js"></script>
+<script src="assets/js/app.js"></script>
+<script src="assets/js/api.js"></script>
+</body>
+</html>

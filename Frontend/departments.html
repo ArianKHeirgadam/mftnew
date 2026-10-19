@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>مدیریت دپارتمان‌ها | سامانه سنجش</title>
+<link rel="stylesheet" href="assets/css/style.css">
+<link rel="stylesheet" href="assets/css/responsive.css">
+<link rel="stylesheet" href="assets/css/dark.css">
+</head>
+<body data-role="superadmin" data-active="departments">
+<div class="app-shell">
+  <div id="sidebar-root"></div>
+  <div class="main-col">
+    <div id="topbar-root" data-title="دپارتمان‌ها"></div>
+    <main class="content fade-in">
+      <div class="page-head">
+        <div>
+          <div class="breadcrumb">سامانه سنجش <span>/</span> <b>مدیریت دپارتمان‌ها</b></div>
+          <h1>دپارتمان‌ها</h1>
+        </div>
+        <button class="btn btn-primary" data-modal-open="deptModal">+ افزودن دپارتمان</button>
+      </div>
+
+      <div class="card card-pad">
+        <div class="table-toolbar">
+          <div class="search-box"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.2-3.2"/></svg><input type="text" placeholder="جستجوی دپارتمان..."></div>
+          <select class="select" style="width:auto"><option>همه وضعیت‌ها</option><option>فعال</option><option>غیرفعال</option></select>
+          <div class="topbar-spacer"></div>
+          <span class="text-soft text-sm">۱۴ دپارتمان</span>
+        </div>
+
+        <div class="table-wrap">
+          <table class="dt">
+            <thead><tr><th>دپارتمان</th><th>مدیر دپارتمان</th><th>دانشجویان</th><th>اساتید</th><th>وضعیت</th><th>عملیات</th></tr></thead>
+            <tbody>
+              <tr>
+                <td><div class="row-user"><div class="mohr sm"><div class="mohr-inner"><b>ک</b></div></div><div><b>مهندسی کامپیوتر</b><span>تاسیس ۱۳۸۰</span></div></div></td>
+                <td>مهندس احمدی</td><td>۴۲۰ نفر</td><td>۳۸ نفر</td>
+                <td><span class="badge badge-ok">فعال</span></td>
+                <td class="flex gap-8"><button class="btn btn-outline btn-sm" data-modal-open="deptModal">ویرایش</button><button class="btn btn-danger btn-sm" data-modal-open="deleteModal">حذف</button></td>
+              </tr>
+              <tr>
+                <td><div class="row-user"><div class="mohr sm gold"><div class="mohr-inner"><b>ب</b></div></div><div><b>مهندسی برق</b><span>تاسیس ۱۳۷۵</span></div></div></td>
+                <td>دکتر موسوی</td><td>۳۰۰ نفر</td><td>۲۹ نفر</td>
+                <td><span class="badge badge-ok">فعال</span></td>
+                <td class="flex gap-8"><button class="btn btn-outline btn-sm" data-modal-open="deptModal">ویرایش</button><button class="btn btn-danger btn-sm" data-modal-open="deleteModal">حذف</button></td>
+              </tr>
+              <tr>
+                <td><div class="row-user"><div class="mohr sm"><div class="mohr-inner"><b>ع</b></div></div><div><b>مهندسی عمران</b><span>تاسیس ۱۳۷۰</span></div></div></td>
+                <td>دکتر جعفری</td><td>۲۶۰ نفر</td><td>۲۲ نفر</td>
+                <td><span class="badge badge-ok">فعال</span></td>
+                <td class="flex gap-8"><button class="btn btn-outline btn-sm" data-modal-open="deptModal">ویرایش</button><button class="btn btn-danger btn-sm" data-modal-open="deleteModal">حذف</button></td>
+              </tr>
+              <tr>
+                <td><div class="row-user"><div class="mohr sm"><div class="mohr-inner"><b>م</b></div></div><div><b>مکانیک</b><span>تاسیس ۱۳۷۸</span></div></div></td>
+                <td>دکتر رستمی</td><td>۲۱۰ نفر</td><td>۱۸ نفر</td>
+                <td><span class="badge badge-warn">در حال بازبینی</span></td>
+                <td class="flex gap-8"><button class="btn btn-outline btn-sm" data-modal-open="deptModal">ویرایش</button><button class="btn btn-danger btn-sm" data-modal-open="deleteModal">حذف</button></td>
+              </tr>
+              <tr>
+                <td><div class="row-user"><div class="mohr sm"><div class="mohr-inner"><b>مد</b></div></div><div><b>مدیریت صنعتی</b><span>تاسیس ۱۳۸۵</span></div></div></td>
+                <td>دکتر شریفی</td><td>۳۴۰ نفر</td><td>۲۴ نفر</td>
+                <td><span class="badge badge-muted">غیرفعال</span></td>
+                <td class="flex gap-8"><button class="btn btn-outline btn-sm" data-modal-open="deptModal">ویرایش</button><button class="btn btn-danger btn-sm" data-modal-open="deleteModal">حذف</button></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="pagination">
+          <button>«</button><button class="active">۱</button><button>۲</button><button>۳</button><button>»</button>
+        </div>
+      </div>
+    </main>
+  </div>
+</div>
+
+<div class="modal-overlay" id="deptModal">
+  <div class="modal-box">
+    <div class="modal-head"><h3 style="font-size:16px">افزودن / ویرایش دپارتمان</h3><button class="icon-btn" data-modal-close>✕</button></div>
+    <div class="modal-body">
+      <div class="field"><label>نام دپارتمان</label><input class="input" type="text" placeholder="مثلاً: مهندسی کامپیوتر"></div>
+      <div class="field"><label>مدیر دپارتمان</label><select class="select" id="departmentManagerId"><option value="">بدون مدیر</option></select></div>
+      <div class="field"><label>وضعیت</label>
+        <select class="select"><option>فعال</option><option>در حال بازبینی</option><option>غیرفعال</option></select>
+      </div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-primary" data-department-save>ذخیره</button>
+      <button class="btn btn-outline" data-modal-close>انصراف</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="deleteModal">
+  <div class="modal-box">
+    <div class="modal-head"><h3 style="font-size:16px">حذف دپارتمان</h3><button class="icon-btn" data-modal-close>✕</button></div>
+    <div class="modal-body"><div class="alert alert-danger">آیا از حذف این دپارتمان مطمئن هستید؟ این عملیات قابل بازگشت نیست.</div></div>
+    <div class="modal-foot">
+      <button class="btn btn-danger" data-modal-close>بله، حذف کن</button>
+      <button class="btn btn-outline" data-modal-close>انصراف</button>
+    </div>
+  </div>
+</div>
+
+<script src="assets/js/theme.js"></script>
+<script src="assets/js/app.js"></script>
+<script src="assets/js/api.js"></script>
+</body>
+</html>

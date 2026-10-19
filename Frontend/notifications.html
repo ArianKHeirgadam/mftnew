@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>اعلان‌ها | سامانه سنجش</title>
+<link rel="stylesheet" href="assets/css/style.css">
+<link rel="stylesheet" href="assets/css/responsive.css">
+<link rel="stylesheet" href="assets/css/dark.css">
+<style>
+  .notif-item{display:flex;gap:14px;padding:16px;border-radius:var(--r-md);transition:.2s;position:relative;}
+  .notif-item:hover{background:var(--surface-2);}
+  .notif-item.unread{background:color-mix(in srgb, var(--primary) 5%, transparent);}
+  .notif-item.unread::before{content:'';position:absolute;top:20px;right:6px;width:7px;height:7px;border-radius:99px;background:var(--primary);}
+  .notif-icon{width:40px;height:40px;border-radius:12px;display:flex;align-items:center;justify-content:center;flex-shrink:0;}
+</style>
+</head>
+<body data-role="student" data-active="notifications">
+<div class="app-shell">
+  <div id="sidebar-root"></div>
+  <div class="main-col">
+    <div id="topbar-root" data-title="اعلان‌ها"></div>
+    <main class="content fade-in">
+      <div class="page-head">
+        <div>
+          <div class="breadcrumb">سامانه سنجش <span>/</span> <b>اعلان‌ها</b></div>
+          <h1>مرکز اعلان‌ها</h1>
+        </div>
+        <button class="btn btn-outline" data-notification-read-all>علامت‌گذاری همه به‌عنوان خوانده‌شده</button>
+      </div>
+
+      <div class="tabs" data-tabs>
+        <button class="tab-btn active" data-tab="tAll">همه (۸)</button>
+        <button class="tab-btn" data-tab="tUnread">خوانده‌نشده (۵)</button>
+        <button class="tab-btn" data-tab="tRead">خوانده‌شده (۳)</button>
+      </div>
+
+      <div class="card card-pad">
+        <div id="tAll" class="tab-panel active" data-notification-list>
+          <div class="notif-item unread">
+            <div class="notif-icon" style="background:color-mix(in srgb, var(--ok) 15%, transparent);color:var(--ok)">✅</div>
+            <div style="flex:1"><b style="font-size:13.5px">نمره آزمون میان‌ترم اعلام شد</b><p class="text-soft text-sm mt-8">نمره شما در آزمون ساختمان داده و الگوریتم ثبت و نهایی شد.</p><span class="text-soft" style="font-size:11px">۱۰ دقیقه پیش</span></div>
+            <button class="btn btn-ghost btn-sm">حذف</button>
+          </div>
+          <div class="notif-item unread">
+            <div class="notif-icon" style="background:color-mix(in srgb, var(--warn) 15%, transparent);color:var(--warn)">⏰</div>
+            <div style="flex:1"><b style="font-size:13.5px">یادآوری آزمون فردا</b><p class="text-soft text-sm mt-8">آزمون ساختمان داده و الگوریتم فردا ساعت ۱۰:۰۰ برگزار می‌شود.</p><span class="text-soft" style="font-size:11px">۲ ساعت پیش</span></div>
+            <button class="btn btn-ghost btn-sm">حذف</button>
+          </div>
+          <div class="notif-item unread">
+            <div class="notif-icon" style="background:color-mix(in srgb, var(--primary) 15%, transparent);color:var(--primary)">📝</div>
+            <div style="flex:1"><b style="font-size:13.5px">ثبت‌نام شما تایید شد</b><p class="text-soft text-sm mt-8">درخواست ثبت‌نام شما در دپارتمان مهندسی کامپیوتر تایید شد.</p><span class="text-soft" style="font-size:11px">دیروز</span></div>
+            <button class="btn btn-ghost btn-sm">حذف</button>
+          </div>
+          <div class="notif-item unread">
+            <div class="notif-icon" style="background:color-mix(in srgb, var(--gold-500) 18%, transparent);color:var(--gold-500)">📢</div>
+            <div style="flex:1"><b style="font-size:13.5px">تغییر زمان‌بندی آزمون</b><p class="text-soft text-sm mt-8">آزمون پایگاه داده به تاریخ جدید موکول شد.</p><span class="text-soft" style="font-size:11px">۲ روز پیش</span></div>
+            <button class="btn btn-ghost btn-sm">حذف</button>
+          </div>
+          <div class="notif-item unread">
+            <div class="notif-icon" style="background:color-mix(in srgb, var(--danger) 15%, transparent);color:var(--danger)">⚠️</div>
+            <div style="flex:1"><b style="font-size:13.5px">هشدار غیبت</b><p class="text-soft text-sm mt-8">شما در آزمون کوییز هفتگی درس شبکه غایب بوده‌اید.</p><span class="text-soft" style="font-size:11px">۳ روز پیش</span></div>
+            <button class="btn btn-ghost btn-sm">حذف</button>
+          </div>
+          <div class="notif-item">
+            <div class="notif-icon" style="background:var(--surface-2);color:var(--text-soft)">📄</div>
+            <div style="flex:1"><b style="font-size:13.5px">کارنامه ترم قابل مشاهده است</b><p class="text-soft text-sm mt-8">کارنامه نیمسال جاری در پروفایل شما بارگذاری شد.</p><span class="text-soft" style="font-size:11px">هفته گذشته</span></div>
+            <button class="btn btn-ghost btn-sm">حذف</button>
+          </div>
+        </div>
+        <div id="tUnread" class="tab-panel"><p class="text-soft text-sm" style="padding:20px 0">اعلان‌های خوانده‌نشده در این بخش نمایش داده می‌شوند.</p></div>
+        <div id="tRead" class="tab-panel"><p class="text-soft text-sm" style="padding:20px 0">اعلان‌های خوانده‌شده در این بخش نمایش داده می‌شوند.</p></div>
+      </div>
+    </main>
+  </div>
+</div>
+<script src="assets/js/theme.js"></script>
+<script src="assets/js/app.js"></script>
+<script src="assets/js/api.js"></script>
+</body>
+</html>
