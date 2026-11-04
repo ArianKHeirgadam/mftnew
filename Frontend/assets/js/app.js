@@ -126,10 +126,20 @@ const ROLE_LABEL = {
   student: "دانشجو",
 };
 
+function getMftSessionUser() {
+  try {
+    return JSON.parse(sessionStorage.getItem("mft.currentUser") || localStorage.getItem("mft.currentUser") || "null");
+  } catch {
+    return null;
+  }
+}
+
 function renderSidebar() {
   const root = document.getElementById("sidebar-root");
   if (!root) return;
-  const role = document.body.dataset.role || "student";
+  const storedUser = getMftSessionUser();
+  const role = String(storedUser?.role || document.body.dataset.role || "student").toLowerCase();
+  document.body.dataset.role = role;
   const active = document.body.dataset.active || "dashboard";
   const groups = NAV_BY_ROLE[role] || NAV_BY_ROLE.student;
 
@@ -188,7 +198,9 @@ function renderTopbar() {
   if (!root) return;
   const title = root.dataset.title || "داشبورد";
   const crumb = root.dataset.crumb || "";
-  const role = document.body.dataset.role || "student";
+  const storedUser = getMftSessionUser();
+  const role = String(storedUser?.role || document.body.dataset.role || "student").toLowerCase();
+  document.body.dataset.role = role;
   const showSearch = root.dataset.search !== "false";
 
   root.innerHTML = `
@@ -218,7 +230,7 @@ function renderTopbar() {
         <div class="dropdown">
           <div class="profile-chip" data-dropdown-toggle="profileDrop" style="cursor:pointer">
             <div class="mohr-avatar" style="width:36px; height:36px;"><span class="initials">${role === "superadmin" ? "مک" : role === "department" ? "مد" : role === "teacher" ? "استا" : "دان"}</span></div>
-            <div class="who"><b>${role === "superadmin" ? "دکتر رضایی" : role === "department" ? "مهندس احمدی" : role === "teacher" ? "دکتر کریمی" : "سارا محمدی"}</b><span>${ROLE_LABEL[role]}</span></div>
+            <div class="who"><b>${storedUser?.fullName || storedUser?.username || (role === "superadmin" ? "مدیر سامانه" : role === "department" ? "مدیر دپارتمان" : role === "teacher" ? "استاد" : "دانشجو")}</b><span>${ROLE_LABEL[role] || "کاربر"}</span></div>
           </div>
           <div class="dropdown-menu" id="profileDrop">
             <a href="profile.html">${ICON.profile} پروفایل من</a>
