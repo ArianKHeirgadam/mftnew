@@ -314,7 +314,10 @@ function showToast(message, type = "info") {
   const el = document.createElement("div");
   el.className = `toast ${type}`;
   const icon = type === "ok" ? ICON.ok : type === "warn" ? ICON.warn : type === "danger" ? ICON.warn : ICON.info;
-  el.innerHTML = `${icon}<span>${message}</span>`;
+  el.innerHTML = icon;
+  const text = document.createElement("span");
+  text.textContent = String(message ?? "");
+  el.appendChild(text);
   stack.appendChild(el);
   setTimeout(() => {
     el.style.transition = "opacity .3s, transform .3s";
