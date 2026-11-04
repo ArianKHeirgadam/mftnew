@@ -45,6 +45,20 @@ This working tree combines the supplied frontend with an ASP.NET Core Web API. T
 
    Set `Bootstrap__CreateSuperAdmin=false` after initialization. Do not reuse the example password.
 
+## Database patch for question bank and exam grading
+
+Before running the API against the existing SQL Server database, back up the
+database and execute
+`database/patch-exam-grading-and-department-manager.sql` against the database
+named by `DefaultConnection`. This additive script creates the columns used
+to persist MCQ options/correct answers, attempt status, answer correctness and
+department manager IDs. Do not skip this step: the previous schema-compatibility
+mapping intentionally ignored those fields.
+
+After applying the patch, build the API and run the test sequence in
+`docs/EXAM-SCORING-VERIFICATION.md`. A 20-question test with 15 correct
+answers should produce 75/100. Live SQL Server verification is still required.
+
 ## Run the frontend
 
 Open `Frontend/` in VS Code and launch `login.html` with Live Server (usually `http://127.0.0.1:5500`). The API bridge defaults to `https://localhost:7081/api`; accept/trust the local ASP.NET HTTPS development certificate when prompted. If the API is hosted elsewhere, override `window.MFT_API_BASE` before `assets/js/api.js` loads.
