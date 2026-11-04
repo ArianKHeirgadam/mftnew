@@ -313,23 +313,73 @@
 
   async function loadDashboard() {
     if (!$('[data-dashboard-summary]') && !document.querySelector('body[data-active="dashboard"]')) return;
-    const data = await request('/dashboard/summary');
-    $$('[data-metric]').forEach(element => {
+
+    const [data, profile] = await Promise.all([
+      request('/dashboard/summary'),
+      request('/auth/me')
+    ]);
+
+    document.querySelectorAll('[data-metric]').forEach(element => {
       const key = element.dataset.metric;
-      if (key in data) element.textContent = faNumber(data[key]);
-    });
-    $$('[data-count]').forEach(element => {
-      const key = element.dataset.metric;
-      if (key && key in data) {
-        element.dataset.count = data[key];
+      if (Object.prototype.hasOwnProperty.call(data, key)) {
         element.textContent = faNumber(data[key]);
       }
     });
-    if (document.getElementById('chartActivity')) {
-      const activity = await request('/dashboard/activity').catch(() => []);
-      window.MftChartData = { ...(window.MftChartData || {}), activity };
-      document.dispatchEvent(new Event('mft:data-ready'));
+
+    document.querySelectorAll('[data-count]').forEach(element => {
+      const key = element.dataset.metric;
+      if (key && Object.prototype.hasOwnProperty.call(data, key)) {
+        element.dataset.count = String(data[key]);
+        element.textContent = faNumber(data[key]);
+      }
+    });
+
+    const greeting = $('[data-dashboard-greeting]');
+    if (greeting) {
+      const name = profile.fullName || profile.username || 'کاربر';
+      greeting.textContent = `سلام ${name}، خوش آمدید`;
     }
+
+    const departmentLabel = $('[data-dashboard-department]');
+    if (departmentLabel) {
+      departmentLabel.textContent = profile.department || 'بدون دپارتمان ثبت‌شده';
+    }
+
+    const requests = [];
+    if (document.getElementById('chartActivity')) {
+      requests.push(request('/dashboard/activity').then(activity => {
+        window.MftChartData = { ...(window.MftChartData || {}), activity };
+      }));
+    }
+
+    const role = (profile.role || '').toLowerCase();
+    if (document.getElementById('chartDepartments') && ['superadmin', 'department'].includes(role)) {
+      requests.push(request('/reports/departments').then(rows => {
+        window.MftChartData = {
+          ...(window.MftChartData || {}),
+          departments: rows.map(row => ({ department: row.department, students: row.students }))
+        };
+      }));
+    }
+
+    if (role === 'department') {
+      requests.push(request('/reports/departments').then(rows => {
+        const report = rows[0];
+        const metrics = $('#departmentDashboardMetrics');
+        if (!metrics || !report) return;
+        const passRate = Math.max(0, Math.min(100, Number(report.passRate) || 0));
+        const averageScore = Math.max(0, Math.min(100, (Number(report.averageScore) || 0) * 5));
+        const participation = Number(report.participation) || 0;
+        metrics.innerHTML = [
+          { label: 'نرخ قبولی آزمون‌ها', value: passRate, color: 'var(--gold-500)' },
+          { label: 'میانگین نمرات (از ۲۰)', value: averageScore, display: `${faNumber(report.averageScore)} از ۲۰` },
+          { label: 'تعداد شرکت در آزمون‌ها', value: Math.min(100, participation), display: faNumber(participation) }
+        ].map(item => `<li><div class="flex justify-between text-sm mt-8"><span>${item.label}</span><b>${item.display || `${faNumber(Math.round(item.value))}٪`}</b></div><div class="progress mt-8"><i style="width:${item.value}%;${item.color ? `background:${item.color};` : ''}"></i></div></li>`).join('');
+      }));
+    }
+
+    await Promise.all(requests);
+    if (requests.length) document.dispatchEvent(new Event('mft:data-ready'));
   }
 
   async function loadProfile() {

@@ -21,9 +21,9 @@
         <div class="page-head">
           <div>
             <div class="breadcrumb">سامانه سنجش <span>/</span> <b>داشبورد دانشجو</b></div>
-            <h1>سلام سارا، موفق باشی! 🌟</h1>
+            <h1><span data-dashboard-greeting>در حال دریافت اطلاعات کاربر...</span></h1>
           </div>
-          <span class="badge badge-info">دپارتمان مهندسی کامپیوتر — ورودی ۱۴۰۲</span>
+          <span class="badge badge-info"><span data-dashboard-department>در حال دریافت دپارتمان...</span></span>
         </div>
 
         <div class="grid-2">
@@ -92,39 +92,8 @@
                   <th></th>
                 </tr>
               </thead>
-              <tbody>
-                <tr>
-                  <td>میان‌ترم</td>
-                  <td>ساختمان داده و الگوریتم</td>
-                  <td>فردا — ۱۰:۰۰</td>
-                  <td>۴۵ دقیقه</td>
-                  <td><span class="badge badge-warn">آماده شروع</span></td>
-                  <td><a href="online-exam.html" class="btn btn-primary btn-sm">ورود</a></td>
-                </tr>
-                <tr>
-                  <td>کوییز هفتگی</td>
-                  <td>پایگاه داده</td>
-                  <td>۱۸ مرداد — ۱۴:۰۰</td>
-                  <td>۲۰ دقیقه</td>
-                  <td><span class="badge badge-muted">زمان‌بندی شده</span></td>
-                  <td><button class="btn btn-outline btn-sm" disabled>در انتظار</button></td>
-                </tr>
-                <tr>
-                  <td>پایان‌ترم</td>
-                  <td>هوش مصنوعی</td>
-                  <td>۱۴۰۴/۰۵/۲۵</td>
-                  <td>۹۰ دقیقه</td>
-                  <td><span class="badge badge-muted">زمان‌بندی شده</span></td>
-                  <td><button class="btn btn-outline btn-sm" disabled>در انتظار</button></td>
-                </tr>
-                <tr>
-                  <td>میان‌ترم</td>
-                  <td>معماری کامپیوتر</td>
-                  <td>گذشته</td>
-                  <td>۶۰ دقیقه</td>
-                  <td><span class="badge badge-ok">اعلام نمره</span></td>
-                  <td><a href="results.html" class="btn btn-ghost btn-sm">نتیجه</a></td>
-                </tr>
+              <tbody id="studentAvailableExamsBody">
+                <tr><td colspan="6" class="text-soft">در حال دریافت آزمون‌های در دسترس...</td></tr>
               </tbody>
             </table>
           </div>
