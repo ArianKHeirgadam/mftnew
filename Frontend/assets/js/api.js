@@ -571,11 +571,11 @@
     const category = $('[data-question-category]', modal)?.value || 'عمومی';
     const optionFields = $$('[data-question-option]', modal);
     let options = optionFields.map(field => field.value.trim()).filter(Boolean);
-    const correctIndex = $('input[name="correct"]', modal).findIndex(field => field.checked);
+    const correctIndex = $$('input[name="correct"]', modal).findIndex(field => field.checked);
     let correctAnswer = type === 'MultipleChoice' ? (optionFields[correctIndex]?.value.trim() || null) : null;
     if (type === 'Matching') {
-      const left = $('[data-match-left]', modal).map(field => field.value.trim());
-      const right = $('[data-match-right]', modal).map(field => field.value.trim());
+      const left = $$('[data-match-left]', modal).map(field => field.value.trim());
+      const right = $$('[data-match-right]', modal).map(field => field.value.trim());
       const pairs = left.map((value, index) => ({ left: value, right: right[index] })).filter(pair => pair.left && pair.right);
       options = pairs.map(pair => pair.left);
       if (pairs.length < 2 || new Set(pairs.map(pair => pair.right.toLocaleLowerCase())).size !== pairs.length)
@@ -751,12 +751,12 @@
     $('#qType', modal).value = question.type || 'MultipleChoice';
     $('[data-question-difficulty]', modal).value = question.difficulty || 'Medium';
     $('[data-question-category]', modal).value = question.category || 'عمومی';
-    $('[data-question-option]', modal).forEach((field, index) => field.value = question.type === 'MultipleChoice' ? (question.options?.[index] || '') : '');
+    $$('[data-question-option]', modal).forEach((field, index) => field.value = question.type === 'MultipleChoice' ? (question.options?.[index] || '') : '');
     if (question.type === 'Matching') {
       let pairs = {};
       try { pairs = JSON.parse(question.correctAnswer || '{}'); } catch { pairs = {}; }
-      $('[data-match-left]', modal).forEach((field, index) => { field.value = question.options?.[index] || ''; });
-      $('[data-match-right]', modal).forEach((field, index) => { field.value = pairs[question.options?.[index]] || ''; });
+      $$('[data-match-left]', modal).forEach((field, index) => { field.value = question.options?.[index] || ''; });
+      $$('[data-match-right]', modal).forEach((field, index) => { field.value = pairs[question.options?.[index]] || ''; });
       $('#mcqOptions', modal).style.display = 'none';
       $('#matchingOptions', modal).hidden = false;
     } else {
@@ -764,7 +764,7 @@
       $('#matchingOptions', modal).hidden = true;
     }
     const correctIndex = question.options?.indexOf(question.correctAnswer) ?? -1;
-    $('input[name="correct"]', modal).forEach((field, index) => field.checked = index === correctIndex);
+    $$('input[name="correct"]', modal).forEach((field, index) => field.checked = index === correctIndex);
     modal.classList.add('show');
   }
 
