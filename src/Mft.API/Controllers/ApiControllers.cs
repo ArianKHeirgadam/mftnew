@@ -341,13 +341,17 @@ public class QuestionsController(AppDbContext db) : ControllerBase
     }
     [HttpPost]
     public async Task<IActionResult> Create(QuestionRequest r, CancellationToken ct){
-        if (string.IsNullOrWhiteSpace(r.Text) || string.IsNullOrWhiteSpace(r.Category) || r.Score <= 0 || r.Type is not ("MultipleChoice" or "Essay") || r.Difficulty is not ("Easy" or "Medium" or "Hard")) return BadRequest(new {
+        if (string.IsNullOrWhiteSpace(r.Text) || string.IsNullOrWhiteSpace(r.Category) || r.Score <= 0 || r.Type is not ("MultipleChoice" or "Essay" or "Matching") || r.Difficulty is not ("Easy" or "Medium" or "Hard")) return BadRequest(new {
             message = "متن، دسته‌بندی، نوع، سختی و نمره معتبر برای سؤال الزامی است."
         });
         if (r.Type =="MultipleChoice" && (r.Options == null || r.Options.Length < 2 || string.IsNullOrWhiteSpace(r.CorrectAnswer) || !r.Options.Contains(r.CorrectAnswer))) return BadRequest(new {
             message = "سؤال چهارگزینه‌ای باید حداقل دو گزینه و پاسخ صحیح معتبر داشته باشد."
         }
         );
+        if (r.Type == "Matching" && (r.Options == null || r.Options.Length < 2 || string.IsNullOrWhiteSpace(r.CorrectAnswer) || !IsValidMatchingKey(r.Options, r.CorrectAnswer)))
+            return BadRequest(new { message = "سؤال وصل‌کردنی باید حداقل دو جفت معتبر داشته باشد." });
+        if (r.Type == "Matching" && (r.Options == null || r.Options.Length < 2 || string.IsNullOrWhiteSpace(r.CorrectAnswer) || !IsValidMatchingKey(r.Options, r.CorrectAnswer)))
+            return BadRequest(new { message = "سؤال وصل‌کردنی باید حداقل دو جفت معتبر داشته باشد." });
         var creator = await db.Users.AsNoTracking().Where(user => user.Id == User.UserId()).Select(user => new { user.DepartmentId }).SingleAsync(ct);
         var questionDepartmentId = r.DepartmentId ?? creator.DepartmentId;
         if (!questionDepartmentId.HasValue || !await db.Departments.AnyAsync(department => department.Id == questionDepartmentId.Value, ct))
@@ -378,7 +382,7 @@ public class QuestionsController(AppDbContext db) : ControllerBase
         if (User.IsInRole("Teacher") && q.CreatedByUserId != User.UserId()) return Forbid();
         if (User.IsInRole("Department") && !await db.Users.AnyAsync(user => user.Id == q.CreatedByUserId && user.DepartmentId == User.DepartmentId(), ct)) return Forbid();
         if (r.Type != q.Type && (await db.ExamQuestions.AnyAsync(item => item.QuestionId == id, ct) || await db.ExamAnswers.AnyAsync(item => item.QuestionId == id, ct))) return Conflict(new { message = "نوع سؤالی که در آزمون استفاده شده قابل تغییر نیست." });
-        if (string.IsNullOrWhiteSpace(r.Text) || string.IsNullOrWhiteSpace(r.Category) || r.Score <= 0 || r.Type is not ("MultipleChoice" or "Essay") || r.Difficulty is not ("Easy" or "Medium" or "Hard")) return BadRequest(new {
+        if (string.IsNullOrWhiteSpace(r.Text) || string.IsNullOrWhiteSpace(r.Category) || r.Score <= 0 || r.Type is not ("MultipleChoice" or "Essay" or "Matching") || r.Difficulty is not ("Easy" or "Medium" or "Hard")) return BadRequest(new {
             message = "متن، دسته‌بندی، نوع، سختی و نمره معتبر برای سؤال الزامی است."
         });
         if (r.Type =="MultipleChoice" && (r.Options == null || r.Options.Length < 2 || string.IsNullOrWhiteSpace(r.CorrectAnswer) || !r.Options.Contains(r.CorrectAnswer))) return BadRequest(new {
@@ -408,6 +412,17 @@ public class QuestionsController(AppDbContext db) : ControllerBase
         db.Questions.Remove(q);
         await db.SaveChangesAsync(ct);
         return NoContent();
+    }
+    private static bool IsValidMatchingKey(string[] options, string json)
+    {
+        try
+        {
+            var pairs = JsonSerializer.Deserialize<Dictionary<string, string>>(json);
+            return pairs is not null && pairs.Count == options.Length &&
+                options.All(left => pairs.TryGetValue(left, out var right) && !string.IsNullOrWhiteSpace(right)) &&
+                pairs.Values.Distinct(StringComparer.OrdinalIgnoreCase).Count() == pairs.Count;
+        }
+        catch (JsonException) { return false; }
     }
 }
 [ApiController, Route("api/exams"), Authorize]
@@ -609,13 +624,20 @@ public class ExamsController(AppDbContext db) : ControllerBase
         }
         var questionIds = e.Questions.OrderBy(x => x.Order).Select(x => x.QuestionId).ToArray();
         var questionRows = await db.Questions.Where(q => questionIds.Contains(q.Id)).Select(q => new{
-            id = q.Id, text = q.Text, type = q.Type, optionsJson = q.OptionsJson
+            id = q.Id, text = q.Text, type = q.Type, optionsJson = q.OptionsJson, correctAnswer = q.CorrectAnswer
         }
         ).ToListAsync(ct);
-        var qs = questionRows.Select(q => new{
-            id = q.id, text = q.text, type = q.type, options = q.optionsJson == null?Array.Empty<string>():JsonSerializer.Deserialize<string[]>(q.optionsJson, (JsonSerializerOptions?)null)??Array.Empty<string>()
-        }
-        ).OrderBy(q => Array.IndexOf(questionIds, q.id)).ToList();
+        var qs = questionRows.Select(q =>
+        {
+            var options = string.IsNullOrWhiteSpace(q.optionsJson) ? Array.Empty<string>() : JsonSerializer.Deserialize<string[]>(q.optionsJson) ?? Array.Empty<string>();
+            var matchingOptions = Array.Empty<string>();
+            if (q.type == "Matching" && !string.IsNullOrWhiteSpace(q.correctAnswer))
+            {
+                try { matchingOptions = JsonSerializer.Deserialize<Dictionary<string, string>>(q.correctAnswer)?.Values.OrderBy(_ => Guid.NewGuid()).ToArray() ?? Array.Empty<string>(); }
+                catch (JsonException) { matchingOptions = Array.Empty<string>(); }
+            }
+            return new { id = q.id, text = q.text, type = q.type, options, matchingOptions };
+        }).OrderBy(q => Array.IndexOf(questionIds, q.id)).ToList();
         var savedAnswers = await db.ExamAnswers.Where(x => x.ExamAttemptId == active.Id).Select(x => new{
             questionId = x.QuestionId, answer = x.Answer
         }
@@ -721,7 +743,23 @@ public class ExamsController(AppDbContext db) : ControllerBase
                 !examQuestionLookup.TryGetValue(saved.QuestionId, out var examQuestion))
                 continue;
 
-            if (question.Type == "MultipleChoice")
+            if (question.Type == "Matching")
+            {
+                try
+                {
+                    var expected = JsonSerializer.Deserialize<Dictionary<string, string>>(question.CorrectAnswer ?? "") ?? new();
+                    var submitted = JsonSerializer.Deserialize<Dictionary<string, string>>(saved.Answer ?? "") ?? new();
+                    var correctCount = expected.Count(pair => submitted.TryGetValue(pair.Key, out var value) && string.Equals(value, pair.Value, StringComparison.OrdinalIgnoreCase));
+                    var questionCount = attempt.Exam.Questions.Count;
+                    var baseQuestionScore = questionCount == 0 ? 0m : Math.Floor(100m / questionCount * 100m) / 100m;
+                    var isLastQuestion = examQuestion.Order == attempt.Exam.Questions.Max(item => item.Order);
+                    var normalizedQuestionScore = isLastQuestion ? 100m - baseQuestionScore * (questionCount - 1) : baseQuestionScore;
+                    saved.IsCorrect = expected.Count > 0 && correctCount == expected.Count;
+                    saved.AwardedScore = expected.Count == 0 ? 0m : Math.Round(normalizedQuestionScore * correctCount / expected.Count, 2);
+                }
+                catch (JsonException) { saved.IsCorrect = false; saved.AwardedScore = 0m; }
+            }
+            else if (question.Type == "MultipleChoice")
             {
                 saved.IsCorrect =
                     !string.IsNullOrWhiteSpace(question.CorrectAnswer) &&
