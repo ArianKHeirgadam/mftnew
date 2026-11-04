@@ -293,8 +293,9 @@ public class QuestionsController(AppDbContext db) : ControllerBase
         if (!string.IsNullOrWhiteSpace(search))q = q.Where(x => x.Text.Contains(search));
         if (!string.IsNullOrWhiteSpace(type))q = q.Where(x => x.Type == type);
         if (!string.IsNullOrWhiteSpace(category))q = q.Where(x => x.Category == category);
+        // CreatedAt is not mapped in the supplied SQL schema; never query it in SQL.
         var rows = await q
-            .OrderByDescending(question => question.CreatedAt)
+            .OrderBy(question => question.Text)
             .Select(question => new
             {
                 Id = question.Id,
@@ -304,8 +305,7 @@ public class QuestionsController(AppDbContext db) : ControllerBase
                 Difficulty = question.Difficulty,
                 OptionsJson = question.OptionsJson,
                 CorrectAnswer = question.CorrectAnswer,
-                Score = question.Score,
-                CreatedAt = question.CreatedAt
+                Score = question.Score
             })
             .ToListAsync(ct);
 
@@ -321,7 +321,6 @@ public class QuestionsController(AppDbContext db) : ControllerBase
                 : JsonSerializer.Deserialize<string[]>(question.OptionsJson) ?? Array.Empty<string>(),
             correctAnswer = question.CorrectAnswer,
             score = question.Score,
-            createdAt = question.CreatedAt
         });
 
         return Ok(response);
@@ -420,8 +419,10 @@ public class ExamsController(AppDbContext db) : ControllerBase
         if (User.IsInRole("Student"))q = q.Where(x => x.IsPublished && (x.DepartmentId == null || x.DepartmentId == User.DepartmentId()));
         if (User.IsInRole("Department"))q = q.Where(x => x.DepartmentId == User.DepartmentId());
         if (User.IsInRole("Teacher"))q = q.Where(x => x.CreatedByUserId == User.UserId());
-        return Ok(await q.OrderByDescending(x => x.CreatedAt).Select(x => new{
-            id = x.Id, title = x.Title, subject = x.Subject, description = x.Description, durationMinutes = x.DurationMinutes, passingScore = x.PassingScore, allowQuestionNavigation = x.AllowQuestionNavigation, startsAt = x.StartsAt, endsAt = x.EndsAt, isPublished = x.IsPublished, departmentId = x.DepartmentId, questionCount = x.Questions.Count, createdAt = x.CreatedAt
+        // Subject, Description, EndsAt and CreatedAt are not mapped in the supplied database schema.
+        // Return explicit nulls rather than asking EF Core to translate ignored properties.
+        return Ok(await q.OrderBy(x => x.Title).Select(x => new{
+            id = x.Id, title = x.Title, subject = (string?)null, description = (string?)null, durationMinutes = x.DurationMinutes, passingScore = x.PassingScore, allowQuestionNavigation = x.AllowQuestionNavigation, startsAt = x.StartsAt, endsAt = (DateTime?)null, isPublished = x.IsPublished, departmentId = x.DepartmentId, questionCount = x.Questions.Count, createdAt = (DateTime?)null
         }
         ).ToListAsync(ct));
     }
