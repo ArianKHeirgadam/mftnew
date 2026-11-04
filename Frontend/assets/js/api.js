@@ -128,6 +128,27 @@
     }
   }
 
+  async function loadDashboardManagers() {
+    if (!document.body.matches('body[data-active="dashboard"][data-role="superadmin"]')) return;
+    const body = $('#dashboardManagersBody');
+    const count = $('#dashboardManagersCount');
+    if (!body) return;
+    try {
+      const managers = await request('/users?role=Department');
+      if (count) count.textContent = `${faNumber(managers.length)} مدیر`;
+      renderRows('#dashboardManagersBody', managers, manager => `<tr>
+        <td>${escapeHtml(manager.fullName || '—')}</td>
+        <td>${escapeHtml(manager.username || '—')}</td>
+        <td>${escapeHtml(manager.department || 'تخصیص‌نیافته')}</td>
+        <td><span class="badge ${manager.isActive ? 'badge-ok' : 'badge-muted'}">${manager.isActive ? 'فعال' : 'غیرفعال'}</span></td>
+      </tr>`, 4);
+    } catch (error) {
+      if (count) count.textContent = 'خطا در دریافت';
+      renderRows('#dashboardManagersBody', [], null, 4);
+      throw error;
+    }
+  }
+
   async function loadDepartments() {
     if (!$('body[data-active="departments"]')) return;
     const search = $('body[data-active="departments"] .search-box input')?.value.trim();
@@ -810,6 +831,7 @@
         [loadResults, ['results']],
         [loadNotifications, ['notifications']],
         [loadDashboard, ['dashboard']],
+        [loadDashboardManagers, ['dashboard']],
         [loadTeacherGrades, ['dashboard']],
         [loadDashboardExtras, ['dashboard']],
         [loadStudentPerformance, ['dashboard']],
