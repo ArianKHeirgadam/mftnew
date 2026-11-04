@@ -17,8 +17,8 @@
     <main class="content fade-in">
       <div class="page-head">
         <div>
-          <div class="breadcrumb">سامانه سنجش <span>/</span> <b>دپارتمان مهندسی کامپیوتر</b></div>
-          <h1>داشبورد دپارتمان مهندسی کامپیوتر</h1>
+          <div class="breadcrumb">سامانه سنجش <span>/</span> <b data-dashboard-department>در حال دریافت دپارتمان...</b></div>
+          <h1>داشبورد دپارتمان</h1>
         </div>
         <span class="badge badge-info">دسترسی محدود به این دپارتمان</span>
       </div>
@@ -49,10 +49,8 @@
         </div>
         <div class="card card-pad">
           <div class="section-title"><h3>وضعیت کلی دپارتمان</h3></div>
-          <ul style="display:flex;flex-direction:column;gap:16px">
-            <li><div class="flex justify-between text-sm mt-8"><span>ظرفیت پذیرش تکمیل‌شده</span><b>—</b></div><div class="progress mt-8"><i style="width:0%"></i></div></li>
-            <li><div class="flex justify-between text-sm"><span>نرخ قبولی آزمون‌های ترم</span><b>—</b></div><div class="progress mt-8"><i style="width:0%;background:var(--gold-500)"></i></div></li>
-            <li><div class="flex justify-between text-sm"><span>پیشرفت تصحیح برگه‌های تشریحی</span><b>—</b></div><div class="progress mt-8"><i style="width:0%"></i></div></li>
+          <ul id="departmentDashboardMetrics" style="display:flex;flex-direction:column;gap:16px">
+            <li class="text-soft">در حال دریافت گزارش دپارتمان...</li>
           </ul>
         </div>
       </div>
@@ -63,9 +61,7 @@
           <table class="dt">
             <thead><tr><th>عنوان آزمون</th><th>استاد</th><th>تاریخ</th><th>شرکت‌کننده</th><th>وضعیت</th><th></th></tr></thead>
             <tbody id="departmentExamsBody">
-              <tr><td>ساختار داده و الگوریتم — میان‌ترم</td><td>دکتر کریمی</td><td>۱۴۰۴/۰۵/۱۲</td><td>۱۱۰ نفر</td><td><span class="badge badge-ok">برگزار شده</span></td><td><a href="results.html" class="btn btn-ghost btn-sm">نتایج</a></td></tr>
-              <tr><td>پایگاه داده — کوییز هفتگی</td><td>مهندس صادقی</td><td>۱۴۰۴/۰۵/۱۸</td><td>۹۸ نفر</td><td><span class="badge badge-warn">در حال برگزاری</span></td><td><a href="results.html" class="btn btn-ghost btn-sm">نتایج</a></td></tr>
-              <tr><td>هوش مصنوعی — پایان‌ترم</td><td>دکتر حسینی</td><td>۱۴۰۴/۰۵/۲۵</td><td>—</td><td><span class="badge badge-muted">زمان‌بندی شده</span></td><td><a href="create-exam.html" class="btn btn-ghost btn-sm">ویرایش</a></td></tr>
+              <tr><td colspan="6" class="text-soft">در حال دریافت آزمون‌های دپارتمان...</td></tr>
             </tbody>
           </table>
         </div>
