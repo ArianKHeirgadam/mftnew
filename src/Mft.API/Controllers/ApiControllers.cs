@@ -291,7 +291,7 @@ public class QuestionsController(AppDbContext db) : ControllerBase
     [HttpGet]
     public async Task<IActionResult> List([FromQuery]string? search, [FromQuery]string? type, [FromQuery]string? category, CancellationToken ct){
         var q = db.Questions.AsQueryable();
-        if (User.IsInRole("Teacher"))q = q.Where(x => x.CreatedByUserId == User.UserId());
+        if (User.IsInRole("Teacher"))q = q.Where(x => x.CreatedByUserId == User.UserId() && x.DepartmentId == User.DepartmentId());
         if (User.IsInRole("Department"))q = q.Where(question => question.DepartmentId == User.DepartmentId());
         if (!string.IsNullOrWhiteSpace(search))q = q.Where(x => x.Text.Contains(search));
         if (!string.IsNullOrWhiteSpace(type))q = q.Where(x => x.Type == type);
@@ -335,7 +335,7 @@ public class QuestionsController(AppDbContext db) : ControllerBase
         }
         ,  ct);
         if (q is null) return NotFound();
-        if (User.IsInRole("Teacher") && q.CreatedByUserId != User.UserId()) return Forbid();
+        if (User.IsInRole("Teacher") && (q.CreatedByUserId != User.UserId() || q.DepartmentId != User.DepartmentId())) return Forbid();
         if (User.IsInRole("Department") && q.DepartmentId != User.DepartmentId()) return Forbid();
         return Ok(new {
             id = q.Id, text = q.Text, category = q.Category, type = q.Type, difficulty = q.Difficulty, options = q.OptionsJson == null?Array.Empty<string>():JsonSerializer.Deserialize<string[]>(q.OptionsJson)!, correctAnswer = q.CorrectAnswer, score = q.Score
@@ -436,7 +436,7 @@ public class ExamsController(AppDbContext db) : ControllerBase
         var q = db.Exams.Include(x => x.Questions).AsQueryable();
         if (User.IsInRole("Student"))q = q.Where(x => x.IsPublished && (x.DepartmentId == null || x.DepartmentId == User.DepartmentId()));
         if (User.IsInRole("Department"))q = q.Where(x => x.DepartmentId == User.DepartmentId());
-        if (User.IsInRole("Teacher"))q = q.Where(x => x.CreatedByUserId == User.UserId());
+        if (User.IsInRole("Teacher"))q = q.Where(x => x.CreatedByUserId == User.UserId() && x.DepartmentId == User.DepartmentId());
         // Subject, Description, EndsAt and CreatedAt are not mapped in the supplied database schema.
         // Return explicit nulls rather than asking EF Core to translate ignored properties.
         return Ok(await q.OrderBy(x => x.Title).Select(x => new{
@@ -449,7 +449,7 @@ public class ExamsController(AppDbContext db) : ControllerBase
         var e = await db.Exams.Include(x => x.Questions).FirstOrDefaultAsync(x => x.Id == id, ct);
         if (e is null || User.IsInRole("Student") && (!e.IsPublished || e.DepartmentId.HasValue && e.DepartmentId != User.DepartmentId())) return NotFound();
         if (User.IsInRole("Department") && e.DepartmentId != User.DepartmentId()) return Forbid();
-        if (User.IsInRole("Teacher") && e.CreatedByUserId != User.UserId()) return Forbid();
+        if (User.IsInRole("Teacher") && (e.CreatedByUserId != User.UserId() || e.DepartmentId != User.DepartmentId())) return Forbid();
         return Ok(new {
             id = e.Id, title = e.Title, subject = e.Subject, description = e.Description, durationMinutes = e.DurationMinutes, passingScore = e.PassingScore, allowQuestionNavigation = e.AllowQuestionNavigation, startsAt = e.StartsAt, endsAt = e.EndsAt, isPublished = e.IsPublished, questionIds = e.Questions.OrderBy(x => x.Order).Select(x => x.QuestionId)
         }
@@ -493,7 +493,7 @@ public class ExamsController(AppDbContext db) : ControllerBase
         );
         if (ids.Length>0){
             var validQuery = db.Questions.Where(q => ids.Contains(q.Id));
-            if (User.IsInRole("Teacher"))validQuery = validQuery.Where(q => q.CreatedByUserId == User.UserId());
+            if (User.IsInRole("Teacher"))validQuery = validQuery.Where(q => q.CreatedByUserId == User.UserId() && q.DepartmentId == User.DepartmentId());
             if (User.IsInRole("Department"))validQuery = validQuery.Where(question => question.DepartmentId == User.DepartmentId());
             var valid = await validQuery.Select(q => q.Id).ToListAsync(ct);
             if (valid.Count != ids.Length) return BadRequest(new {
@@ -823,7 +823,7 @@ public class ResultsController(AppDbContext db) : ControllerBase
     public async Task<IActionResult> List([FromQuery]Guid? examId, [FromQuery]Guid? studentId, CancellationToken ct){
         var q = db.ExamAttempts.Include(x => x.Exam).AsQueryable();
         if (User.IsInRole("Student"))q = q.Where(x => x.StudentId == User.UserId());
-        if (User.IsInRole("Teacher"))q = q.Where(x => x.Exam.CreatedByUserId == User.UserId());
+        if (User.IsInRole("Teacher"))q = q.Where(x => x.Exam.CreatedByUserId == User.UserId() && x.Exam.DepartmentId == User.DepartmentId());
         if (User.IsInRole("Department"))q = q.Where(x => x.Exam.DepartmentId == User.DepartmentId());
         if (examId.HasValue)q = q.Where(x => x.ExamId == examId);
         if (studentId.HasValue)q = q.Where(x => x.StudentId == studentId);
@@ -838,7 +838,7 @@ public class ResultsController(AppDbContext db) : ControllerBase
         if (a is null) return NotFound();
         if (User.IsInRole("Student") && a.StudentId != User.UserId()) return Forbid();
         if (User.IsInRole("Student") && a.Status == "InProgress") return Forbid();
-        if (User.IsInRole("Teacher") && a.Exam.CreatedByUserId != User.UserId()) return Forbid();
+        if (User.IsInRole("Teacher") && (a.Exam.CreatedByUserId != User.UserId() || a.Exam.DepartmentId != User.DepartmentId())) return Forbid();
         if (User.IsInRole("Department") && a.Exam.DepartmentId != User.DepartmentId()) return Forbid();
         var maxScore = 100m;
         var questionIds = a.Answers.Select(answer => answer.QuestionId).Distinct().ToArray();
@@ -931,7 +931,7 @@ public class DashboardController(AppDbContext db) : ControllerBase
             departments = departments.Where(department => department.Id == departmentId);
             questions = questions.Where(question => question.CreatedByUserId == User.UserId());
             exams = exams.Where(exam => exam.CreatedByUserId == User.UserId());
-            attempts = attempts.Where(attempt => attempt.Exam.CreatedByUserId == User.UserId());
+            attempts = attempts.Where(attempt => attempt.Exam.CreatedByUserId == User.UserId() && attempt.Exam.DepartmentId == departmentId);
         }
         if (User.IsInRole("Student")){
             attempts = attempts.Where(attempt => attempt.StudentId == User.UserId());
