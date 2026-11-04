@@ -128,7 +128,17 @@ const ROLE_LABEL = {
 
 function getMftSessionUser() {
   try {
-    return JSON.parse(sessionStorage.getItem("mft.currentUser") || localStorage.getItem("mft.currentUser") || "null");
+    const sessionToken = sessionStorage.getItem("mft.accessToken");
+    const localToken = localStorage.getItem("mft.accessToken");
+    if (sessionToken && localToken && sessionToken !== localToken) {
+      ["mft.accessToken", "mft.currentUser"].forEach(key => {
+        sessionStorage.removeItem(key);
+        localStorage.removeItem(key);
+      });
+      return null;
+    }
+    const store = sessionToken ? sessionStorage : localToken ? localStorage : null;
+    return JSON.parse(store?.getItem("mft.currentUser") || "null");
   } catch {
     return null;
   }
@@ -167,7 +177,7 @@ function renderSidebar() {
       </div>
       <nav>${navHtml}</nav>
       <div class="sidebar-foot">
-        <a class="nav-link" href="login.html"> ${ICON.logout} <span class="nav-label">خروج از حساب</span></a>
+        <a class="nav-link" href="login.html" data-mft-logout> ${ICON.logout} <span class="nav-label">خروج از حساب</span></a>
         
       </div>
       <button class="collapse-btn" id="collapseBtn" type="button">
@@ -236,7 +246,7 @@ function renderTopbar() {
             <a href="profile.html">${ICON.profile} پروفایل من</a>
             <a href="settings.html">${ICON.settings} تنظیمات</a>
             <hr>
-            <a href="login.html" style="color:var(--danger)">${ICON.logout} خروج از حساب</a>
+            <a href="login.html" data-mft-logout style="color:var(--danger)">${ICON.logout} خروج از حساب</a>
           </div>
         </div>
       </div>
@@ -357,6 +367,20 @@ window.clearFieldError = clearFieldError;
 
 /* ---------------- Boot ---------------- */
 document.addEventListener("DOMContentLoaded", () => {
+  document.addEventListener("click", event => {
+    const logoutLink = event.target.closest("[data-mft-logout]");
+    if (!logoutLink) return;
+    event.preventDefault();
+    if (window.MftApi?.logout) {
+      window.MftApi.logout();
+    } else {
+      ["mft.accessToken", "mft.currentUser"].forEach(key => {
+        sessionStorage.removeItem(key);
+        localStorage.removeItem(key);
+      });
+      window.location.href = "login.html";
+    }
+  });
   renderSidebar();
   renderTopbar();
   initDropdowns();
