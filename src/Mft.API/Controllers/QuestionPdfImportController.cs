@@ -12,10 +12,10 @@ namespace Mft.API.Controllers;
 [ApiController, Route("api/questions"), Authorize(Policy = "TeacherOrAbove")]
 public sealed class QuestionPdfImportController(AppDbContext db) : ControllerBase
 {
-    private static readonly Regex QuestionStart = new(@"^(?:Q(?:UESTION)?\\s*\\d+|سؤال\\s*\\d+)\\s*[:.)\\-]\\s*(.*)$", RegexOptions.IgnoreCase | RegexOptions.Compiled);
-    private static readonly Regex OptionLine = new(@"^(?:([A-E])|([الفبجد]))[).:\\-]\\s*(.+)$", RegexOptions.IgnoreCase | RegexOptions.Compiled);
-    private static readonly Regex AnswerLine = new(@"^(?:ANSWER|پاسخ)\\s*[:=]\\s*(.+)$", RegexOptions.IgnoreCase | RegexOptions.Compiled);
-    private static readonly Regex PairLine = new(@"^(?:PAIR|جفت)\\s*[:=]\\s*(.+?)\\s*(?:=>|->|→|=)\\s*(.+)$", RegexOptions.IgnoreCase | RegexOptions.Compiled);
+    private static readonly Regex QuestionStart = new(@"^(?:Q(?:UESTION)?\s*\d+|سؤال\s*\d+)\s*[:.)\-]\s*(.*)$", RegexOptions.IgnoreCase | RegexOptions.Compiled);
+    private static readonly Regex OptionLine = new(@"^(?:([A-E])|([الفبجد]))[).:\-]\s*(.+)$", RegexOptions.IgnoreCase | RegexOptions.Compiled);
+    private static readonly Regex AnswerLine = new(@"^(?:ANSWER|پاسخ)\s*[:=]\s*(.+)$", RegexOptions.IgnoreCase | RegexOptions.Compiled);
+    private static readonly Regex PairLine = new(@"^(?:PAIR|جفت)\s*[:=]\s*(.+?)\s*(?:=>|->|→|=)\s*(.+)$", RegexOptions.IgnoreCase | RegexOptions.Compiled);
 
     [HttpPost("import-pdf"), RequestSizeLimit(15_000_000)]
     public async Task<IActionResult> ImportPdf(
@@ -48,7 +48,7 @@ public sealed class QuestionPdfImportController(AppDbContext db) : ControllerBas
         {
             await using var stream = file.OpenReadStream();
             using var pdf = PdfDocument.Open(stream);
-            var text = string.Join("\\n", pdf.GetPages().Select(page => page.Text));
+            var text = string.Join("\n", pdf.GetPages().Select(page => page.Text));
             var blocks = Parse(text);
             if (blocks.Count == 0)
                 return BadRequest(new { message = "سؤالی پیدا نشد. ساختار PDF را مطابق راهنمای صفحه بارگذاری تنظیم کنید." });
@@ -99,9 +99,9 @@ public sealed class QuestionPdfImportController(AppDbContext db) : ControllerBas
     {
         var result = new List<ParsedQuestion>();
         List<string>? current = null;
-        foreach (var raw in source.Replace("\\r", "").Split('\\n'))
+        foreach (var raw in source.Replace("\r", "").Split('\n'))
         {
-            var line = Regex.Replace(raw, @"\\s+", " ").Trim();
+            var line = Regex.Replace(raw, @"\s+", " ").Trim();
             if (line.Length == 0) continue;
             var start = QuestionStart.Match(line);
             if (start.Success)
@@ -127,7 +127,7 @@ public sealed class QuestionPdfImportController(AppDbContext db) : ControllerBas
 
         foreach (var line in lines)
         {
-            var typeMatch = Regex.Match(line, @"^(?:TYPE|نوع)\\s*[:=]\\s*(.+)$", RegexOptions.IgnoreCase);
+            var typeMatch = Regex.Match(line, @"^(?:TYPE|نوع)\s*[:=]\s*(.+)$", RegexOptions.IgnoreCase);
             if (typeMatch.Success) { declaredType = typeMatch.Groups[1].Value.Trim().ToUpperInvariant(); continue; }
             var pair = PairLine.Match(line);
             if (pair.Success) { pairs.Add((pair.Groups[1].Value.Trim(), pair.Groups[2].Value.Trim())); continue; }
