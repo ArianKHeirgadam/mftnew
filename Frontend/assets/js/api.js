@@ -675,17 +675,65 @@
     notify('دپارتمان ایجاد شد و به فهرست انتخاب اضافه شد.', 'ok');
   }
 
+  function showQuickCreateModal(title, fields) {
+    return new Promise(resolve => {
+      const overlay = document.createElement('div');
+      overlay.className = 'modal-overlay show';
+      overlay.style.zIndex = '220';
+      const box = document.createElement('div');
+      box.className = 'modal-box';
+      const head = document.createElement('div');
+      head.className = 'modal-head';
+      const heading = document.createElement('h3');
+      heading.style.fontSize = '16px';
+      heading.textContent = title;
+      const close = document.createElement('button');
+      close.type = 'button'; close.className = 'icon-btn'; close.textContent = '✕';
+      head.append(heading, close);
+      const body = document.createElement('div');
+      body.className = 'modal-body';
+      const controls = {};
+      fields.forEach(field => {
+        const wrapper = document.createElement('div'); wrapper.className = 'field';
+        const label = document.createElement('label'); label.textContent = field.label;
+        const input = document.createElement('input'); input.className = 'input';
+        input.type = field.type || 'text'; input.autocomplete = 'off';
+        input.placeholder = field.placeholder || ''; input.required = true;
+        wrapper.append(label, input); body.appendChild(wrapper); controls[field.name] = input;
+      });
+      const foot = document.createElement('div'); foot.className = 'modal-foot';
+      const submit = document.createElement('button'); submit.type = 'button';
+      submit.className = 'btn btn-primary'; submit.textContent = 'ایجاد';
+      const cancel = document.createElement('button'); cancel.type = 'button';
+      cancel.className = 'btn btn-outline'; cancel.textContent = 'انصراف';
+      foot.append(submit, cancel); box.append(head, body, foot); overlay.appendChild(box);
+      document.body.appendChild(overlay);
+      const finish = value => { overlay.remove(); resolve(value); };
+      close.addEventListener('click', () => finish(null));
+      cancel.addEventListener('click', () => finish(null));
+      overlay.addEventListener('click', event => { if (event.target === overlay) finish(null); });
+      submit.addEventListener('click', () => {
+        const values = Object.fromEntries(Object.entries(controls).map(([key, input]) => [key, input.value.trim()]));
+        const missing = fields.find(field => !values[field.name]);
+        if (missing) { notify(missing.label + ' الزامی است.', 'warn'); controls[missing.name].focus(); return; }
+        finish(values);
+      });
+      Object.values(controls)[0]?.focus();
+    });
+  }
+
   async function createManagerInline() {
     if ((currentUser()?.role || '').toLowerCase() !== 'superadmin') {
       return notify('فقط مدیر کل امکان ایجاد مدیر دپارتمان دارد.', 'warn');
     }
-    const fullName = window.prompt('نام و نام خانوادگی مدیر دپارتمان:')?.trim();
-    if (!fullName) return;
-    const username = window.prompt('نام کاربری مدیر دپارتمان:')?.trim();
-    if (!username) return;
+    const values = await showQuickCreateModal('ایجاد مدیر دپارتمان', [
+      { name: 'fullName', label: 'نام و نام خانوادگی مدیر' },
+      { name: 'username', label: 'نام کاربری' }
+    ]);
+    if (!values) return;
     const created = await request('/users', {
       method: 'POST',
-      body: JSON.stringify({ username, fullName, role: 'Department', email: null, mobile: null, departmentId: null, mustChangePassword: true })
+      body: JSON.stringify({ username: values.username, fullName: values.fullName, role: 'Department', email: null, mobile: null, departmentId: null, mustChangePassword: true })
     });
     const select = $('#departmentManagerId');
     if (select) {
@@ -694,8 +742,8 @@
         managers.map(manager => `<option value="${manager.id}">${escapeHtml(manager.fullName)}</option>`).join('');
       select.value = created.id;
     }
-    if (created.temporaryPassword) window.prompt('حساب مدیر ایجاد شد. رمز موقت را همین حالا کپی و امن تحویل دهید:', created.temporaryPassword);
-    notify('حساب مدیر ایجاد شد؛ پس از ایجاد دپارتمان آن را به دپارتمان متصل کنید.', 'ok');
+    if (created.temporaryPassword) notify('حساب ساخته شد. رمز موقت: ' + created.temporaryPassword, 'info');
+    notify('حساب مدیر ایجاد شد؛ با ذخیره دپارتمان به آن متصل می‌شود.', 'ok');
   }
 
   async function createTeacherInline() {
