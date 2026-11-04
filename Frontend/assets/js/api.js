@@ -899,16 +899,15 @@
         const anchor = managerSelect?.closest('.field') || managerSelect?.parentElement;
         mountInlineQuickForm(anchor, '+ ایجاد مدیر دپارتمان', 'ساخت حساب مدیر دپارتمان', [
           { name: 'username', label: 'نام کاربری' },
-          { name: 'fullName', label: 'نام و نام خانوادگی' }
+          { name: 'fullName', label: 'نام و نام خانوادگی' },
+          { name: 'password', label: 'رمز عبور (حداقل ۸ کاراکتر)', type: 'password' }
         ], async values => {
           const created = await request('/users', { method: 'POST', body: JSON.stringify({
-            username: values.username, fullName: values.fullName, role: 'Department'
+            username: values.username, password: values.password, fullName: values.fullName, role: 'Department'
           }) });
           const managers = await request('/users?role=Department');
           managerSelect.innerHTML = '<option value="">بدون مدیر</option>' + managers.map(manager => `<option value="${manager.id}">${escapeHtml(manager.fullName)}</option>`).join('');
           managerSelect.value = String(created.id);
-          const temporaryPassword = created.temporaryPassword || '';
-          if (temporaryPassword) showTemporaryPasswordModal(temporaryPassword);
           notify('حساب مدیر ایجاد شد؛ با ذخیره دپارتمان به آن متصل می‌شود.', 'ok');
         });
       }
@@ -930,19 +929,18 @@
     if ((role === 'superadmin' || role === 'department') && document.body.dataset.active === 'exams' && $('#teacherChoices')) {
       mountInlineQuickForm($('#teacherChoices').parentElement, '+ ایجاد استاد جدید', 'ساخت حساب استاد', [
         { name: 'username', label: 'نام کاربری' },
-        { name: 'fullName', label: 'نام و نام خانوادگی' }
+        { name: 'fullName', label: 'نام و نام خانوادگی' },
+        { name: 'password', label: 'رمز عبور (حداقل ۸ کاراکتر)', type: 'password' }
       ], async values => {
         const department = $('#deptChoices .choice-card.selected');
         if (!department?.dataset.id) throw new Error('ابتدا دپارتمان را انتخاب کنید.');
         const created = await request('/users', { method: 'POST', body: JSON.stringify({
-          username: values.username, fullName: values.fullName, role: 'Teacher', departmentId: department.dataset.id
+          username: values.username, password: values.password, fullName: values.fullName, role: 'Teacher', departmentId: department.dataset.id
         }) });
         await loadExamWizard();
         const card = [...document.querySelectorAll('#teacherChoices .choice-card')].find(item => item.dataset.id === String(created.id));
         card?.parentElement.querySelectorAll('.choice-card').forEach(item => item.classList.remove('selected'));
         card?.classList.add('selected');
-        const temporaryPassword = created.temporaryPassword || '';
-        if (temporaryPassword) showTemporaryPasswordModal(temporaryPassword);
         notify('استاد ایجاد و برای آزمون انتخاب شد.', 'ok');
       });
     }
