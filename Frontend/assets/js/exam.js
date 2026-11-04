@@ -69,9 +69,24 @@
     card?.querySelectorAll('label.option-row').forEach(el => el.remove());
     const options = Array.isArray(q.options) ? q.options : [];
     const oldTextarea = card?.querySelector('#examEssayAnswer'); oldTextarea?.remove();
+    card?.querySelectorAll('[data-matching-row]').forEach(el => el.remove());
     const oldHint = card?.querySelector('[data-no-options]'); oldHint?.remove();
     const currentAnswer = answers.get(q.id) ?? '';
-    if (options.length) {
+    if (q.type === 'Matching') {
+      let selected = {};
+      try { selected = JSON.parse(currentAnswer || '{}'); } catch { selected = {}; }
+      const choices = Array.isArray(q.matchingOptions) ? q.matchingOptions : [];
+      options.forEach(left => {
+        const row = document.createElement('div'); row.dataset.matchingRow = 'true'; row.className = 'field';
+        const label = document.createElement('label'); label.textContent = left;
+        const select = document.createElement('select'); select.className = 'select'; select.style.width = '100%';
+        const empty = document.createElement('option'); empty.value = ''; empty.textContent = 'انتخاب مورد مرتبط'; select.append(empty);
+        choices.forEach(right => { const option = document.createElement('option'); option.value = right; option.textContent = right; select.append(option); });
+        select.value = selected[left] || '';
+        select.addEventListener('change', () => { selected[left] = select.value; answers.set(q.id, JSON.stringify(selected)); updateProgress(); buildNav(); queueSave(); });
+        row.append(label, select); questionTitle?.after(row);
+      });
+    } else if (options.length) {
       let anchor = questionTitle;
       options.forEach((option, idx) => {
         const label = document.createElement('label'); label.className = 'option-row';
