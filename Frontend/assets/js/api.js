@@ -946,8 +946,8 @@
     await safe(async () => {
       await loadCurrentUser();
       const isSuperAdmin = (currentUser()?.role || '').toLowerCase() === 'superadmin';
-      $('[data-create-department], [data-create-manager]').forEach(button => { button.hidden = !isSuperAdmin; });
-      $('[data-create-teacher]').forEach(button => { button.hidden = !['superadmin', 'department'].includes((currentUser()?.role || '').toLowerCase()); });
+      $$('[data-create-department], [data-create-manager]').forEach(button => { button.hidden = !isSuperAdmin; });
+      $$('[data-create-teacher]').forEach(button => { button.hidden = !['superadmin', 'department'].includes((currentUser()?.role || '').toLowerCase()); });
       const loaders = [
         [loadUsers, ['students', 'teachers']],
         [loadDepartments, ['departments']],
