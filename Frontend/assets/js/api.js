@@ -319,14 +319,14 @@
       request('/auth/me')
     ]);
 
-    $('[data-metric]').forEach(element => {
+    document.querySelectorAll('[data-metric]').forEach(element => {
       const key = element.dataset.metric;
       if (Object.prototype.hasOwnProperty.call(data, key)) {
         element.textContent = faNumber(data[key]);
       }
     });
 
-    $('[data-count]').forEach(element => {
+    document.querySelectorAll('[data-count]').forEach(element => {
       const key = element.dataset.metric;
       if (key && Object.prototype.hasOwnProperty.call(data, key)) {
         element.dataset.count = String(data[key]);
