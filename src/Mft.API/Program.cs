@@ -1,6 +1,5 @@
 
 using System.Text;
-using System.Security.Claims;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
@@ -125,88 +124,6 @@ if (app.Environment.IsDevelopment())
 }
 
 app.UseAuthentication();
-
-// --------------------------------------------------
-// Temporary Password Middleware
-// --------------------------------------------------
-
-app.Use(async (context, next) =>
-{
-    var path = context.Request.Path.Value ?? string.Empty;
-
-    var isPasswordLifecycleEndpoint =
-        path.Equals(
-            "/api/auth/login",
-            StringComparison.OrdinalIgnoreCase)
-        ||
-        path.Equals(
-            "/api/auth/me",
-            StringComparison.OrdinalIgnoreCase)
-        ||
-        path.Equals(
-            "/api/auth/change-password",
-            StringComparison.OrdinalIgnoreCase);
-
-    if (
-        context.User.Identity?.IsAuthenticated == true
-        &&
-        path.StartsWith(
-            "/api/",
-            StringComparison.OrdinalIgnoreCase)
-        &&
-        !isPasswordLifecycleEndpoint
-    )
-    {
-        var idValue = context.User.FindFirst(
-            ClaimTypes.NameIdentifier)?.Value;
-
-        if (Guid.TryParse(idValue, out var userId))
-        {
-            var account = await context.RequestServices
-                .GetRequiredService<AppDbContext>()
-                .Users
-                .AsNoTracking()
-                .Where(user => user.Id == userId)
-                .Select(user => new
-                {
-                    user.MustChangePassword,
-                    user.IsActive
-                })
-                .SingleOrDefaultAsync(
-                    context.RequestAborted);
-
-            if (account is null || !account.IsActive)
-            {
-                context.Response.StatusCode =
-                    StatusCodes.Status401Unauthorized;
-
-                return;
-            }
-
-            if (account.MustChangePassword)
-            {
-                context.Response.StatusCode =
-                    StatusCodes.Status403Forbidden;
-
-                context.Response.ContentType =
-                    "application/json; charset=utf-8";
-
-                await context.Response.WriteAsJsonAsync(
-                    new
-                    {
-                        message =
-                            "برای ادامه ابتدا باید رمز موقت خود را تغییر دهید.",
-                        code = "PASSWORD_CHANGE_REQUIRED"
-                    },
-                    context.RequestAborted);
-
-                return;
-            }
-        }
-    }
-
-    await next();
-});
 
 app.UseAuthorization();
 
