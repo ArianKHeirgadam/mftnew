@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>حضور و غیاب | سامانه سنجش</title>
+<link rel="stylesheet" href="assets/css/style.css"><link rel="stylesheet" href="assets/css/responsive.css"><link rel="stylesheet" href="assets/css/dark.css">
+<style>
+.att-wrap{max-width:1100px;margin:auto}.att-actions{display:flex;gap:8px;flex-wrap:wrap}.att-status{display:flex;gap:6px;flex-wrap:wrap}.att-status button{border:1px solid var(--border);background:var(--surface-2);color:var(--text);border-radius:9px;padding:8px 12px;cursor:pointer}.att-status button[aria-pressed="true"][data-status="Present"]{background:#0f9d72;color:white}.att-status button[aria-pressed="true"][data-status="Absent"]{background:#d9485f;color:white}.att-status button[aria-pressed="true"][data-status="Deleted"]{background:#64748b;color:white}.att-summary{display:flex;gap:10px;flex-wrap:wrap}.att-summary span{padding:8px 12px;border-radius:9px;background:var(--surface-2)}
+</style></head>
+<body data-active="attendance">
+<div class="app-shell"><div id="sidebar-root"></div><div class="main-col"><div id="topbar-root" data-title="حضور و غیاب"></div>
+<main class="content fade-in"><div class="page-head"><div><div class="breadcrumb">سامانه سنجش / <b>حضور و غیاب</b></div><h1>ثبت حضور و غیاب دانشجویان</h1><p class="text-soft">تاریخ به‌صورت خودکار از تاریخ دستگاه شما تنظیم می‌شود؛ وضعیت هر دانشجو را با یک کلیک مشخص کنید.</p></div></div>
+<section class="card card-pad"><div class="grid-2" style="grid-template-columns:repeat(auto-fit,minmax(220px,1fr));align-items:end">
+<div class="field"><label for="attendanceDate">تاریخ</label><input class="input" type="date" id="attendanceDate"></div>
+<div class="field" id="departmentPickerWrap" hidden><label for="attendanceDepartment">دپارتمان</label><select class="select" id="attendanceDepartment"></select></div>
+<div class="att-actions"><button class="btn btn-outline" id="loadAttendance">نمایش</button><button class="btn btn-primary" id="saveAttendance">ذخیره وضعیت‌ها</button></div></div>
+<div class="att-summary" id="attendanceSummary" style="margin:14px 0"></div>
+<div class="table-wrap"><table class="dt"><thead><tr><th>دانشجو</th><th>نام کاربری</th><th>وضعیت حضور</th></tr></thead><tbody id="attendanceRows"><tr><td colspan="3">در حال بارگذاری...</td></tr></tbody></table></div>
+<p id="attendanceMessage" class="text-soft" role="status" aria-live="polite"></p></section></main></div></div>
+<script src="assets/js/theme.js"></script><script src="assets/js/app.js"></script><script src="assets/js/api.js"></script>
+<script>
+(() => {
+ const $=s=>document.querySelector(s); const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+ const today=new Date(); const localDate=new Date(today.getTime()-today.getTimezoneOffset()*60000).toISOString().slice(0,10);
+ $('#attendanceDate').value=localDate; let rows=[];
+ const labels={Present:'حاضر',Absent:'غایب',Deleted:'حذف‌شده'};
+ const statusButtons=(id,status)=>Object.entries(labels).map(([key,label])=>'<button type="button" data-student="'+id+'" data-status="'+key+'" aria-pressed="'+(status===key)+'">'+label+'</button>').join('');
+ function summary(){const counts={Present:0,Absent:0,Deleted:0,unset:0};rows.forEach(x=>counts[x.status||'unset']++);$('#attendanceSummary').innerHTML='<span>حاضر: '+counts.Present+'</span><span>غایب: '+counts.Absent+'</span><span>حذف‌شده: '+counts.Deleted+'</span><span>تعیین‌نشده: '+counts.unset+'</span>';}
+ async function load(){const dept=$('#attendanceDepartment')?.value;const q=new URLSearchParams({date:$('#attendanceDate').value});if(dept)q.set('departmentId',dept);const data=await MftApi.request('/attendance?'+q.toString());rows=data.students.map(x=>({...x,status:x.status||null}));$('#attendanceRows').innerHTML=rows.length?rows.map(x=>'<tr><td>'+esc(x.fullName)+'</td><td>'+esc(x.username)+'</td><td><div class="att-status">'+statusButtons(x.id,x.status)+'</div></td></tr>').join(''):'<tr><td colspan="3">دانشجویی در این دپارتمان ثبت نشده است.</td></tr>';summary();$('#attendanceMessage').textContent='';}
+ document.addEventListener('click',e=>{const b=e.target.closest('[data-student][data-status]');if(!b)return;const row=rows.find(x=>x.id===b.dataset.student);if(!row)return;row.status=b.dataset.status;const group=b.parentElement;group.querySelectorAll('button').forEach(x=>x.setAttribute('aria-pressed',String(x===b)));summary();});
+ $('#loadAttendance').addEventListener('click',()=>load().catch(e=>$('#attendanceMessage').textContent=e.message));
+ $('#saveAttendance').addEventListener('click',async()=>{const marked=rows.filter(x=>x.status);if(!marked.length){$('#attendanceMessage').textContent='ابتدا وضعیت دانشجویان را مشخص کنید.';return;}try{const departmentId=$('#attendanceDepartment')?.value||null;const result=await MftApi.request('/attendance',{method:'PUT',body:JSON.stringify({date:$('#attendanceDate').value,departmentId,records:marked.map(x=>({studentId:x.id,status:x.status}))})});$('#attendanceMessage').textContent=result.message;await load();}catch(e){$('#attendanceMessage').textContent=e.message;}});
+ async function init(){const user=JSON.parse(sessionStorage.getItem('mft.currentUser')||localStorage.getItem('mft.currentUser')||'null');if(user?.role==='SuperAdmin'){const wrap=$('#departmentPickerWrap');wrap.hidden=false;const departments=await MftApi.request('/departments');$('#attendanceDepartment').innerHTML=departments.map(d=>'<option value="'+d.id+'">'+esc(d.name)+'</option>').join('');}await load();}
+ document.addEventListener('DOMContentLoaded',()=>init().catch(e=>$('#attendanceMessage').textContent=e.message));
+})();
+</script></body></html>
