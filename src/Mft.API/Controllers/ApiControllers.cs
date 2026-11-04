@@ -929,8 +929,8 @@ public class DashboardController(AppDbContext db) : ControllerBase
         if (User.IsInRole("Teacher")){
             users = users.Where(user => user.Role == UserRole.Student && user.DepartmentId == departmentId);
             departments = departments.Where(department => department.Id == departmentId);
-            questions = questions.Where(question => question.CreatedByUserId == User.UserId());
-            exams = exams.Where(exam => exam.CreatedByUserId == User.UserId());
+            questions = questions.Where(question => question.CreatedByUserId == User.UserId() && question.DepartmentId == departmentId);
+            exams = exams.Where(exam => exam.CreatedByUserId == User.UserId() && exam.DepartmentId == departmentId);
             attempts = attempts.Where(attempt => attempt.Exam.CreatedByUserId == User.UserId() && attempt.Exam.DepartmentId == departmentId);
         }
         if (User.IsInRole("Student")){
