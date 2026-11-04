@@ -556,6 +556,8 @@
       const activeField = $('[data-user-active]', modal);
       if (activeField) activeField.checked = true;
       if ($('[data-question-difficulty]', modal)) $('[data-question-difficulty]', modal).value = 'Medium';
+      if ($('#mcqOptions', modal)) $('#mcqOptions', modal).style.display = 'block';
+      if ($('#matchingOptions', modal)) $('#matchingOptions', modal).hidden = true;
     });
     document.addEventListener('click', event => {
       const gradeSave = event.target.closest('[data-grade-save]');
