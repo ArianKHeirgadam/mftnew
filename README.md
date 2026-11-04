@@ -74,7 +74,7 @@ The role is read from the authenticated account, not selected in the login UI. N
 
 ## Current verification status
 
-- JavaScript syntax checks pass with Node.js for the files in `Frontend/assets/js/`.
+- A code-level scan was performed for unsafe `querySelector(...).forEach(...)` patterns; none remain in the shared JavaScript files.\n- The latest attendance, PDF-import, matching-question and modal changes have **not yet been runtime-tested** in a browser or against SQL Server.
 - JSON configuration files parse successfully.
 - The .NET SDK is not installed in the build environment, so `dotnet restore`, `dotnet build`, migrations, API integration tests, and live SQL Server tests have **not** been run here.
 - User, department, question, exam, result grading, notification, profile, settings, dashboard and report workflows are now connected where supported by the supplied API. See `API-ENDPOINTS.md` and `docs/PROJECT_STATUS.md` for unsupported items and test limitations. Do not treat this working version as production-ready until the .NET build, migrations, SQL Server integration and authorization tests are completed.
