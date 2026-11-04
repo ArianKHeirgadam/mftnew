@@ -1,4 +1,5 @@
 
+using System.Security.Claims;
 using System.Text;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
@@ -63,6 +64,56 @@ builder.Services.AddAuthentication(
                 ValidateLifetime = true,
                 ClockSkew = TimeSpan.FromSeconds(30)
             };
+
+        // JWTs are otherwise valid until expiry even after an account is disabled
+        // or its role/department changes. Re-check the account on every request
+        // so stale claims cannot keep access to the previous permission scope.
+        options.Events = new JwtBearerEvents
+        {
+            OnTokenValidated = async context =>
+            {
+                var userIdValue = context.Principal?
+                    .FindFirstValue(ClaimTypes.NameIdentifier);
+
+                if (!Guid.TryParse(userIdValue, out var userId))
+                {
+                    context.Fail("توکن فاقد شناسه کاربر معتبر است.");
+                    return;
+                }
+
+                var db = context.HttpContext.RequestServices
+                    .GetRequiredService<AppDbContext>();
+
+                var account = await db.Users
+                    .AsNoTracking()
+                    .Where(user => user.Id == userId)
+                    .Select(user => new
+                    {
+                        user.IsActive,
+                        Role = user.Role.ToString(),
+                        user.DepartmentId
+                    })
+                    .SingleOrDefaultAsync(context.HttpContext.RequestAborted);
+
+                if (account is null || !account.IsActive)
+                {
+                    context.Fail("حساب کاربری غیرفعال یا حذف شده است.");
+                    return;
+                }
+
+                var tokenRole = context.Principal?
+                    .FindFirstValue(ClaimTypes.Role);
+                var tokenDepartment = context.Principal?
+                    .FindFirstValue("departmentId") ?? "";
+
+                var currentDepartment = account.DepartmentId?.ToString() ?? "";
+                if (!string.Equals(tokenRole, account.Role, StringComparison.Ordinal) ||
+                    !string.Equals(tokenDepartment, currentDepartment, StringComparison.OrdinalIgnoreCase))
+                {
+                    context.Fail("سطح دسترسی حساب تغییر کرده است؛ دوباره وارد شوید.");
+                }
+            }
+        };
     });
 
 // --------------------------------------------------
