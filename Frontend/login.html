@@ -236,7 +236,7 @@
         <div class="field"><label>ایمیل</label><input class="input" type="email" placeholder="you@example.com"></div>
       </div>
       <div class="modal-foot">
-        <button class="btn btn-primary" id="sendResetBtn" data-password-reset-unavailable>ارسال لینک بازیابی</button>
+        <button class="btn btn-primary" id="sendResetBtn" data-password-reset-unavailable disabled>بازیابی خودکار در دسترس نیست</button>
         <button class="btn btn-outline" data-modal-close>انصراف</button>
       </div>
     </div>
@@ -245,13 +245,6 @@
   <script src="assets/js/theme.js"></script>
   <script src="assets/js/app.js"></script>
   <script src="assets/js/api.js"></script>
-  <script>
-    // Authentication and role routing are handled by assets/js/api.js from the API response.
-    document.getElementById("sendResetBtn")?.addEventListener("click", () => {
-      document.getElementById("forgotModal").classList.remove("show");
-      showToast("لینک بازیابی رمز عبور ارسال شد", "ok");
-    });
-  </script>
 </body>
 
 </html>

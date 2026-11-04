@@ -5,8 +5,21 @@
   const API_BASE = window.MFT_API_BASE || 'https://localhost:7081/api';
   const TOKEN_KEY = 'mft.accessToken';
   const USER_KEY = 'mft.currentUser';
-  const token = () => sessionStorage.getItem(TOKEN_KEY) || localStorage.getItem(TOKEN_KEY);
-  const userStore = () => sessionStorage.getItem(USER_KEY) || localStorage.getItem(USER_KEY);
+  // A valid login must live in exactly one storage area. If legacy state left
+  // two different identities behind, fail closed instead of sending the wrong token.
+  function activeSessionStore() {
+    const sessionToken = sessionStorage.getItem(TOKEN_KEY);
+    const localToken = localStorage.getItem(TOKEN_KEY);
+    if (sessionToken && localToken && sessionToken !== localToken) {
+      clearSession();
+      return null;
+    }
+    if (sessionToken) return sessionStorage;
+    if (localToken) return localStorage;
+    return null;
+  }
+  const token = () => activeSessionStore()?.getItem(TOKEN_KEY) || null;
+  const userStore = () => activeSessionStore()?.getItem(USER_KEY) || null;
   const currentUser = () => { try { return JSON.parse(userStore() || 'null'); } catch { return null; } };
   const $ = (selector, root = document) => root.querySelector(selector);
   const $$ = (selector, root = document) => [...root.querySelectorAll(selector)];
@@ -66,7 +79,15 @@
       if (!username || !password) return notify('نام کاربری و رمز عبور را وارد کنید.', 'warn');
 
       await safe(async () => {
+        // Remove any previous identity before sending the unauthenticated login request.
+        clearSession();
         const result = await request('/auth/login', { method: 'POST', body: JSON.stringify({ username, password }) });
+        if (!result?.accessToken || !result?.role) {
+          throw new Error('پاسخ ورود از سرور معتبر نیست.');
+        }
+
+        // Keep the new identity in one store only; never let an older token win.
+        clearSession();
         const store = $('input[type="checkbox"]', form)?.checked ? localStorage : sessionStorage;
         store.setItem(TOKEN_KEY, result.accessToken);
         store.setItem(USER_KEY, JSON.stringify(result));
@@ -86,7 +107,9 @@
     if (!token()) return null;
     const user = await request('/auth/me');
     const serialized = JSON.stringify(user);
-    (sessionStorage.getItem(TOKEN_KEY) ? sessionStorage : localStorage).setItem(USER_KEY, serialized);
+    const store = activeSessionStore();
+    if (!store) throw new Error('نشست معتبر نیست؛ دوباره وارد شوید.');
+    store.setItem(USER_KEY, serialized);
     document.body.dataset.role = (user.role || '').toLowerCase();
     $$('[data-current-user-name]').forEach(element => element.textContent = user.fullName || user.username);
     return user;
