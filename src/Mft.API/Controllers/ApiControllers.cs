@@ -951,3 +951,93 @@ static class ClaimsExtensions{
     public static Guid UserId(this ClaimsPrincipal u) => Guid.TryParse(u.FindFirstValue(ClaimTypes.NameIdentifier), out var id)?id:Guid.Empty;
     public static Guid? DepartmentId(this ClaimsPrincipal u) => Guid.TryParse(u.FindFirst("departmentId")?.Value, out var id)?id:null;
 }
+
+
+[ApiController, Route("api/attendance"), Authorize(Policy = "TeacherOrAbove")]
+public sealed class AttendanceController(AppDbContext db) : ControllerBase
+{
+    [HttpGet]
+    public async Task<IActionResult> List([FromQuery] DateOnly? date, [FromQuery] Guid? departmentId, CancellationToken ct)
+    {
+        var effectiveDepartmentId = User.IsInRole("SuperAdmin") ? departmentId : User.DepartmentId();
+        if (!effectiveDepartmentId.HasValue)
+            return BadRequest(new { message = "دپارتمان را انتخاب کنید." });
+
+        var departmentExists = await db.Departments.AnyAsync(x => x.Id == effectiveDepartmentId.Value, ct);
+        if (!departmentExists) return NotFound(new { message = "دپارتمان پیدا نشد." });
+
+        var targetDate = date ?? DateOnly.FromDateTime(DateTime.Today);
+        var students = await db.Users.AsNoTracking()
+            .Where(x => x.Role == UserRole.Student && x.DepartmentId == effectiveDepartmentId.Value)
+            .OrderBy(x => x.FullName)
+            .Select(x => new { id = x.Id, fullName = x.FullName, username = x.Username })
+            .ToListAsync(ct);
+
+        var ids = students.Select(x => x.id).ToArray();
+        var marks = await db.AttendanceRecords.AsNoTracking()
+            .Where(x => x.DepartmentId == effectiveDepartmentId.Value && x.AttendanceDate == targetDate && ids.Contains(x.StudentUserId))
+            .ToDictionaryAsync(x => x.StudentUserId, x => x.Status, ct);
+
+        return Ok(new {
+            date = targetDate,
+            departmentId = effectiveDepartmentId,
+            students = students.Select(x => new {
+                x.id, x.fullName, x.username,
+                status = marks.TryGetValue(x.id, out var status) ? status : (string?)null
+            })
+        });
+    }
+
+    [HttpPut]
+    public async Task<IActionResult> Save(SaveAttendanceRequest request, CancellationToken ct)
+    {
+        var effectiveDepartmentId = User.IsInRole("SuperAdmin") ? request.DepartmentId : User.DepartmentId();
+        if (!effectiveDepartmentId.HasValue)
+            return BadRequest(new { message = "دپارتمان را انتخاب کنید." });
+        if (request.Records is null || request.Records.Count == 0)
+            return BadRequest(new { message = "حداقل وضعیت یک دانشجو را مشخص کنید." });
+        if (request.Records.Count > 1000)
+            return BadRequest(new { message = "در هر بار حداکثر ۱۰۰۰ دانشجو قابل ثبت است." });
+
+        var allowed = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "Present", "Absent", "Deleted" };
+        if (request.Records.Any(x => !allowed.Contains(x.Status)))
+            return BadRequest(new { message = "وضعیت حضور و غیاب نامعتبر است." });
+
+        var ids = request.Records.Select(x => x.StudentId).Distinct().ToArray();
+        if (ids.Length != request.Records.Count)
+            return BadRequest(new { message = "برای یک دانشجو وضعیت تکراری ارسال شده است." });
+
+        var validIds = await db.Users
+            .Where(x => ids.Contains(x.Id) && x.Role == UserRole.Student && x.DepartmentId == effectiveDepartmentId.Value)
+            .Select(x => x.Id).ToListAsync(ct);
+        if (validIds.Count != ids.Length)
+            return BadRequest(new { message = "یک یا چند دانشجو به این دپارتمان تعلق ندارند." });
+
+        var existing = await db.AttendanceRecords
+            .Where(x => x.DepartmentId == effectiveDepartmentId.Value && x.AttendanceDate == request.Date && ids.Contains(x.StudentUserId))
+            .ToDictionaryAsync(x => x.StudentUserId, ct);
+
+        foreach (var item in request.Records)
+        {
+            if (existing.TryGetValue(item.StudentId, out var record))
+            {
+                record.Status = item.Status;
+                record.RecordedByUserId = User.UserId();
+                record.CreatedAt = DateTime.UtcNow;
+            }
+            else
+            {
+                db.AttendanceRecords.Add(new AttendanceRecord {
+                    StudentUserId = item.StudentId,
+                    DepartmentId = effectiveDepartmentId.Value,
+                    RecordedByUserId = User.UserId(),
+                    AttendanceDate = request.Date,
+                    Status = item.Status
+                });
+            }
+        }
+
+        await db.SaveChangesAsync(ct);
+        return Ok(new { message = "حضور و غیاب ذخیره شد.", saved = request.Records.Count, date = request.Date });
+    }
+}
