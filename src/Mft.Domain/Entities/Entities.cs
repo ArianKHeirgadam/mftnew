@@ -28,7 +28,6 @@ public class Department
 {
     public Guid Id { get; set; } = Guid.NewGuid();
     public string Name { get; set; } = "";
-    [System.ComponentModel.DataAnnotations.Schema.NotMapped]
     public Guid? ManagerUserId { get; set; }
     public string? ManagerName { get; set; }
     public string DegreeLevel { get; set; } = "";
@@ -43,14 +42,10 @@ public class Question
     public Guid Id { get; set; } = Guid.NewGuid();
     public string Text { get; set; } = "";
     public Guid DepartmentId { get; set; }
-    [System.ComponentModel.DataAnnotations.Schema.NotMapped]
     public string Category { get; set; } = "عمومی";
     public string Type { get; set; } = "MultipleChoice";
-    [System.ComponentModel.DataAnnotations.Schema.NotMapped]
     public string Difficulty { get; set; } = "Medium";
-    [System.ComponentModel.DataAnnotations.Schema.NotMapped]
     public string? OptionsJson { get; set; }
-    [System.ComponentModel.DataAnnotations.Schema.NotMapped]
     public string? CorrectAnswer { get; set; }
     public decimal Score { get; set; } = 1;
     public bool IsActive { get; set; } = true;
@@ -98,7 +93,6 @@ public class ExamAttempt
     public DateTime StartedAt { get; set; } = DateTime.UtcNow;
     public DateTime? SubmittedAt { get; set; }
     public decimal? Score { get; set; }
-    [System.ComponentModel.DataAnnotations.Schema.NotMapped]
     public string Status { get; set; } = "InProgress";
     public Exam Exam { get; set; } = null!;
     public ICollection<ExamAnswer> Answers { get; set; } = new List<ExamAnswer>();
@@ -110,7 +104,6 @@ public class ExamAnswer
     public Guid ExamAttemptId { get; set; }
     public Guid QuestionId { get; set; }
     public string? Answer { get; set; }
-    [System.ComponentModel.DataAnnotations.Schema.NotMapped]
     public bool? IsCorrect { get; set; }
     public decimal AwardedScore { get; set; }
     [System.ComponentModel.DataAnnotations.Schema.NotMapped]
