@@ -17,6 +17,39 @@ public sealed class QuestionPdfImportController(AppDbContext db) : ControllerBas
     private static readonly Regex AnswerLine = new(@"^(?:ANSWER|پاسخ)\s*[:=]\s*(.+)$", RegexOptions.IgnoreCase | RegexOptions.Compiled);
     private static readonly Regex PairLine = new(@"^(?:PAIR|جفت)\s*[:=]\s*(.+?)\s*(?:=>|->|→|=)\s*(.+)$", RegexOptions.IgnoreCase | RegexOptions.Compiled);
 
+    [HttpPost("import-pdf/preview"), RequestSizeLimit(15_000_000)]
+    public async Task<IActionResult> PreviewPdf(IFormFile? file, CancellationToken ct)
+    {
+        if (file is null || file.Length == 0) return BadRequest(new { message = "فایل PDF را انتخاب کنید." });
+        if (file.Length > 15_000_000) return BadRequest(new { message = "حداکثر حجم فایل ۱۵ مگابایت است." });
+        if (!string.Equals(Path.GetExtension(file.FileName), ".pdf", StringComparison.OrdinalIgnoreCase))
+            return BadRequest(new { message = "فقط فایل PDF پذیرفته می‌شود." });
+        try
+        {
+            await using var stream = file.OpenReadStream();
+            using var pdf = PdfDocument.Open(stream);
+            var blocks = Parse(string.Join("\n", pdf.GetPages().Select(page => page.Text)));
+            if (blocks.Count == 0)
+                return BadRequest(new { message = "سؤالی پیدا نشد. ساختار PDF را مطابق راهنمای صفحه بارگذاری تنظیم کنید." });
+            return Ok(new
+            {
+                count = blocks.Count,
+                questions = blocks.Select((q, index) => new
+                {
+                    number = index + 1,
+                    text = q.Text,
+                    type = q.Type,
+                    options = q.Options,
+                    answerKeyAvailable = !string.IsNullOrWhiteSpace(q.CorrectAnswer)
+                })
+            });
+        }
+        catch (Exception) when (!ct.IsCancellationRequested)
+        {
+            return BadRequest(new { message = "خواندن PDF ناموفق بود. فایل باید سالم و دارای متن قابل انتخاب باشد؛ PDF اسکن‌شده به OCR نیاز دارد." });
+        }
+    }
+
     [HttpPost("import-pdf"), RequestSizeLimit(15_000_000)]
     public async Task<IActionResult> ImportPdf(
         IFormFile? file,
