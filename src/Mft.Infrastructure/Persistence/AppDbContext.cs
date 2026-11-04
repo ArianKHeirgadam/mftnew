@@ -16,6 +16,7 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
     // The supplied database schema has no settings table. Keep the entity available for API compatibility,
     // but do not assume that EF can persist it to a table that does not exist.
     public DbSet<AppSetting> Settings => Set<AppSetting>();
+    public DbSet<AttendanceRecord> AttendanceRecords => Set<AttendanceRecord>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -129,6 +130,17 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
             entity.Ignore(x => x.Type);
             entity.Property(x => x.Title).HasMaxLength(250).IsRequired();
             entity.Property(x => x.Message).IsRequired();
+        });
+
+        modelBuilder.Entity<AttendanceRecord>(entity =>
+        {
+            entity.ToTable("AttendanceRecords");
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.Id).HasColumnType("uniqueidentifier").ValueGeneratedNever();
+            entity.Property(x => x.AttendanceDate).HasColumnType("date");
+            entity.Property(x => x.Status).HasMaxLength(20).IsRequired();
+            entity.HasIndex(x => new { x.StudentUserId, x.AttendanceDate }).IsUnique();
+            entity.HasIndex(x => new { x.DepartmentId, x.AttendanceDate });
         });
 
         modelBuilder.Entity<AppSetting>(entity =>
