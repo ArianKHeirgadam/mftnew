@@ -77,53 +77,49 @@ public sealed class QuestionPdfImportController(AppDbContext db) : ControllerBas
             !await db.Departments.AnyAsync(x => x.Id == effectiveDepartment.Value, ct))
             return BadRequest(new { message = "دپارتمان معتبر را انتخاب کنید." });
 
+        List<ParsedQuestion> blocks;
         try
         {
             await using var stream = file.OpenReadStream();
             using var pdf = PdfDocument.Open(stream);
-            var text = string.Join("\n", pdf.GetPages().Select(page => page.Text));
-            var blocks = Parse(text);
-            if (blocks.Count == 0)
-                return BadRequest(new { message = "سؤالی پیدا نشد. ساختار PDF را مطابق راهنمای صفحه بارگذاری تنظیم کنید." });
-
-            var questions = new List<Question>();
-            foreach (var block in blocks)
-            {
-                var question = new Question
-                {
-                    Text = block.Text,
-                    DepartmentId = effectiveDepartment.Value,
-                    Category = string.IsNullOrWhiteSpace(category) ? "عمومی" : category.Trim(),
-                    Type = block.Type,
-                    Difficulty = difficulty,
-                    OptionsJson = JsonSerializer.Serialize(block.Options),
-                    CorrectAnswer = block.CorrectAnswer,
-                    Score = score,
-                    CreatedByUserId = User.UserId()
-                };
-                questions.Add(question);
-            }
-
-            db.Questions.AddRange(questions);
-            await db.SaveChangesAsync(ct);
-            return Ok(new
-            {
-                message = $"{questions.Count} سؤال از PDF استخراج و به بانک سؤال اضافه شد.",
-                imported = questions.Count,
-                questions = questions.Select((q, index) => new
-                {
-                    id = q.Id,
-                    number = index + 1,
-                    text = q.Text,
-                    type = q.Type,
-                    optionCount = blockOptionCount(q.OptionsJson)
-                })
-            });
+            blocks = Parse(string.Join("\n", pdf.GetPages().Select(page => page.Text)));
         }
         catch (Exception) when (!ct.IsCancellationRequested)
         {
             return BadRequest(new { message = "خواندن PDF ناموفق بود. مطمئن شوید فایل سالم و دارای متن قابل انتخاب است. PDF اسکن‌شده به OCR نیاز دارد." });
         }
+
+        if (blocks.Count == 0)
+            return BadRequest(new { message = "سؤالی پیدا نشد. ساختار PDF را مطابق راهنمای صفحه بارگذاری تنظیم کنید." });
+
+        var questions = blocks.Select(block => new Question
+        {
+            Text = block.Text,
+            DepartmentId = effectiveDepartment.Value,
+            Category = string.IsNullOrWhiteSpace(category) ? "عمومی" : category.Trim(),
+            Type = block.Type,
+            Difficulty = difficulty,
+            OptionsJson = JsonSerializer.Serialize(block.Options),
+            CorrectAnswer = block.CorrectAnswer,
+            Score = score,
+            CreatedByUserId = User.UserId()
+        }).ToList();
+
+        db.Questions.AddRange(questions);
+        await db.SaveChangesAsync(ct);
+        return Ok(new
+        {
+            message = $"{questions.Count} سؤال از PDF استخراج و به بانک سؤال اضافه شد.",
+            imported = questions.Count,
+            questions = questions.Select((q, index) => new
+            {
+                id = q.Id,
+                number = index + 1,
+                text = q.Text,
+                type = q.Type,
+                optionCount = blockOptionCount(q.OptionsJson)
+            })
+        });
     }
 
     private sealed record ParsedQuestion(string Text, string Type, string[] Options, string? CorrectAnswer);
