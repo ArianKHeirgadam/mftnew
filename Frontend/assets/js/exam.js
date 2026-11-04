@@ -65,7 +65,7 @@
     current = Math.min(Math.max(index, 0), questions.length - 1);
     const q = questions[current];
     if (questionTitle) questionTitle.textContent = q.text || 'بدون متن';
-    const badge = card?.querySelector('.badge'); if (badge) badge.textContent = /essay|text/i.test(q.type || '') ? 'تشریحی' : 'چهارگزینه‌ای';
+    const badge = card?.querySelector('.badge'); if (badge) badge.textContent = /matching/i.test(q.type || '') ? 'وصل‌کردنی' : /essay|text/i.test(q.type || '') ? 'تشریحی' : 'چهارگزینه‌ای';
     card?.querySelectorAll('label.option-row').forEach(el => el.remove());
     const options = Array.isArray(q.options) ? q.options : [];
     const oldTextarea = card?.querySelector('#examEssayAnswer'); oldTextarea?.remove();
