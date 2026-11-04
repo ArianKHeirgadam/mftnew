@@ -702,6 +702,7 @@
     if (!username) return;
     const department = $('#deptChoices .choice-card.selected');
     const departmentId = department?.dataset.id || null;
+    if (role === 'superadmin' && !departmentId) return notify('ابتدا دپارتمان مقصد را انتخاب یا ایجاد کنید.', 'warn');
     const created = await request('/users', {
       method: 'POST',
       body: JSON.stringify({ username, fullName, role: 'Teacher', email: null, mobile: null, departmentId, mustChangePassword: true })
