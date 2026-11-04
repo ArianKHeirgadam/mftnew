@@ -651,57 +651,113 @@ public class ExamsController(AppDbContext db) : ControllerBase
         return NoContent();
     }
     [HttpPost("attempts/{attemptId:guid}/submit"), Authorize(Roles ="Student")]
-    public async Task<IActionResult> Submit(Guid attemptId, SubmitAttemptRequest r, CancellationToken ct){
-        var a = await db.ExamAttempts.Include(x => x.Exam).ThenInclude(x => x.Questions).FirstOrDefaultAsync(x => x.Id == attemptId && x.StudentId == User.UserId() && x.Status =="InProgress",  ct);
-        if (a is null) return NotFound();
-        var withinTime = DateTime.UtcNow <= a.StartedAt.AddMinutes(a.Exam.DurationMinutes);
-        if (withinTime){
-            foreach (var answer in r.Answers.GroupBy(x => x.QuestionId).Select(g => g.Last())){
-                var examQuestion = a.Exam.Questions.FirstOrDefault(x => x.QuestionId == answer.QuestionId);
-                if (examQuestion is null)continue;
-                var q = await db.Questions.FindAsync(new object?[]{
-                    answer.QuestionId
-                }
-                ,  ct);
-                if (q is null)continue;
-                var saved = await db.ExamAnswers.FirstOrDefaultAsync(x => x.ExamAttemptId == attemptId && x.QuestionId == answer.QuestionId, ct);
-                if (saved is null){
-                    saved = new ExamAnswer{
-                        ExamAttemptId = attemptId, QuestionId = answer.QuestionId
-                    }
-                    ;
+    public async Task<IActionResult> Submit(Guid attemptId, SubmitAttemptRequest r, CancellationToken ct)
+    {
+        var attempt = await db.ExamAttempts
+            .Include(x => x.Exam)
+            .ThenInclude(x => x.Questions)
+            .FirstOrDefaultAsync(
+                x => x.Id == attemptId &&
+                     x.StudentId == User.UserId() &&
+                     x.Status == "InProgress", ct);
+
+        if (attempt is null) return NotFound();
+
+        var withinTime = DateTime.UtcNow <=
+            attempt.StartedAt.AddMinutes(attempt.Exam.DurationMinutes);
+
+        // Accept the final payload only while the server-side timer is still valid.
+        // Answers autosaved before expiry remain eligible for grading after expiry.
+        if (withinTime)
+        {
+            foreach (var answer in r.Answers
+                .GroupBy(x => x.QuestionId)
+                .Select(group => group.Last()))
+            {
+                if (!attempt.Exam.Questions.Any(
+                    item => item.QuestionId == answer.QuestionId))
+                    continue;
+
+                var saved = await db.ExamAnswers.FirstOrDefaultAsync(
+                    item => item.ExamAttemptId == attemptId &&
+                            item.QuestionId == answer.QuestionId, ct);
+
+                if (saved is null)
+                {
+                    saved = new ExamAnswer
+                    {
+                        ExamAttemptId = attemptId,
+                        QuestionId = answer.QuestionId
+                    };
                     db.ExamAnswers.Add(saved);
                 }
+
                 saved.Answer = answer.Answer;
-                if (q.Type =="MultipleChoice"){
-                    saved.IsCorrect = q.CorrectAnswer != null && string.Equals(q.CorrectAnswer.Trim(), answer.Answer?.Trim(), StringComparison.OrdinalIgnoreCase);
-                    // The exam is graded on a 100-point scale, regardless of legacy score weights.
-                    var configuredScore = a.Exam.Questions.Count == 0 ? 0m : Math.Floor(100m / a.Exam.Questions.Count * 100m) / 100m;
-                    if (saved.IsCorrect == true)
-                    {
-                        var isLastQuestion = a.Exam.Questions.OrderBy(item => item.Order).Last().QuestionId == examQuestion.QuestionId;
-                        saved.AwardedScore = isLastQuestion
-                            ? 100m - Math.Floor(100m / a.Exam.Questions.Count * 100m) / 100m * (a.Exam.Questions.Count - 1)
-                            : configuredScore;
-                    }
-                    else saved.AwardedScore = 0m;
-                }
-                else{
-                    saved.IsCorrect = null;
-                    saved.AwardedScore = 0;
-                }
+                saved.UpdatedAt = DateTime.UtcNow;
             }
         }
-        a.Score = await db.ExamAnswers.Where(x => x.ExamAttemptId == attemptId).SumAsync(x => x.AwardedScore, ct);
-        a.Status ="Submitted";
-        a.SubmittedAt = DateTime.UtcNow;
-        await db.SaveChangesAsync(ct);
-        return Ok(new {
-            id = a.Id, score = a.Score, status = a.Status, submittedAt = a.SubmittedAt
+
+        // Grade the complete persisted answer set, not only the final request body.
+        var savedAnswers = await db.ExamAnswers
+            .Where(item => item.ExamAttemptId == attemptId)
+            .ToListAsync(ct);
+
+        var answeredQuestionIds = savedAnswers
+            .Select(item => item.QuestionId)
+            .Distinct()
+            .ToArray();
+
+        var questionLookup = await db.Questions
+            .Where(question => answeredQuestionIds.Contains(question.Id))
+            .ToDictionaryAsync(question => question.Id, ct);
+
+        var examQuestionLookup = attempt.Exam.Questions
+            .ToDictionary(item => item.QuestionId);
+
+        foreach (var saved in savedAnswers)
+        {
+            if (!questionLookup.TryGetValue(saved.QuestionId, out var question) ||
+                !examQuestionLookup.TryGetValue(saved.QuestionId, out var examQuestion))
+                continue;
+
+            if (question.Type == "MultipleChoice")
+            {
+                saved.IsCorrect =
+                    !string.IsNullOrWhiteSpace(question.CorrectAnswer) &&
+                    string.Equals(
+                        question.CorrectAnswer.Trim(),
+                        saved.Answer?.Trim(),
+                        StringComparison.OrdinalIgnoreCase);
+
+                saved.AwardedScore = saved.IsCorrect == true
+                    ? examQuestion.Score
+                    : 0m;
+            }
+            else
+            {
+                // Essay answers require manual grading.
+                saved.IsCorrect = null;
+                saved.AwardedScore = 0m;
+            }
         }
-        );
-    }
-}
+
+        attempt.Score = savedAnswers.Sum(item => item.AwardedScore);
+        attempt.Status = "Submitted";
+        attempt.SubmittedAt = DateTime.UtcNow;
+
+        await db.SaveChangesAsync(ct);
+
+        var pendingManualCount = savedAnswers.Count(item => item.IsCorrect is null);
+        return Ok(new
+        {
+            id = attempt.Id,
+            score = pendingManualCount > 0 ? (decimal?)null : attempt.Score,
+            autoScore = attempt.Score,
+            pendingManualCount,
+            status = attempt.Status,
+            submittedAt = attempt.SubmittedAt
+        });
+    }}
 [ApiController, Route("api/results"), Authorize]
 public class ResultsController(AppDbContext db) : ControllerBase
 {
