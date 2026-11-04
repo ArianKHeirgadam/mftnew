@@ -248,7 +248,7 @@
     const header = $('body[data-active="results"] table thead tr');
     if (header) header.innerHTML = '<th>#</th><th>آزمون</th><th>دانشجو</th><th>وضعیت</th><th>نمره</th>' ;
     renderRows('body[data-active="results"] table tbody', rows, row => `<tr>
-      <td>${faNumber(row.id)}</td><td>${escapeHtml(row.examTitle)}</td><td>${escapeHtml(row.studentName || '—')}</td>
+      <td>${escapeHtml(String(row.id).slice(0, 8))}</td><td>${escapeHtml(row.examTitle)}</td><td>${escapeHtml(row.studentName || '—')}</td>
       <td>${row.status === 'InProgress' ? 'در حال برگزاری' : row.status === 'Submitted' ? 'ثبت شده' : 'تصحیح شده'}</td>
       <td>${row.score == null ? 'در انتظار تصحیح' : faNumber(row.score)}</td></tr>`, 5);
   }
