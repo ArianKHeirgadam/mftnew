@@ -51,6 +51,7 @@
         <!-- Step 1: Department -->
         <div class="wpanel active" id="step1">
           <h3 style="margin-bottom:16px">دپارتمان را انتخاب کنید</h3>
+          <div class="flex items-center justify-between gap-8" style="margin-bottom:12px"><span class="text-soft text-sm">اگر دپارتمان موردنظر وجود ندارد، همین‌جا بسازید.</span><button type="button" class="btn btn-outline btn-sm" data-create-department>+ ایجاد دپارتمان</button></div>
           <div class="choice-grid" id="deptChoices">
             <div class="choice-card selected" data-value="کامپیوتر"><div class="mohr sm"><div class="mohr-inner"><b>ک</b></div></div><b>مهندسی کامپیوتر</b></div>
             <div class="choice-card" data-value="برق"><div class="mohr sm gold"><div class="mohr-inner"><b>ب</b></div></div><b>مهندسی برق</b></div>
@@ -61,6 +62,7 @@
         <!-- Step 2: Teacher -->
         <div class="wpanel" id="step2">
           <h3 style="margin-bottom:16px">استاد مربوطه را انتخاب کنید</h3>
+          <div class="flex items-center justify-between gap-8" style="margin-bottom:12px"><span class="text-soft text-sm">در صورت نبود استاد، حساب استاد جدید بسازید.</span><button type="button" class="btn btn-outline btn-sm" data-create-teacher>+ ایجاد استاد</button></div>
           <div class="choice-grid" id="teacherChoices">
             <div class="choice-card selected" data-value="دکتر کریمی"><div class="mohr sm"><div class="mohr-inner"><b>دک</b></div></div><b>دکتر کریمی</b></div>
             <div class="choice-card" data-value="مهندس صادقی"><div class="mohr sm gold"><div class="mohr-inner"><b>مص</b></div></div><b>مهندس صادقی</b></div>
@@ -92,7 +94,7 @@
           <div class="field"><label>توضیحات</label><textarea class="textarea" id="examDescription" rows="2" placeholder="توضیحات اختیاری"></textarea></div>
           <div class="grid-2" style="grid-template-columns:1fr 1fr">
             <div class="field"><label>مدت زمان آزمون (دقیقه)</label><input class="input" id="examDuration" type="number" min="1" max="600" value="45"></div>
-            <div class="field"><label>نمره قبولی (از ۲۰)</label><input class="input" id="examPassingScore" type="number" min="0" max="20" step="0.25" value="10"></div>
+            <div class="field"><label>نمره قبولی (از ۱۰۰)</label><input class="input" id="examPassingScore" type="number" min="0" max="100" step="0.25" value="50"></div>
           </div>
           <div class="checkbox-row"><input type="checkbox" id="allowQuestionNavigation" checked> امکان جابجایی بین سوالات فعال باشد</div>
         </div>
@@ -115,7 +117,7 @@
             <li class="flex justify-between" style="border-bottom:1px solid var(--border);padding-bottom:8px"><span class="text-soft">استاد</span><b id="prevTeacher">—</b></li>
             <li class="flex justify-between" style="border-bottom:1px solid var(--border);padding-bottom:8px"><span class="text-soft">تعداد سوالات</span><b id="prevQuestionCount">۰ سوال</b></li>
             <li class="flex justify-between"><span class="text-soft">مدت زمان</span><b id="prevDuration">۴۵ دقیقه</b></li>
-            <li class="flex justify-between"><span class="text-soft">نمره قبولی</span><b id="prevPassingScore">۱۰ از ۲۰</b></li>
+            <li class="flex justify-between"><span class="text-soft">نمره قبولی</span><b id="prevPassingScore">۵۰ از ۱۰۰</b></li>
           </ul>
         </div>
 
