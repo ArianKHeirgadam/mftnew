@@ -56,29 +56,6 @@
       : `<tr><td colspan="${columns}" style="text-align:center;padding:28px;color:var(--text-muted,#7b8794)">داده‌ای برای نمایش وجود ندارد.</td></tr>`;
   }
 
-  async function forcePasswordChange() {
-    const form = $('#forcePasswordForm');
-    if (!form) return;
-    const pending = (() => { try { return JSON.parse(sessionStorage.getItem('mft.pendingPasswordChange') || 'null'); } catch { return null; } })();
-    if (!token() || !pending?.currentPassword) { location.href = 'login.html'; return; }
-    form.addEventListener('submit', async event => {
-      event.preventDefault();
-      const newPassword = $('#newPassword', form)?.value || '';
-      const confirmPassword = $('#confirmPassword', form)?.value || '';
-      if (newPassword.length < 8) return notify('رمز جدید باید حداقل ۸ کاراکتر باشد.', 'warn');
-      if (newPassword !== confirmPassword) return notify('تکرار رمز عبور با رمز جدید یکسان نیست.', 'warn');
-      await safe(async () => {
-        await request('/auth/change-password', { method: 'POST', body: JSON.stringify({ currentPassword: pending.currentPassword, newPassword }) });
-        sessionStorage.removeItem('mft.pendingPasswordChange');
-        const user = currentUser() || {};
-        user.mustChangePassword = false;
-        [sessionStorage, localStorage].forEach(store => { if (store.getItem(USER_KEY)) store.setItem(USER_KEY, JSON.stringify(user)); });
-        const destination = { SuperAdmin: 'dashboard-superadmin.html', Department: 'dashboard-department.html', Teacher: 'dashboard-teacher.html', Student: 'dashboard-student.html' }[pending.role || user.role] || 'login.html';
-        location.href = destination;
-      }, 'رمز عبور با موفقیت تغییر کرد.');
-    });
-  }
-
   async function login() {
     const form = $('#loginForm');
     if (!form) return;
@@ -452,45 +429,6 @@
     modal.dataset.editId = id || '';
     modal.dataset.editRole = role;
     modal.classList.add('show');
-  }
-
-  function showTemporaryPasswordModal(password) {
-    const overlay = document.createElement('div');
-    overlay.className = 'modal-overlay show';
-    overlay.style.zIndex = '230';
-    const box = document.createElement('div');
-    box.className = 'modal-box';
-    const head = document.createElement('div');
-    head.className = 'modal-head';
-    const title = document.createElement('h3');
-    title.textContent = 'رمز موقت حساب';
-    const close = document.createElement('button');
-    close.type = 'button'; close.className = 'icon-btn'; close.textContent = '✕';
-    head.append(title, close);
-    const body = document.createElement('div');
-    body.className = 'modal-body';
-    const note = document.createElement('p');
-    note.textContent = 'این رمز فقط همین بار نمایش داده می‌شود. آن را کپی و به‌صورت امن به کاربر تحویل دهید.';
-    const input = document.createElement('input');
-    input.className = 'input'; input.readOnly = true; input.value = password;
-    body.append(note, input);
-    const foot = document.createElement('div');
-    foot.className = 'modal-foot';
-    const copy = document.createElement('button');
-    copy.type = 'button'; copy.className = 'btn btn-primary'; copy.textContent = 'کپی رمز';
-    const done = document.createElement('button');
-    done.type = 'button'; done.className = 'btn btn-outline'; done.textContent = 'بستن';
-    foot.append(copy, done); box.append(head, body, foot); overlay.appendChild(box);
-    document.body.appendChild(overlay);
-    const closeModal = () => overlay.remove();
-    close.addEventListener('click', closeModal);
-    done.addEventListener('click', closeModal);
-    overlay.addEventListener('click', event => { if (event.target === overlay) closeModal(); });
-    copy.addEventListener('click', async () => {
-      try { await navigator.clipboard.writeText(password); notify('رمز موقت کپی شد.', 'ok'); }
-      catch { input.focus(); input.select(); notify('رمز را با Ctrl+C کپی کنید.', 'info'); }
-    });
-    input.focus(); input.select();
   }
 
   async function saveUserFromModal(modal) {
@@ -970,7 +908,6 @@
   async function init() {
     wireClicks();
     await login();
-    forcePasswordChange();
     if (!token()) return;
     if ($('#studentsBody')) $('#studentsBody').replaceChildren();
     if ($('body[data-active="teachers"] table tbody')) $('body[data-active="teachers"] table tbody').replaceChildren();
