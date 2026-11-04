@@ -165,7 +165,7 @@
     if (!$('body[data-active="departments"]')) return;
     const search = $('body[data-active="departments"] .search-box input')?.value.trim();
     const rows = await request(`/departments${search ? `?search=${encodeURIComponent(search)}` : ''}`);
-    $$('[data-department-field]').forEach(select => {
+    $$$('[data-department-field]').forEach(select => {
       const selected = select.value;
       select.innerHTML = '<option value="">انتخاب دپارتمان</option>' + rows.map(dept => `<option value="${dept.id}">${escapeHtml(dept.name)}</option>`).join('');
       if (selected) select.value = selected;
@@ -445,7 +445,7 @@
     const modal = document.getElementById(modalId);
     if (!modal) return;
     const fields = $$('input, select', modal).filter(field => !['radio', 'checkbox', 'file'].includes(field.type));
-    const nameField = $('[data-fullname-field]', modal) || fields.find(field => field.type === 'text' && !field.dataset.usernameField);
+    const nameField = $('[data-fullname-field]', modal) || fields.find(field => field.type === 'text' && !field.hasAttribute('data-username-field'));
     let existing = null;
     if (id) existing = await request(`/users/${id}`);
     if (nameField) nameField.value = existing?.fullName || '';
@@ -453,7 +453,7 @@
     if (departmentField && existing?.departmentId) departmentField.value = String(existing.departmentId);
     const activeField = $('[data-user-active]', modal);
     if (activeField) activeField.checked = existing ? Boolean(existing.isActive) : true;
-    const usernameField = fields.find(field => field.dataset.usernameField);
+    const usernameField = fields.find(field => field.hasAttribute('data-username-field'));
     if (usernameField) usernameField.value = existing?.username || '';
     const email = fields.find(field => field.type === 'email');
     const mobile = fields.find(field => field.type === 'tel');
@@ -467,8 +467,8 @@
   async function saveUserFromModal(modal) {
     const role = modal.dataset.editRole || (modal.id === 'teacherModal' ? 'Teacher' : 'Student');
     const fields = $$('input, select', modal).filter(field => !['radio', 'checkbox', 'file'].includes(field.type));
-    const fullName = $('[data-fullname-field]', modal)?.value.trim() || fields.find(field => field.type === 'text' && !field.dataset.usernameField)?.value.trim();
-    const username = fields.find(field => field.dataset.usernameField)?.value.trim();
+    const fullName = $('[data-fullname-field]', modal)?.value.trim() || fields.find(field => field.type === 'text' && !field.hasAttribute('data-username-field'))?.value.trim();
+    const username = fields.find(field => field.hasAttribute('data-username-field'))?.value.trim();
     const password = fields.find(field => field.type === 'password')?.value;
     const email = fields.find(field => field.type === 'email')?.value.trim() || null;
     const mobile = fields.find(field => field.type === 'tel')?.value.trim() || null;
@@ -602,10 +602,6 @@
       });
     });
 
-    document.addEventListener('click', event => {
-      const saveButton = event.target.closest('#studentModal .modal-foot .btn-primary, #teacherModal .modal-foot .btn-primary');
-      if (saveButton) { event.preventDefault(); saveUserFromModal(saveButton.closest('.modal-overlay')); }
-    });
   }
 
   async function saveQuestionFromModal(modal) {
@@ -656,7 +652,7 @@
       body: JSON.stringify({ name, managerUserId: null, isActive: true })
     });
     const rows = await request('/departments');
-    $('[data-department-field]').forEach(select => {
+    $$('[data-department-field]').forEach(select => {
       const selected = select.value;
       select.innerHTML = '<option value="">انتخاب دپارتمان</option>' +
         rows.map(dept => `<option value="${dept.id}">${escapeHtml(dept.name)}</option>`).join('');
@@ -858,14 +854,14 @@
   async function initInlineQuickCreate() {
     const role = (currentUser()?.role || '').toLowerCase();
     if (role === 'superadmin') {
-      $('[data-department-field]').forEach(select => {
+      $$('[data-department-field]').forEach(select => {
         const anchor = select.closest('.field') || select.parentElement;
         mountInlineQuickForm(anchor, '+ ایجاد دپارتمان جدید', 'ایجاد دپارتمان', [
           { name: 'name', label: 'نام دپارتمان', placeholder: 'مثلاً مهندسی کامپیوتر' }
         ], async values => {
           const created = await request('/departments', { method: 'POST', body: JSON.stringify({ name: values.name, managerUserId: null, isActive: true }) });
           const departments = await request('/departments');
-          $('[data-department-field]').forEach(field => {
+          $$('[data-department-field]').forEach(field => {
             field.innerHTML = '<option value="">انتخاب دپارتمان</option>' + departments.map(dept => `<option value="${dept.id}">${escapeHtml(dept.name)}</option>`).join('');
             field.value = String(created.id);
           });
@@ -969,7 +965,7 @@
         const role = (currentUser()?.role || '').toLowerCase();
         if (role === 'superadmin' || role === 'department') {
           const departments = await request('/departments').catch(() => []);
-          $$('[data-department-field]').forEach(select => { select.innerHTML = '<option value="">انتخاب دپارتمان</option>' + departments.map(dept => `<option value="${dept.id}">${escapeHtml(dept.name)}</option>`).join(''); });
+          $$$('[data-department-field]').forEach(select => { select.innerHTML = '<option value="">انتخاب دپارتمان</option>' + departments.map(dept => `<option value="${dept.id}">${escapeHtml(dept.name)}</option>`).join(''); });
         }
       }
       if (document.body.dataset.active === 'students') attachSearch('body[data-active="students"] .search-box input', loadUsers);
