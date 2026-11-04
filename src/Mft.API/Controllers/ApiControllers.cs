@@ -350,8 +350,6 @@ public class QuestionsController(AppDbContext db) : ControllerBase
         );
         if (r.Type == "Matching" && (r.Options == null || r.Options.Length < 2 || string.IsNullOrWhiteSpace(r.CorrectAnswer) || !IsValidMatchingKey(r.Options, r.CorrectAnswer)))
             return BadRequest(new { message = "سؤال وصل‌کردنی باید حداقل دو جفت معتبر داشته باشد." });
-        if (r.Type == "Matching" && (r.Options == null || r.Options.Length < 2 || string.IsNullOrWhiteSpace(r.CorrectAnswer) || !IsValidMatchingKey(r.Options, r.CorrectAnswer)))
-            return BadRequest(new { message = "سؤال وصل‌کردنی باید حداقل دو جفت معتبر داشته باشد." });
         var creator = await db.Users.AsNoTracking().Where(user => user.Id == User.UserId()).Select(user => new { user.DepartmentId }).SingleAsync(ct);
         var questionDepartmentId = r.DepartmentId ?? creator.DepartmentId;
         if (!questionDepartmentId.HasValue || !await db.Departments.AnyAsync(department => department.Id == questionDepartmentId.Value, ct))
@@ -389,6 +387,8 @@ public class QuestionsController(AppDbContext db) : ControllerBase
             message = "سؤال چهارگزینه‌ای باید حداقل دو گزینه و پاسخ صحیح معتبر داشته باشد."
         }
         );
+        if (r.Type == "Matching" && (r.Options == null || r.Options.Length < 2 || string.IsNullOrWhiteSpace(r.CorrectAnswer) || !IsValidMatchingKey(r.Options, r.CorrectAnswer)))
+            return BadRequest(new { message = "سؤال وصل‌کردنی باید حداقل دو جفت معتبر داشته باشد." });
         q.Text = r.Text;
         q.Category = r.Category;
         q.Type = r.Type;
