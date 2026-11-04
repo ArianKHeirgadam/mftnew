@@ -477,7 +477,7 @@
     if (!id && !username) return notify('نام کاربری الزامی است.', 'warn');
     await safe(async () => {
       const departmentField = $('[data-department-field]', modal);
-      const departmentId = departmentField?.value && /^\d+$/.test(departmentField.value) ? Number(departmentField.value) : null;
+      const departmentId = departmentField?.value || null;
       const isActive = $('[data-user-active]', modal)?.checked ?? true;
       if (id) await request(`/users/${id}`, { method: 'PUT', body: JSON.stringify({ fullName, email, mobile, departmentId, isActive }) });
       else {
@@ -541,7 +541,7 @@
       const gradeSave = event.target.closest('[data-grade-save]');
       if (gradeSave) { event.preventDefault(); saveGrade(gradeSave.closest('.modal-overlay')); return; }
       const gradeAttempt = event.target.closest('[data-grade-attempt]');
-      if (gradeAttempt) { event.preventDefault(); safe(() => openGradeAttempt(Number(gradeAttempt.dataset.gradeAttempt))); return; }
+      if (gradeAttempt) { event.preventDefault(); safe(() => openGradeAttempt(gradeAttempt.dataset.gradeAttempt)); return; }
       if (event.target.closest('[data-export-print]')) { event.preventDefault(); window.print(); return; }
       if (event.target.closest('[data-export-csv]')) { event.preventDefault(); exportTableCsv(); return; }
       if (event.target.closest('[data-backup-unavailable], [data-restore-unavailable]')) { event.preventDefault(); notify('پشتیبان‌گیری و بازیابی دیتابیس هنوز در سمت سرور پیکربندی نشده است؛ این دکمه داده‌ها را تغییر نمی‌دهد.', 'warn'); return; }
@@ -568,19 +568,19 @@
           await request(`/users/${target.dataset.userDelete}`, { method: 'DELETE' });
           await loadUsers();
         } else if (target.dataset.userEdit) {
-          await openUserEditor(Number(target.dataset.userEdit), target.dataset.userRole || 'Student');
+          await openUserEditor(target.dataset.userEdit, target.dataset.userRole || 'Student');
         } else if (target.dataset.questionDelete) {
           if (!confirm('این سؤال حذف شود؟')) return;
           await request(`/questions/${target.dataset.questionDelete}`, { method: 'DELETE' });
           await loadQuestions();
         } else if (target.dataset.questionEdit) {
-          await editQuestion(Number(target.dataset.questionEdit));
+          await editQuestion(target.dataset.questionEdit);
         } else if (target.dataset.departmentDelete) {
           if (!confirm('این دپارتمان حذف شود؟')) return;
           await request(`/departments/${target.dataset.departmentDelete}`, { method: 'DELETE' });
           await loadDepartments();
         } else if (target.dataset.departmentEdit) {
-          await editDepartment(Number(target.dataset.departmentEdit));
+          await editDepartment(target.dataset.departmentEdit);
         } else if (target.dataset.notificationDelete) {
           await request(`/notifications/${target.dataset.notificationDelete}`, { method: 'DELETE' });
           await loadNotifications();
@@ -632,7 +632,7 @@
     const managerValue = $('#departmentManagerId', modal)?.value;
     const status = fields.find(field => field.tagName === 'SELECT' && field.id !== 'departmentManagerId')?.value || 'فعال';
     if (!name) return notify('نام دپارتمان الزامی است.', 'warn');
-    const payload = { name, managerUserId: managerValue ? Number(managerValue) : null, isActive: !['غیرفعال', 'Inactive'].includes(status) };
+    const payload = { name, managerUserId: managerValue || null, isActive: !['غیرفعال', 'Inactive'].includes(status) };
     await safe(async () => {
       const id = modal.dataset.editId;
       await request(id ? `/departments/${id}` : '/departments', { method: id ? 'PUT' : 'POST', body: JSON.stringify(payload) });
