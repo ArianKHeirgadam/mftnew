@@ -740,6 +740,132 @@
     modal.classList.add('show');
   }
 
+
+  function mountInlineQuickForm(anchor, buttonLabel, title, fieldDefs, onSave) {
+    if (!anchor || anchor.dataset.quickFormReady === 'true') return;
+    anchor.dataset.quickFormReady = 'true';
+    const wrap = document.createElement('div');
+    wrap.style.cssText = 'margin:10px 0;display:flex;flex-direction:column;gap:8px;';
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = 'btn btn-outline btn-sm';
+    button.textContent = buttonLabel;
+    const panel = document.createElement('div');
+    panel.className = 'card card-pad';
+    panel.hidden = true;
+    panel.style.cssText = 'padding:14px;display:grid;gap:10px;';
+    const heading = document.createElement('b');
+    heading.textContent = title;
+    panel.appendChild(heading);
+    const inputs = {};
+    fieldDefs.forEach(def => {
+      const label = document.createElement('label');
+      label.className = 'field';
+      label.textContent = def.label;
+      const input = document.createElement('input');
+      input.className = 'input';
+      input.type = def.type || 'text';
+      input.autocomplete = 'off';
+      input.placeholder = def.placeholder || '';
+      input.required = def.required !== false;
+      label.appendChild(input);
+      panel.appendChild(label);
+      inputs[def.name] = input;
+    });
+    const actions = document.createElement('div');
+    actions.className = 'flex gap-8';
+    const save = document.createElement('button');
+    save.type = 'button'; save.className = 'btn btn-primary btn-sm'; save.textContent = 'ثبت';
+    const cancel = document.createElement('button');
+    cancel.type = 'button'; cancel.className = 'btn btn-outline btn-sm'; cancel.textContent = 'انصراف';
+    actions.append(save, cancel); panel.appendChild(actions); wrap.append(button, panel);
+    anchor.appendChild(wrap);
+    button.addEventListener('click', () => { panel.hidden = !panel.hidden; if (!panel.hidden) Object.values(inputs)[0]?.focus(); });
+    cancel.addEventListener('click', () => { panel.hidden = true; });
+    save.addEventListener('click', async () => {
+      const values = Object.fromEntries(Object.entries(inputs).map(([key, input]) => [key, input.value.trim()]));
+      const missing = fieldDefs.find(def => def.required !== false && !values[def.name]);
+      if (missing) { notify(missing.label + ' الزامی است.', 'warn'); inputs[missing.name].focus(); return; }
+      save.disabled = true;
+      try { await onSave(values, inputs); panel.hidden = true; Object.values(inputs).forEach(input => input.value = ''); }
+      catch (error) { notify(error.message || 'ثبت اطلاعات ناموفق بود.', 'danger'); }
+      finally { save.disabled = false; }
+    });
+    return { wrap, panel, inputs, button };
+  }
+
+  async function initInlineQuickCreate() {
+    const role = (currentUser()?.role || '').toLowerCase();
+    if (role === 'superadmin') {
+      $('[data-department-field]').forEach(select => {
+        const anchor = select.closest('.field') || select.parentElement;
+        mountInlineQuickForm(anchor, '+ ایجاد دپارتمان جدید', 'ایجاد دپارتمان', [
+          { name: 'name', label: 'نام دپارتمان', placeholder: 'مثلاً مهندسی کامپیوتر' }
+        ], async values => {
+          const created = await request('/departments', { method: 'POST', body: JSON.stringify({ name: values.name, managerUserId: null, isActive: true }) });
+          const departments = await request('/departments');
+          $('[data-department-field]').forEach(field => {
+            field.innerHTML = '<option value="">انتخاب دپارتمان</option>' + departments.map(dept => `<option value="${dept.id}">${escapeHtml(dept.name)}</option>`).join('');
+            field.value = String(created.id);
+          });
+          notify('دپارتمان ایجاد شد و انتخاب شد.', 'ok');
+        });
+      });
+
+      if (document.body.dataset.active === 'departments') {
+        const managerSelect = $('#departmentManagerId');
+        const anchor = managerSelect?.closest('.field') || managerSelect?.parentElement;
+        mountInlineQuickForm(anchor, '+ ایجاد مدیر دپارتمان', 'ساخت حساب مدیر دپارتمان', [
+          { name: 'username', label: 'نام کاربری' },
+          { name: 'fullName', label: 'نام و نام خانوادگی' }
+        ], async values => {
+          const created = await request('/users', { method: 'POST', body: JSON.stringify({
+            username: values.username, fullName: values.fullName, role: 'Department'
+          }) });
+          const managers = await request('/users?role=Department');
+          managerSelect.innerHTML = '<option value="">بدون مدیر</option>' + managers.map(manager => `<option value="${manager.id}">${escapeHtml(manager.fullName)}</option>`).join('');
+          managerSelect.value = String(created.id);
+          const temporaryPassword = created.temporaryPassword || '';
+          if (temporaryPassword) window.alert(`حساب مدیر ساخته شد. رمز موقت را همین حالا به او تحویل دهید:\n${temporaryPassword}`);
+          notify('حساب مدیر ایجاد شد؛ با ذخیره دپارتمان به آن متصل می‌شود.', 'ok');
+        });
+      }
+
+      if (document.body.dataset.active === 'exams' && $('#deptChoices')) {
+        mountInlineQuickForm($('#deptChoices').parentElement, '+ ایجاد دپارتمان', 'ایجاد دپارتمان جدید', [
+          { name: 'name', label: 'نام دپارتمان' }
+        ], async values => {
+          const created = await request('/departments', { method: 'POST', body: JSON.stringify({ name: values.name, managerUserId: null, isActive: true }) });
+          await loadExamWizard();
+          const card = [...document.querySelectorAll('#deptChoices .choice-card')].find(item => item.dataset.id === String(created.id));
+          card?.parentElement.querySelectorAll('.choice-card').forEach(item => item.classList.remove('selected'));
+          card?.classList.add('selected');
+          notify('دپارتمان ایجاد و انتخاب شد.', 'ok');
+        });
+      }
+    }
+
+    if ((role === 'superadmin' || role === 'department') && document.body.dataset.active === 'exams' && $('#teacherChoices')) {
+      mountInlineQuickForm($('#teacherChoices').parentElement, '+ ایجاد استاد جدید', 'ساخت حساب استاد', [
+        { name: 'username', label: 'نام کاربری' },
+        { name: 'fullName', label: 'نام و نام خانوادگی' }
+      ], async values => {
+        const department = $('#deptChoices .choice-card.selected');
+        if (!department?.dataset.id) throw new Error('ابتدا دپارتمان را انتخاب کنید.');
+        const created = await request('/users', { method: 'POST', body: JSON.stringify({
+          username: values.username, fullName: values.fullName, role: 'Teacher', departmentId: department.dataset.id
+        }) });
+        await loadExamWizard();
+        const card = [...document.querySelectorAll('#teacherChoices .choice-card')].find(item => item.dataset.id === String(created.id));
+        card?.parentElement.querySelectorAll('.choice-card').forEach(item => item.classList.remove('selected'));
+        card?.classList.add('selected');
+        const temporaryPassword = created.temporaryPassword || '';
+        if (temporaryPassword) window.alert(`استاد ایجاد شد. رمز موقت را همین حالا به او تحویل دهید:\n${temporaryPassword}`);
+        notify('استاد ایجاد و برای آزمون انتخاب شد.', 'ok');
+      });
+    }
+  }
+
   async function init() {
     wireClicks();
     await login();
@@ -789,6 +915,7 @@
       if (document.body.dataset.active === 'teachers') attachSearch('body[data-active="teachers"] .search-box input', loadUsers);
       if (document.body.dataset.active === 'departments') attachSearch('body[data-active="departments"] .search-box input', loadDepartments);
       if (document.body.dataset.active === 'bank') attachSearch('body[data-active="bank"] .search-box input', loadQuestions);
+      await initInlineQuickCreate();
     });
   }
 
