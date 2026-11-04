@@ -6,6 +6,8 @@
 SET XACT_ABORT ON;
 BEGIN TRANSACTION;
 
+IF OBJECT_ID(N'dbo.Users', N'U') IS NULL
+    THROW 51000, 'dbo.Users table was not found.', 1;
 IF OBJECT_ID(N'dbo.Departments', N'U') IS NULL
     THROW 51000, 'dbo.Departments table was not found.', 1;
 IF OBJECT_ID(N'dbo.Questions', N'U') IS NULL
@@ -14,6 +16,17 @@ IF OBJECT_ID(N'dbo.ExamAttempts', N'U') IS NULL
     THROW 51000, 'dbo.ExamAttempts table was not found.', 1;
 IF OBJECT_ID(N'dbo.ExamAnswers', N'U') IS NULL
     THROW 51000, 'dbo.ExamAnswers table was not found.', 1;
+
+-- Email is optional in the application model and in quick-created accounts.
+-- Relax the legacy NOT NULL constraint without changing existing email values.
+IF EXISTS (
+    SELECT 1
+    FROM sys.columns
+    WHERE object_id = OBJECT_ID(N'dbo.Users')
+      AND name = N'Email'
+      AND is_nullable = 0
+)
+    ALTER TABLE dbo.Users ALTER COLUMN Email nvarchar(200) NULL;
 
 IF COL_LENGTH('dbo.Departments', 'ManagerUserId') IS NULL
     ALTER TABLE dbo.Departments ADD ManagerUserId uniqueidentifier NULL;
