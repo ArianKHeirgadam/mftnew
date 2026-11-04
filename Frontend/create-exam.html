@@ -83,6 +83,7 @@
           <div id="randomPick" style="display:none">
             <div class="field"><label>تعداد سوالات چهارگزینه‌ای</label><input class="input" id="randomMcqCount" type="number" min="0" value="15"></div>
             <div class="field"><label>تعداد سوالات تشریحی</label><input class="input" id="randomEssayCount" type="number" min="0" value="2"></div>
+            <div class="field"><label>تعداد سؤال‌های وصل‌کردنی</label><input class="input" id="randomMatchingCount" type="number" min="0" value="0"></div>
           </div>
         </div>
 
@@ -152,7 +153,7 @@
     if (number === 6) {
       const randomMode = document.getElementById("randomToggle").checked;
       const selectedCount = randomMode
-        ? Number(document.getElementById("randomMcqCount").value || 0) + Number(document.getElementById("randomEssayCount").value || 0)
+        ? Number(document.getElementById("randomMcqCount").value || 0) + Number(document.getElementById("randomEssayCount").value || 0) + Number(document.getElementById("randomMatchingCount").value || 0)
         : document.querySelectorAll('#manualPick input[type=checkbox]:checked').length;
       document.getElementById("prevQuestionCount").textContent = `${selectedCount} سوال${randomMode ? ' (تصادفی)' : ''}`;
       document.getElementById("prevDuration").textContent = `${document.getElementById("examDuration").value || 0} دقیقه`;
@@ -186,10 +187,12 @@
       const pool = [...document.querySelectorAll('#manualPick input[type="checkbox"]')];
       const mcqCount = Math.max(0, Number(document.getElementById("randomMcqCount").value) || 0);
       const essayCount = Math.max(0, Number(document.getElementById("randomEssayCount").value) || 0);
+      const matchingCount = Math.max(0, Number(document.getElementById("randomMatchingCount").value) || 0);
       const pickRandom = items => items.sort(() => Math.random() - 0.5);
       const mcq = pickRandom(pool.filter(input => /multiplechoice|mcq/i.test(input.dataset.questionType || ''))).slice(0, mcqCount);
       const essay = pickRandom(pool.filter(input => /essay|text|descriptive/i.test(input.dataset.questionType || ''))).slice(0, essayCount);
-      questionIds = [...mcq, ...essay].map(input => input.value).filter(Boolean);
+      const matching = pickRandom(pool.filter(input => /matching/i.test(input.dataset.questionType || ''))).slice(0, matchingCount);
+      questionIds = [...mcq, ...essay, ...matching].map(input => input.value).filter(Boolean);
     }
     const selectedTeacher = document.querySelector("#teacherChoices .choice-card.selected");
     const durationMinutes = Number(document.getElementById("examDuration").value);
