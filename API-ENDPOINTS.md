@@ -54,6 +54,14 @@ Base URL: `https://localhost:7081/api` (ASP.NET launch profile). All routes requ
 | GET | `/reports/departments` | SuperAdmin or Department; scoped department-level exam, score, pass-rate, participation, student and teacher aggregates |
 | GET | `/health` | API health check (outside `/api`) |
 
+## Schema requirements for exam grading
+
+Run `database/patch-exam-grading-and-department-manager.sql` on a backed-up
+development database before using the updated API. It adds persistence for
+question category/difficulty/options/correct answers, department manager IDs,
+attempt status and answer correctness. Frontend IDs are GUID strings and must
+not be converted to JavaScript numbers.
+
 ## Frontend wiring in this revision
 
 - Login uses API authentication and role-driven navigation; no role picker.
