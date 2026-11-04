@@ -761,12 +761,17 @@ public class ExamsController(AppDbContext db) : ControllerBase
             }
             else if (question.Type == "MultipleChoice")
             {
-                saved.IsCorrect =
-                    !string.IsNullOrWhiteSpace(question.CorrectAnswer) &&
-                    string.Equals(
-                        question.CorrectAnswer.Trim(),
-                        saved.Answer?.Trim(),
-                        StringComparison.OrdinalIgnoreCase);
+                if (string.IsNullOrWhiteSpace(question.CorrectAnswer))
+                {
+                    saved.IsCorrect = null;
+                    saved.AwardedScore = 0m;
+                    continue;
+                }
+
+                saved.IsCorrect = string.Equals(
+                    question.CorrectAnswer.Trim(),
+                    saved.Answer?.Trim(),
+                    StringComparison.OrdinalIgnoreCase);
 
                 var questionCount = attempt.Exam.Questions.Count;
                 var baseQuestionScore = questionCount == 0
