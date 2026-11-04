@@ -464,6 +464,45 @@
     modal.classList.add('show');
   }
 
+  function showTemporaryPasswordModal(password) {
+    const overlay = document.createElement('div');
+    overlay.className = 'modal-overlay show';
+    overlay.style.zIndex = '230';
+    const box = document.createElement('div');
+    box.className = 'modal-box';
+    const head = document.createElement('div');
+    head.className = 'modal-head';
+    const title = document.createElement('h3');
+    title.textContent = 'رمز موقت حساب';
+    const close = document.createElement('button');
+    close.type = 'button'; close.className = 'icon-btn'; close.textContent = '✕';
+    head.append(title, close);
+    const body = document.createElement('div');
+    body.className = 'modal-body';
+    const note = document.createElement('p');
+    note.textContent = 'این رمز فقط همین بار نمایش داده می‌شود. آن را کپی و به‌صورت امن به کاربر تحویل دهید.';
+    const input = document.createElement('input');
+    input.className = 'input'; input.readOnly = true; input.value = password;
+    body.append(note, input);
+    const foot = document.createElement('div');
+    foot.className = 'modal-foot';
+    const copy = document.createElement('button');
+    copy.type = 'button'; copy.className = 'btn btn-primary'; copy.textContent = 'کپی رمز';
+    const done = document.createElement('button');
+    done.type = 'button'; done.className = 'btn btn-outline'; done.textContent = 'بستن';
+    foot.append(copy, done); box.append(head, body, foot); overlay.appendChild(box);
+    document.body.appendChild(overlay);
+    const closeModal = () => overlay.remove();
+    close.addEventListener('click', closeModal);
+    done.addEventListener('click', closeModal);
+    overlay.addEventListener('click', event => { if (event.target === overlay) closeModal(); });
+    copy.addEventListener('click', async () => {
+      try { await navigator.clipboard.writeText(password); notify('رمز موقت کپی شد.', 'ok'); }
+      catch { input.focus(); input.select(); notify('رمز را با Ctrl+C کپی کنید.', 'info'); }
+    });
+    input.focus(); input.select();
+  }
+
   async function saveUserFromModal(modal) {
     const role = modal.dataset.editRole || (modal.id === 'teacherModal' ? 'Teacher' : 'Student');
     const fields = $$('input, select', modal).filter(field => !['radio', 'checkbox', 'file'].includes(field.type));
@@ -487,9 +526,7 @@
         const temporaryPassword = created?.temporaryPassword || '';
         if (temporaryPassword) {
           const message = `کاربر ساخته شد. رمز موقت فقط همین بار نمایش داده می‌شود: ${temporaryPassword}`;
-          if (window.confirm(`${message}\n\nبرای کپی‌کردن رمز موقت، OK را بزنید.`)) {
-            try { await navigator.clipboard.writeText(temporaryPassword); } catch { window.prompt('رمز موقت را کپی کنید:', temporaryPassword); }
-          }
+          showTemporaryPasswordModal(temporaryPassword);
           notify('کاربر ساخته شد؛ رمز موقت را به‌صورت امن به او تحویل دهید.', 'ok');
           return;
         }
@@ -762,7 +799,7 @@
       method: 'POST',
       body: JSON.stringify({ username, fullName, role: 'Teacher', email: null, mobile: null, departmentId, mustChangePassword: true })
     });
-    if (created.temporaryPassword) window.prompt('استاد ایجاد شد. رمز موقت را همین حالا کپی و امن تحویل دهید:', created.temporaryPassword);
+    if (created.temporaryPassword) showTemporaryPasswordModal(created.temporaryPassword);
     await loadExamWizard();
     const newTeacherCard = $$('#teacherChoices .choice-card').find(card => card.dataset.id === created.id);
     if (newTeacherCard) {
@@ -887,7 +924,7 @@
           managerSelect.innerHTML = '<option value="">بدون مدیر</option>' + managers.map(manager => `<option value="${manager.id}">${escapeHtml(manager.fullName)}</option>`).join('');
           managerSelect.value = String(created.id);
           const temporaryPassword = created.temporaryPassword || '';
-          if (temporaryPassword) window.alert(`حساب مدیر ساخته شد. رمز موقت را همین حالا به او تحویل دهید:\n${temporaryPassword}`);
+          if (temporaryPassword) showTemporaryPasswordModal(temporaryPassword);
           notify('حساب مدیر ایجاد شد؛ با ذخیره دپارتمان به آن متصل می‌شود.', 'ok');
         });
       }
