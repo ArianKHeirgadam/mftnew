@@ -69,3 +69,7 @@ public record DashboardSummary(
     int Questions,
     int Exams,
     int Attempts);
+
+
+public record AttendanceEntryRequest(Guid StudentId, string Status);
+public record SaveAttendanceRequest(DateOnly Date, Guid? DepartmentId, List<AttendanceEntryRequest> Records);
