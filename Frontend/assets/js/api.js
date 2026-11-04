@@ -165,7 +165,7 @@
     if (!$('body[data-active="departments"]')) return;
     const search = $('body[data-active="departments"] .search-box input')?.value.trim();
     const rows = await request(`/departments${search ? `?search=${encodeURIComponent(search)}` : ''}`);
-    $('[data-department-field]').forEach(select => {
+    $$('[data-department-field]').forEach(select => {
       const selected = select.value;
       select.innerHTML = '<option value="">انتخاب دپارتمان</option>' + rows.map(dept => `<option value="${dept.id}">${escapeHtml(dept.name)}</option>`).join('');
       if (selected) select.value = selected;
@@ -654,7 +654,7 @@
       body: JSON.stringify({ name: values.name, managerUserId: null, isActive: true })
     });
     const rows = await request('/departments');
-    $$('[data-department-field]').forEach(select => {
+    $$$('[data-department-field]').forEach(select => {
       const selected = select.value;
       select.innerHTML = '<option value="">انتخاب دپارتمان</option>' +
         rows.map(dept => `<option value="${dept.id}">${escapeHtml(dept.name)}</option>`).join('');
@@ -858,14 +858,14 @@
   async function initInlineQuickCreate() {
     const role = (currentUser()?.role || '').toLowerCase();
     if (role === 'superadmin') {
-      $$('[data-department-field]').forEach(select => {
+      $$$('[data-department-field]').forEach(select => {
         const anchor = select.closest('.field') || select.parentElement;
         mountInlineQuickForm(anchor, '+ ایجاد دپارتمان جدید', 'ایجاد دپارتمان', [
           { name: 'name', label: 'نام دپارتمان', placeholder: 'مثلاً مهندسی کامپیوتر' }
         ], async values => {
           const created = await request('/departments', { method: 'POST', body: JSON.stringify({ name: values.name, managerUserId: null, isActive: true }) });
           const departments = await request('/departments');
-          $$('[data-department-field]').forEach(field => {
+          $$$('[data-department-field]').forEach(field => {
             field.innerHTML = '<option value="">انتخاب دپارتمان</option>' + departments.map(dept => `<option value="${dept.id}">${escapeHtml(dept.name)}</option>`).join('');
             field.value = String(created.id);
           });
@@ -969,7 +969,7 @@
         const role = (currentUser()?.role || '').toLowerCase();
         if (role === 'superadmin' || role === 'department') {
           const departments = await request('/departments').catch(() => []);
-          $('[data-department-field]').forEach(select => { select.innerHTML = '<option value="">انتخاب دپارتمان</option>' + departments.map(dept => `<option value="${dept.id}">${escapeHtml(dept.name)}</option>`).join(''); });
+          $$('[data-department-field]').forEach(select => { select.innerHTML = '<option value="">انتخاب دپارتمان</option>' + departments.map(dept => `<option value="${dept.id}">${escapeHtml(dept.name)}</option>`).join(''); });
         }
       }
       if (document.body.dataset.active === 'students') attachSearch('body[data-active="students"] .search-box input', loadUsers);
