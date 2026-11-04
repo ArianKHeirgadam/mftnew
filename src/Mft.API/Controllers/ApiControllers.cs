@@ -770,7 +770,7 @@ public class ResultsController(AppDbContext db) : ControllerBase
         if (examId.HasValue)q = q.Where(x => x.ExamId == examId);
         if (studentId.HasValue)q = q.Where(x => x.StudentId == studentId);
         return Ok(await q.OrderByDescending(x => x.SubmittedAt).Select(x => new{
-            id = x.Id, examId = x.ExamId, examTitle = x.Exam.Title, studentId = x.StudentId, studentName = db.Users.Where(u => u.Id == x.StudentId).Select(u => u.FullName).FirstOrDefault(), startedAt = x.StartedAt, submittedAt = x.SubmittedAt, score = x.Score, status = x.Status
+            id = x.Id, examId = x.ExamId, examTitle = x.Exam.Title, studentId = x.StudentId, studentName = db.Users.Where(u => u.Id == x.StudentId).Select(u => u.FullName).FirstOrDefault(), startedAt = x.StartedAt, submittedAt = x.SubmittedAt, score = x.Status == "Graded" || !x.Answers.Any(answer => answer.IsCorrect == null) ? x.Score : null, status = x.Status
         }
         ).ToListAsync(ct));
     }
@@ -789,7 +789,7 @@ public class ResultsController(AppDbContext db) : ControllerBase
         }
         ).ToDictionaryAsync(question => question.Id, ct);
         return Ok(new {
-            id = a.Id, exam = a.Exam.Title, score = a.Score, maxScore, passingScore = a.Exam.PassingScore, status = a.Status, answers = a.Answers.Select(answer => new{
+            id = a.Id, exam = a.Exam.Title, score = a.Status == "Graded" || !a.Answers.Any(answer => answer.IsCorrect == null) ? a.Score : null, autoScore = a.Score, pendingManualCount = a.Answers.Count(answer => answer.IsCorrect == null), maxScore, passingScore = a.Exam.PassingScore, status = a.Status, answers = a.Answers.Select(answer => new{
                 questionId = answer.QuestionId, question = questionDetails.TryGetValue(answer.QuestionId, out var detail)?detail.Text:null, correctAnswer = a.Status == "InProgress"?null:questionDetails.TryGetValue(answer.QuestionId, out var correct)?correct.CorrectAnswer:null, answer = answer.Answer, isCorrect = answer.IsCorrect, awardedScore = answer.AwardedScore
             }
             )
