@@ -66,6 +66,7 @@ const NAV_BY_ROLE = {
         { key: "bank", label: "بانک سوالات", href: "question-bank.html", icon: ICON.bank },
         { key: "exams", label: "آزمون‌ها", href: "create-exam.html", icon: ICON.exam },
         { key: "results", label: "نتایج", href: "results.html", icon: ICON.result },
+        { key: "attendance", label: "حضور و غیاب", href: "attendance.html", icon: ICON.students },
       ]
     },
     {
