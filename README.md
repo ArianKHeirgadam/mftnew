@@ -45,7 +45,7 @@ This working tree combines the supplied frontend with an ASP.NET Core Web API. T
 
    Set `Bootstrap__CreateSuperAdmin=false` after initialization. Do not reuse the example password.
 
-## Database patch for question bank and exam grading
+## Database patch for question bank, exam grading and attendance
 
 Before running the API against the existing SQL Server database, back up the
 database and execute
@@ -55,7 +55,7 @@ to persist MCQ options/correct answers, attempt status, answer correctness and
 department manager IDs. Do not skip this step: the previous schema-compatibility
 mapping intentionally ignored those fields.
 
-After applying the patch, build the API and run the test sequence in
+Also execute `database/create-attendance-records.sql` on the same development database to enable daily attendance records. Back up the database first.\n\nAfter applying the patches, build the API and run the test sequence in
 `docs/EXAM-SCORING-VERIFICATION.md`. A 20-question test with 15 correct
 answers should produce 75/100. Live SQL Server verification is still required.
 
@@ -70,7 +70,7 @@ Open `Frontend/` in VS Code and launch `login.html` with Live Server (usually `h
 - `Teacher`: student management in their department and exams/questions they own.
 - `Student`: no account-management endpoints; can start published exams and access their own attempts/results.
 
-The role is read from the authenticated account, not selected in the login UI. Newly created users are marked `MustChangePassword`; the current frontend prompts for a replacement password after login. An SMS provider is **not yet wired**, so this bundle must not be represented as delivering temporary passwords or verification codes by SMS.
+The role is read from the authenticated account, not selected in the login UI. New accounts use the password entered by the administrator/teacher at creation time. The temporary-password redirect and forced-change middleware have been removed; users may change their password later from their profile. An SMS provider is **not yet wired**, so this bundle must not be represented as delivering temporary passwords or verification codes by SMS.
 
 ## Current verification status
 
