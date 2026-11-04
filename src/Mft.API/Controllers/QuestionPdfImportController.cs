@@ -12,7 +12,10 @@ namespace Mft.API.Controllers;
 [ApiController, Route("api/questions"), Authorize(Policy = "TeacherOrAbove")]
 public sealed class QuestionPdfImportController(AppDbContext db) : ControllerBase
 {
-    private static readonly Regex QuestionStart = new(@"^(?:Q(?:UESTION)?\s*\d+|سؤال\s*\d+)\s*[:.)\-]\s*(.*)$", RegexOptions.IgnoreCase | RegexOptions.Compiled);
+    private static readonly Regex QuestionStart = new(@"^(?:Q(?:UESTION)?\s*\d+|س[ؤو]ال\s*[0-9۰-۹٠-٩]+)\s*[:.)\-]\s*(.*)$", RegexOptions.IgnoreCase | RegexOptions.Compiled);
+    // PdfPig may return RTL text with the Persian question marker at the END of the line,
+    // e.g. ": متن سؤال؟۱ سؤال" instead of "سؤال ۱: متن سؤال؟".
+    private static readonly Regex TrailingPersianQuestion = new(@"^(?<body>.+?)\s*[:：؟.!،]?\s*(?<number>[0-9۰-۹٠-٩]+)\s*س[ؤو]ال\s*$", RegexOptions.IgnoreCase | RegexOptions.Compiled);
     private static readonly Regex OptionLine = new(@"^(?:([A-E])|([الفبجد]))[).:\-]\s*(.+)$", RegexOptions.IgnoreCase | RegexOptions.Compiled);
     private static readonly Regex AnswerLine = new(@"^(?:ANSWER|پاسخ)\s*[:=]\s*(.+)$", RegexOptions.IgnoreCase | RegexOptions.Compiled);
     private static readonly Regex PairLine = new(@"^(?:PAIR|جفت)\s*[:=]\s*(.+?)\s*(?:=>|->|→|=)\s*(.+)$", RegexOptions.IgnoreCase | RegexOptions.Compiled);
@@ -132,6 +135,16 @@ public sealed class QuestionPdfImportController(AppDbContext db) : ControllerBas
         {
             var line = Regex.Replace(raw, @"\s+", " ").Trim();
             if (line.Length == 0) continue;
+
+            // Normalize RTL-extracted Persian question markers before detecting question boundaries.
+            var trailingMarker = TrailingPersianQuestion.Match(line);
+            if (trailingMarker.Success)
+            {
+                var body = trailingMarker.Groups["body"].Value.Trim().TrimStart(':', '：', '؟');
+                var number = trailingMarker.Groups["number"].Value;
+                line = $"سؤال {number}: {body}";
+            }
+
             var start = QuestionStart.Match(line);
             if (start.Success)
             {
