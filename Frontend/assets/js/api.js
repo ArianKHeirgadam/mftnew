@@ -761,7 +761,6 @@
         managers.map(manager => `<option value="${manager.id}">${escapeHtml(manager.fullName)}</option>`).join('');
       select.value = created.id;
     }
-    if (created.temporaryPassword) notify('حساب ساخته شد. رمز موقت: ' + created.temporaryPassword, 'info');
     notify('حساب مدیر ایجاد شد؛ با ذخیره دپارتمان به آن متصل می‌شود.', 'ok');
   }
 
