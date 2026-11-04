@@ -507,8 +507,8 @@
     ]);
     const departmentWrap = $('#deptChoices');
     const questionWrap = $('#manualPick');
-    if (departmentWrap && departments.length) {
-      departmentWrap.innerHTML = departments.map((dept, index) => `<div class="choice-card ${index === 0 ? 'selected' : ''}" data-id="${dept.id}" data-value="${escapeHtml(dept.name)}"><div class="mohr sm"><div class="mohr-inner"><b>${escapeHtml(dept.name.slice(0, 2))}</b></div></div><b>${escapeHtml(dept.name)}</b></div>`).join('');
+    if (departmentWrap) {
+      departmentWrap.innerHTML = departments.length ? departments.map((dept, index) => `<div class="choice-card ${index === 0 ? 'selected' : ''}" data-id="${dept.id}" data-value="${escapeHtml(dept.name)}"><div class="mohr sm"><div class="mohr-inner"><b>${escapeHtml(dept.name.slice(0, 2))}</b></div></div><b>${escapeHtml(dept.name)}</b></div>`).join('') : '<p class="text-soft">دپارتمانی ثبت نشده است. از گزینه «ایجاد دپارتمان» استفاده کنید.</p>';
     }
     if (questionWrap) {
       questionWrap.innerHTML = questions.map(question => `<label class="qpick-row"><input type="checkbox" data-question-type="${escapeHtml(question.type)}" value="${question.id}"><span style="flex:1">${escapeHtml(question.text)}</span><span class="badge badge-info">${escapeHtml(question.type)}</span></label>`).join('') || '<p class="text-soft">ابتدا از بانک سؤال، سؤال ثبت کنید.</p>';
@@ -517,7 +517,7 @@
     if (teacherWrap) {
       const me = await request('/auth/me').catch(() => null);
       const teachers = me?.role === 'Teacher' ? [me] : await request('/users?role=Teacher').catch(() => []);
-      teacherWrap.innerHTML = teachers.map((teacher, index) => `<div class="choice-card ${index === 0 ? 'selected' : ''}" data-id="${teacher.id}" data-value="${escapeHtml(teacher.fullName)}"><div class="mohr sm"><div class="mohr-inner"><b>${escapeHtml(teacher.fullName.slice(0, 2))}</b></div></div><b>${escapeHtml(teacher.fullName)}</b></div>`).join('') || '<p class="text-soft">استادی برای انتخاب وجود ندارد.</p>';
+      teacherWrap.innerHTML = teachers.map((teacher, index) => `<div class="choice-card ${index === 0 ? 'selected' : ''}" data-id="${teacher.id}" data-value="${escapeHtml(teacher.fullName)}"><div class="mohr sm"><div class="mohr-inner"><b>${escapeHtml(teacher.fullName.slice(0, 2))}</b></div></div><b>${escapeHtml(teacher.fullName)}</b></div>`).join('') || '<p class="text-soft">استادی برای انتخاب وجود ندارد. می‌توانید استاد جدید ایجاد کنید.</p>';
     }
   }
 
@@ -553,6 +553,9 @@
       if (settingsSave) { event.preventDefault(); saveSettings(); return; }
       const questionSave = event.target.closest('[data-question-save]');
       if (questionSave) { event.preventDefault(); saveQuestionFromModal(questionSave.closest('.modal-overlay')); return; }
+      if (event.target.closest('[data-create-department]')) { event.preventDefault(); safe(createDepartmentInline); return; }
+      if (event.target.closest('[data-create-manager]')) { event.preventDefault(); safe(createManagerInline); return; }
+      if (event.target.closest('[data-create-teacher]')) { event.preventDefault(); safe(createTeacherInline); return; }
       const departmentSave = event.target.closest('[data-department-save]');
       if (departmentSave) { event.preventDefault(); saveDepartmentFromModal(departmentSave.closest('.modal-overlay')); return; }
       const userSave = event.target.closest('[data-user-save]');
@@ -642,6 +645,72 @@
     }, 'دپارتمان ذخیره شد.');
   }
 
+  async function createDepartmentInline() {
+    if ((currentUser()?.role || '').toLowerCase() !== 'superadmin') {
+      return notify('فقط مدیر کل امکان ایجاد دپارتمان دارد.', 'warn');
+    }
+    const name = window.prompt('نام دپارتمان جدید را وارد کنید:')?.trim();
+    if (!name) return;
+    const created = await request('/departments', {
+      method: 'POST',
+      body: JSON.stringify({ name, managerUserId: null, isActive: true })
+    });
+    const rows = await request('/departments');
+    $('[data-department-field]').forEach(select => {
+      const selected = select.value;
+      select.innerHTML = '<option value="">انتخاب دپارتمان</option>' +
+        rows.map(dept => `<option value="${dept.id}">${escapeHtml(dept.name)}</option>`).join('');
+      select.value = created.id;
+      if (selected && selected !== created.id) select.value = selected;
+    });
+    if ($('#deptChoices')) await loadExamWizard();
+    if ($('body[data-active="departments"]')) await loadDepartments();
+    notify('دپارتمان ایجاد شد و به فهرست انتخاب اضافه شد.', 'ok');
+  }
+
+  async function createManagerInline() {
+    if ((currentUser()?.role || '').toLowerCase() !== 'superadmin') {
+      return notify('فقط مدیر کل امکان ایجاد مدیر دپارتمان دارد.', 'warn');
+    }
+    const fullName = window.prompt('نام و نام خانوادگی مدیر دپارتمان:')?.trim();
+    if (!fullName) return;
+    const username = window.prompt('نام کاربری مدیر دپارتمان:')?.trim();
+    if (!username) return;
+    const created = await request('/users', {
+      method: 'POST',
+      body: JSON.stringify({ username, fullName, role: 'Department', email: null, mobile: null, departmentId: null, mustChangePassword: true })
+    });
+    const select = $('#departmentManagerId');
+    if (select) {
+      const managers = await request('/users?role=Department');
+      select.innerHTML = '<option value="">بدون مدیر</option>' +
+        managers.map(manager => `<option value="${manager.id}">${escapeHtml(manager.fullName)}</option>`).join('');
+      select.value = created.id;
+    }
+    if (created.temporaryPassword) window.prompt('حساب مدیر ایجاد شد. رمز موقت را همین حالا کپی و امن تحویل دهید:', created.temporaryPassword);
+    notify('حساب مدیر ایجاد شد؛ پس از ایجاد دپارتمان آن را به دپارتمان متصل کنید.', 'ok');
+  }
+
+  async function createTeacherInline() {
+    const role = (currentUser()?.role || '').toLowerCase();
+    if (!['superadmin', 'department'].includes(role)) {
+      return notify('ایجاد استاد از این بخش برای نقش فعلی مجاز نیست.', 'warn');
+    }
+    const fullName = window.prompt('نام و نام خانوادگی استاد:')?.trim();
+    if (!fullName) return;
+    const username = window.prompt('نام کاربری استاد:')?.trim();
+    if (!username) return;
+    const department = $('#deptChoices .choice-card.selected');
+    const departmentId = department?.dataset.id || null;
+    const created = await request('/users', {
+      method: 'POST',
+      body: JSON.stringify({ username, fullName, role: 'Teacher', email: null, mobile: null, departmentId, mustChangePassword: true })
+    });
+    if (created.temporaryPassword) window.prompt('استاد ایجاد شد. رمز موقت را همین حالا کپی و امن تحویل دهید:', created.temporaryPassword);
+    await loadExamWizard();
+    notify('استاد ایجاد شد و به فهرست انتخاب اضافه شد.', 'ok');
+  }
+
   async function editQuestion(id) {
     const question = await request(`/questions/${id}`);
     const modal = $('#questionModal');
@@ -689,6 +758,9 @@
     if ($('#departmentExamsBody')) $('#departmentExamsBody').replaceChildren();
     await safe(async () => {
       await loadCurrentUser();
+      const isSuperAdmin = (currentUser()?.role || '').toLowerCase() === 'superadmin';
+      $('[data-create-department], [data-create-manager]').forEach(button => { button.hidden = !isSuperAdmin; });
+      $('[data-create-teacher]').forEach(button => { button.hidden = !['superadmin', 'department'].includes((currentUser()?.role || '').toLowerCase()); });
       const loaders = [
         [loadUsers, ['students', 'teachers']],
         [loadDepartments, ['departments']],
