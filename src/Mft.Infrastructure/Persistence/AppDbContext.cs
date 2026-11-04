@@ -45,7 +45,7 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
             entity.Property(x => x.Name).HasMaxLength(200).IsRequired();
             entity.Property(x => x.ManagerName).HasMaxLength(200);
             entity.Property(x => x.DegreeLevel).HasMaxLength(100).IsRequired();
-            entity.Ignore(x => x.ManagerUserId);
+            entity.Property(x => x.ManagerUserId).HasColumnType("uniqueidentifier");
             entity.Ignore(x => x.CreatedAt);
             entity.HasIndex(x => x.Name).IsUnique();
         });
@@ -61,10 +61,10 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
             entity.Property(x => x.Text).IsRequired();
             entity.Property(x => x.IsActive).IsRequired();
             entity.Property(x => x.Type).HasMaxLength(30).IsRequired();
-            entity.Ignore(x => x.Category);
-            entity.Ignore(x => x.Difficulty);
-            entity.Ignore(x => x.OptionsJson);
-            entity.Ignore(x => x.CorrectAnswer);
+            entity.Property(x => x.Category).HasMaxLength(200).IsRequired();
+            entity.Property(x => x.Difficulty).HasMaxLength(30).IsRequired();
+            entity.Property(x => x.OptionsJson).HasColumnType("nvarchar(max)");
+            entity.Property(x => x.CorrectAnswer).HasColumnType("nvarchar(max)");
             entity.Ignore(x => x.CreatedAt);
         });
 
@@ -102,7 +102,7 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
             entity.ToTable("ExamAttempts");
             entity.HasKey(x => x.Id);
             entity.Property(x => x.Id).HasColumnType("uniqueidentifier").ValueGeneratedNever();
-            entity.Ignore(x => x.Status);
+            entity.Property(x => x.Status).HasMaxLength(30).IsRequired();
             entity.Property(x => x.Score).HasPrecision(18, 2);
             entity.HasOne(x => x.Exam).WithMany().HasForeignKey(x => x.ExamId).OnDelete(DeleteBehavior.Restrict);
         });
@@ -115,7 +115,7 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
             entity.Property(x => x.ExamAttemptId).HasColumnName("AttemptId");
             entity.Property(x => x.Answer).HasColumnName("EssayText");
             entity.Property(x => x.AwardedScore).HasColumnName("Score").HasPrecision(18, 2);
-            entity.Ignore(x => x.IsCorrect);
+            entity.Property(x => x.IsCorrect);
             entity.Ignore(x => x.UpdatedAt);
             entity.HasOne(x => x.Attempt).WithMany(x => x.Answers).HasForeignKey(x => x.ExamAttemptId).OnDelete(DeleteBehavior.Cascade);
             entity.HasOne<Question>().WithMany().HasForeignKey(x => x.QuestionId).OnDelete(DeleteBehavior.Restrict);
