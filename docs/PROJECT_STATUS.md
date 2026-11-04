@@ -2,6 +2,11 @@
 
 ## Implemented in this revision
 
+- Added inline create actions for departments in student/teacher forms and for teachers in the exam wizard; added inline Department-manager account creation in the department editor. Role checks remain enforced by the API.
+- Corrected frontend GUID handling so department, user, question, exam and attempt IDs remain strings instead of being coerced to JavaScript numbers.
+- Corrected the exam wizard's passing-score input to use the API's 0–100 scale.
+- Added `database/patch-exam-grading-and-department-manager.sql` and EF mappings for MCQ options/correct answers, department manager IDs, attempt status and answer correctness. See `docs/EXAM-SCORING-VERIFICATION.md`.
+
 - Preserved the supplied frontend pages, styles, and image assets.
 - Reworked the API adapter into readable modules for authentication, user CRUD, departments, question CRUD, exam creation/start, result review, notifications, profile/password changes, settings and reports.
 - Connected the student/teacher user forms and question/department modals to the backend instead of displaying fake success messages.
