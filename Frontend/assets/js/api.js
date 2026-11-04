@@ -958,7 +958,7 @@
         card?.parentElement.querySelectorAll('.choice-card').forEach(item => item.classList.remove('selected'));
         card?.classList.add('selected');
         const temporaryPassword = created.temporaryPassword || '';
-        if (temporaryPassword) window.alert(`استاد ایجاد شد. رمز موقت را همین حالا به او تحویل دهید:\n${temporaryPassword}`);
+        if (temporaryPassword) showTemporaryPasswordModal(temporaryPassword);
         notify('استاد ایجاد و برای آزمون انتخاب شد.', 'ok');
       });
     }
