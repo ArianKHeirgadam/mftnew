@@ -130,3 +130,15 @@ public class AppSetting
     public string Value { get; set; } = "";
     public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
 }
+
+
+public class AttendanceRecord
+{
+    public Guid Id { get; set; } = Guid.NewGuid();
+    public Guid StudentUserId { get; set; }
+    public Guid DepartmentId { get; set; }
+    public Guid RecordedByUserId { get; set; }
+    public DateOnly AttendanceDate { get; set; }
+    public string Status { get; set; } = "Present";
+    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+}
