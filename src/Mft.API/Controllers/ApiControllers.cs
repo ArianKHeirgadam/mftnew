@@ -562,7 +562,7 @@ public class ExamsController(AppDbContext db) : ControllerBase
         );
         var validQuery = db.Questions.Where(q => ids.Contains(q.Id));
         if (User.IsInRole("Teacher"))validQuery = validQuery.Where(q => q.CreatedByUserId == User.UserId());
-        if (User.IsInRole("Department"))validQuery = validQuery.Where(question => db.Users.Any(user => user.Id == question.CreatedByUserId && user.DepartmentId == User.DepartmentId()));
+        if (User.IsInRole("Department"))validQuery = validQuery.Where(question => question.DepartmentId == User.DepartmentId());
         var validIds = await validQuery.Select(q => q.Id).ToListAsync(ct);
         if (validIds.Count != ids.Length) return BadRequest(new {
             message = "یک یا چند سؤال وجود ندارد یا به شما تعلق ندارد."
