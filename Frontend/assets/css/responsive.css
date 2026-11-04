@@ -70,9 +70,18 @@
   overscroll-behavior: contain;
 }
 .modal-box {
+  display: flex;
+  flex-direction: column;
   width: min(560px, 100%);
   max-width: 100%;
   max-height: calc(100dvh - 32px);
+  min-height: 0;
+  overflow: hidden;
+  overscroll-behavior: contain;
+}
+.modal-box > .modal-body {
+  flex: 1 1 auto;
+  min-height: 0;
   overflow-x: hidden;
   overflow-y: auto;
   overscroll-behavior: contain;
