@@ -179,7 +179,7 @@
     const api = window.MftApi;
     if (!api) return showToast("اتصال API آماده نیست.", "danger");
     const department = document.querySelector("#deptChoices .choice-card.selected");
-    let questionIds = [...document.querySelectorAll('#manualPick input[type="checkbox"]:checked')].map(input => Number(input.value)).filter(Number.isFinite);
+    let questionIds = [...document.querySelectorAll('#manualPick input[type="checkbox"]:checked')].map(input => input.value).filter(Boolean);
     if (document.getElementById("randomToggle").checked) {
       const pool = [...document.querySelectorAll('#manualPick input[type="checkbox"]')];
       const mcqCount = Math.max(0, Number(document.getElementById("randomMcqCount").value) || 0);
@@ -187,7 +187,7 @@
       const pickRandom = items => items.sort(() => Math.random() - 0.5);
       const mcq = pickRandom(pool.filter(input => /multiplechoice|mcq/i.test(input.dataset.questionType || ''))).slice(0, mcqCount);
       const essay = pickRandom(pool.filter(input => /essay|text|descriptive/i.test(input.dataset.questionType || ''))).slice(0, essayCount);
-      questionIds = [...mcq, ...essay].map(input => Number(input.value));
+      questionIds = [...mcq, ...essay].map(input => input.value).filter(Boolean);
     }
     const selectedTeacher = document.querySelector("#teacherChoices .choice-card.selected");
     const durationMinutes = Number(document.getElementById("examDuration").value);
@@ -203,9 +203,9 @@
         title: document.getElementById("examTitle").value.trim(),
         subject: document.getElementById("examSubject").value.trim() || null,
         description: document.getElementById("examDescription").value.trim() || null,
-        durationMinutes, passingScore: Number(document.getElementById("examPassingScore").value || 0), allowQuestionNavigation: document.getElementById("allowQuestionNavigation").checked, startsAt, endsAt: null, isPublished: true,
-        departmentId: department?.dataset.id ? Number(department.dataset.id) : null,
-        createdByUserId: selectedTeacher?.dataset.id ? Number(selectedTeacher.dataset.id) : null,
+        durationMinutes, passingScore: Number(document.getElementById("examPassingScore").value || 0) * 5, allowQuestionNavigation: document.getElementById("allowQuestionNavigation").checked, startsAt, endsAt: null, isPublished: true,
+        departmentId: department?.dataset.id || null,
+        createdByUserId: selectedTeacher?.dataset.id || null,
         questionIds
       }) });
       showToast("آزمون با موفقیت ذخیره و منتشر شد.", "ok");
