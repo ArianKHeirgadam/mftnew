@@ -131,8 +131,15 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
             entity.Property(x => x.Message).IsRequired();
         });
 
-        // This database has no AppSettings table. Excluding it prevents accidental queries against a
-        // nonexistent table; Settings endpoints still need a storage implementation before use.
-        modelBuilder.Ignore<AppSetting>();
+        modelBuilder.Entity<AppSetting>(entity =>
+        {
+            entity.ToTable("AppSettings");
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.Id).HasColumnType("uniqueidentifier").ValueGeneratedNever();
+            entity.Property(x => x.Key).HasMaxLength(100).IsRequired();
+            entity.Property(x => x.Value).HasColumnType("nvarchar(max)").IsRequired();
+            entity.Property(x => x.UpdatedAt).IsRequired();
+            entity.HasIndex(x => x.Key).IsUnique();
+        });
     }
 }
