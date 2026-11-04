@@ -729,8 +729,18 @@ public class ExamsController(AppDbContext db) : ControllerBase
                         saved.Answer?.Trim(),
                         StringComparison.OrdinalIgnoreCase);
 
+                var questionCount = attempt.Exam.Questions.Count;
+                var baseQuestionScore = questionCount == 0
+                    ? 0m
+                    : Math.Floor(100m / questionCount * 100m) / 100m;
+                var isLastQuestion = examQuestion.Order ==
+                    attempt.Exam.Questions.Max(item => item.Order);
+                var normalizedQuestionScore = isLastQuestion
+                    ? 100m - baseQuestionScore * (questionCount - 1)
+                    : baseQuestionScore;
+
                 saved.AwardedScore = saved.IsCorrect == true
-                    ? examQuestion.Score
+                    ? normalizedQuestionScore
                     : 0m;
             }
             else
@@ -757,7 +767,8 @@ public class ExamsController(AppDbContext db) : ControllerBase
             status = attempt.Status,
             submittedAt = attempt.SubmittedAt
         });
-    }}
+    }
+}
 [ApiController, Route("api/results"), Authorize]
 public class ResultsController(AppDbContext db) : ControllerBase
 {
