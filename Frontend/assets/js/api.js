@@ -645,11 +645,13 @@
     if ((currentUser()?.role || '').toLowerCase() !== 'superadmin') {
       return notify('فقط مدیر کل امکان ایجاد دپارتمان دارد.', 'warn');
     }
-    const name = window.prompt('نام دپارتمان جدید را وارد کنید:')?.trim();
-    if (!name) return;
+    const values = await showQuickCreateModal('ایجاد دپارتمان جدید', [
+      { name: 'name', label: 'نام دپارتمان', placeholder: 'مثلاً مهندسی کامپیوتر' }
+    ]);
+    if (!values) return;
     const created = await request('/departments', {
       method: 'POST',
-      body: JSON.stringify({ name, managerUserId: null, isActive: true })
+      body: JSON.stringify({ name: values.name, managerUserId: null, isActive: true })
     });
     const rows = await request('/departments');
     $$('[data-department-field]').forEach(select => {
@@ -747,10 +749,12 @@
     if (!['superadmin', 'department'].includes(role)) {
       return notify('ایجاد استاد از این بخش برای نقش فعلی مجاز نیست.', 'warn');
     }
-    const fullName = window.prompt('نام و نام خانوادگی استاد:')?.trim();
-    if (!fullName) return;
-    const username = window.prompt('نام کاربری استاد:')?.trim();
-    if (!username) return;
+    const values = await showQuickCreateModal('ایجاد حساب استاد', [
+      { name: 'fullName', label: 'نام و نام خانوادگی استاد' },
+      { name: 'username', label: 'نام کاربری استاد' }
+    ]);
+    if (!values) return;
+    const { fullName, username } = values;
     const department = $('#deptChoices .choice-card.selected');
     const departmentId = department?.dataset.id || null;
     if (role === 'superadmin' && !departmentId) return notify('ابتدا دپارتمان مقصد را انتخاب یا ایجاد کنید.', 'warn');
