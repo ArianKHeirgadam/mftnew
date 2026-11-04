@@ -205,7 +205,7 @@
         title: document.getElementById("examTitle").value.trim(),
         subject: document.getElementById("examSubject").value.trim() || null,
         description: document.getElementById("examDescription").value.trim() || null,
-        durationMinutes, passingScore: Number(document.getElementById("examPassingScore").value || 0) * 5, allowQuestionNavigation: document.getElementById("allowQuestionNavigation").checked, startsAt, endsAt: null, isPublished: true,
+        durationMinutes, passingScore: Number(document.getElementById("examPassingScore").value || 0), allowQuestionNavigation: document.getElementById("allowQuestionNavigation").checked, startsAt, endsAt: null, isPublished: true,
         departmentId: department?.dataset.id || null,
         createdByUserId: selectedTeacher?.dataset.id || null,
         questionIds
