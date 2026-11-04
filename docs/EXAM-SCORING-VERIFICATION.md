@@ -12,6 +12,12 @@ The previous compatibility mapping intentionally ignored several of these CLR
 properties. Without the SQL patch, the exam API cannot reliably persist the
 answer key or the attempt lifecycle.
 
+Existing legacy option rows in the separate `QuestionOptions` table are not
+automatically copied into the new `Questions.OptionsJson` column because the
+legacy table's exact option schema was not available for a safe migration.
+For the first grading test, create fresh questions after applying the patch
+(or re-enter/import the answer key and options for legacy questions).
+
 ## Functional test
 
 1. Sign in as a Teacher whose account has a valid `DepartmentId`.
