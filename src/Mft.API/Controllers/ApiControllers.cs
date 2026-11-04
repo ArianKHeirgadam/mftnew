@@ -274,14 +274,49 @@ public class DepartmentsController(AppDbContext db) : ControllerBase
         return NoContent();
     }
     [HttpDelete("{id:guid}"), Authorize(Policy = "SuperAdmin")]
-    public async Task<IActionResult> Delete(Guid id, CancellationToken ct){
-        var d = await db.Departments.FindAsync(new object?[]{
-            id
-        }
-        ,  ct);
+    public async Task<IActionResult> Delete(Guid id, CancellationToken ct)
+    {
+        var d = await db.Departments.FindAsync(new object?[] { id }, ct);
         if (d is null) return NotFound();
+
+        // Keep historical and operational data intact. A department that is still
+        // referenced by questions, exams, or attendance records cannot be hard-deleted.
+        var questionCount = await db.Questions.CountAsync(x => x.DepartmentId == id, ct);
+        var examCount = await db.Exams.CountAsync(x => x.DepartmentId == id, ct);
+        var attendanceCount = await db.AttendanceRecords.CountAsync(x => x.DepartmentId == id, ct);
+
+        if (questionCount > 0 || examCount > 0 || attendanceCount > 0)
+        {
+            return Conflict(new
+            {
+                message = "این دپارتمان قابل حذف نیست؛ ابتدا اطلاعات وابسته را تعیین تکلیف کنید.",
+                dependencies = new
+                {
+                    questions = questionCount,
+                    exams = examCount,
+                    attendanceRecords = attendanceCount
+                }
+            });
+        }
+
+        // Explicitly detach users before deleting the department so their accounts remain.
+        var linkedUsers = await db.Users.Where(x => x.DepartmentId == id).ToListAsync(ct);
+        foreach (var user in linkedUsers)
+            user.DepartmentId = null;
+
         db.Departments.Remove(d);
-        await db.SaveChangesAsync(ct);
+        try
+        {
+            await db.SaveChangesAsync(ct);
+        }
+        catch (DbUpdateException)
+        {
+            return Conflict(new
+            {
+                message = "حذف دپارتمان به‌دلیل وجود اطلاعات وابسته در دیتابیس انجام نشد. اطلاعات موجود حفظ شده‌اند."
+            });
+        }
+
         return NoContent();
     }
 }
