@@ -14,7 +14,7 @@ public record LoginResponse(
 
 public record CreateUserRequest(
     string Username,
-    string? Password,
+    string Password,
     string FullName,
     string Role,
     string? Email,
