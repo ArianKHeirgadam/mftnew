@@ -665,9 +665,9 @@
     });
     if ($('#deptChoices')) {
       await loadExamWizard();
-      const newCard = $('#deptChoices .choice-card').find(card => card.dataset.id === created.id);
+      const newCard = $$('#deptChoices .choice-card').find(card => card.dataset.id === created.id);
       if (newCard) {
-        $('#deptChoices .choice-card').forEach(card => card.classList.toggle('selected', card === newCard));
+        $$('#deptChoices .choice-card').forEach(card => card.classList.toggle('selected', card === newCard));
         $('#prevDept').textContent = newCard.dataset.value || newCard.textContent.trim();
       }
     }
@@ -716,9 +716,9 @@
     });
     if (created.temporaryPassword) window.prompt('استاد ایجاد شد. رمز موقت را همین حالا کپی و امن تحویل دهید:', created.temporaryPassword);
     await loadExamWizard();
-    const newTeacherCard = $('#teacherChoices .choice-card').find(card => card.dataset.id === created.id);
+    const newTeacherCard = $$('#teacherChoices .choice-card').find(card => card.dataset.id === created.id);
     if (newTeacherCard) {
-      $('#teacherChoices .choice-card').forEach(card => card.classList.toggle('selected', card === newTeacherCard));
+      $$('#teacherChoices .choice-card').forEach(card => card.classList.toggle('selected', card === newTeacherCard));
       $('#prevTeacher').textContent = newTeacherCard.dataset.value || newTeacherCard.textContent.trim();
     }
     notify('استاد ایجاد شد و به فهرست انتخاب اضافه شد.', 'ok');
