@@ -292,7 +292,7 @@ public class QuestionsController(AppDbContext db) : ControllerBase
     public async Task<IActionResult> List([FromQuery]string? search, [FromQuery]string? type, [FromQuery]string? category, CancellationToken ct){
         var q = db.Questions.AsQueryable();
         if (User.IsInRole("Teacher"))q = q.Where(x => x.CreatedByUserId == User.UserId());
-        if (User.IsInRole("Department"))q = q.Where(question => db.Users.Any(user => user.Id == question.CreatedByUserId && user.DepartmentId == User.DepartmentId()));
+        if (User.IsInRole("Department"))q = q.Where(question => question.DepartmentId == User.DepartmentId());
         if (!string.IsNullOrWhiteSpace(search))q = q.Where(x => x.Text.Contains(search));
         if (!string.IsNullOrWhiteSpace(type))q = q.Where(x => x.Type == type);
         if (!string.IsNullOrWhiteSpace(category))q = q.Where(x => x.Category == category);
@@ -336,7 +336,7 @@ public class QuestionsController(AppDbContext db) : ControllerBase
         ,  ct);
         if (q is null) return NotFound();
         if (User.IsInRole("Teacher") && q.CreatedByUserId != User.UserId()) return Forbid();
-        if (User.IsInRole("Department") && !await db.Users.AnyAsync(user => user.Id == q.CreatedByUserId && user.DepartmentId == User.DepartmentId(), ct)) return Forbid();
+        if (User.IsInRole("Department") && q.DepartmentId != User.DepartmentId()) return Forbid();
         return Ok(new {
             id = q.Id, text = q.Text, category = q.Category, type = q.Type, difficulty = q.Difficulty, options = q.OptionsJson == null?Array.Empty<string>():JsonSerializer.Deserialize<string[]>(q.OptionsJson)!, correctAnswer = q.CorrectAnswer, score = q.Score
         }
@@ -381,7 +381,7 @@ public class QuestionsController(AppDbContext db) : ControllerBase
         ,  ct);
         if (q is null) return NotFound();
         if (User.IsInRole("Teacher") && q.CreatedByUserId != User.UserId()) return Forbid();
-        if (User.IsInRole("Department") && !await db.Users.AnyAsync(user => user.Id == q.CreatedByUserId && user.DepartmentId == User.DepartmentId(), ct)) return Forbid();
+        if (User.IsInRole("Department") && q.DepartmentId != User.DepartmentId()) return Forbid();
         if (r.Type != q.Type && (await db.ExamQuestions.AnyAsync(item => item.QuestionId == id, ct) || await db.ExamAnswers.AnyAsync(item => item.QuestionId == id, ct))) return Conflict(new { message = "نوع سؤالی که در آزمون استفاده شده قابل تغییر نیست." });
         if (string.IsNullOrWhiteSpace(r.Text) || string.IsNullOrWhiteSpace(r.Category) || r.Score <= 0 || r.Type is not ("MultipleChoice" or "Essay" or "Matching") || r.Difficulty is not ("Easy" or "Medium" or "Hard")) return BadRequest(new {
             message = "متن، دسته‌بندی، نوع، سختی و نمره معتبر برای سؤال الزامی است."
@@ -410,7 +410,7 @@ public class QuestionsController(AppDbContext db) : ControllerBase
         ,  ct);
         if (q is null) return NotFound();
         if (User.IsInRole("Teacher") && q.CreatedByUserId != User.UserId()) return Forbid();
-        if (User.IsInRole("Department") && !await db.Users.AnyAsync(user => user.Id == q.CreatedByUserId && user.DepartmentId == User.DepartmentId(), ct)) return Forbid();
+        if (User.IsInRole("Department") && q.DepartmentId != User.DepartmentId()) return Forbid();
         if (await db.ExamQuestions.AnyAsync(item => item.QuestionId == id, ct) || await db.ExamAnswers.AnyAsync(item => item.QuestionId == id, ct)) return Conflict(new { message = "این سؤال در آزمون یا پاسخ ثبت‌شده استفاده شده و قابل حذف نیست." });
         db.Questions.Remove(q);
         await db.SaveChangesAsync(ct);
@@ -494,7 +494,7 @@ public class ExamsController(AppDbContext db) : ControllerBase
         if (ids.Length>0){
             var validQuery = db.Questions.Where(q => ids.Contains(q.Id));
             if (User.IsInRole("Teacher"))validQuery = validQuery.Where(q => q.CreatedByUserId == User.UserId());
-            if (User.IsInRole("Department"))validQuery = validQuery.Where(question => db.Users.Any(user => user.Id == question.CreatedByUserId && user.DepartmentId == User.DepartmentId()));
+            if (User.IsInRole("Department"))validQuery = validQuery.Where(question => question.DepartmentId == User.DepartmentId());
             var valid = await validQuery.Select(q => q.Id).ToListAsync(ct);
             if (valid.Count != ids.Length) return BadRequest(new {
                 message = "یک یا چند سؤال وجود ندارد یا به شما تعلق ندارد."
@@ -922,7 +922,7 @@ public class DashboardController(AppDbContext db) : ControllerBase
         if (User.IsInRole("Department")){
             users = users.Where(user => user.DepartmentId == departmentId);
             departments = departments.Where(department => department.Id == departmentId);
-            questions = questions.Where(question => db.Users.Any(user => user.Id == question.CreatedByUserId && user.DepartmentId == departmentId));
+            questions = questions.Where(question => question.DepartmentId == departmentId);
             exams = exams.Where(exam => exam.DepartmentId == departmentId);
             attempts = attempts.Where(attempt => attempt.Exam.DepartmentId == departmentId);
         }
