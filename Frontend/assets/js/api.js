@@ -94,12 +94,6 @@
         store.setItem(TOKEN_KEY, result.accessToken);
         store.setItem(USER_KEY, JSON.stringify(result));
 
-        if (result.mustChangePassword) {
-          sessionStorage.setItem('mft.pendingPasswordChange', JSON.stringify({ currentPassword: password, role: result.role }));
-          location.href = 'force-change-password.html';
-          return;
-        }
-
         const destination = {
           SuperAdmin: 'dashboard-superadmin.html',
           Department: 'dashboard-department.html',
@@ -114,10 +108,6 @@
   async function loadCurrentUser() {
     if (!token()) return null;
     const user = await request('/auth/me');
-    if (user.mustChangePassword && !location.pathname.endsWith('force-change-password.html')) {
-      location.href = 'force-change-password.html';
-      return user;
-    }
     const serialized = JSON.stringify(user);
     (sessionStorage.getItem(TOKEN_KEY) ? sessionStorage : localStorage).setItem(USER_KEY, serialized);
     document.body.dataset.role = (user.role || '').toLowerCase();
@@ -514,22 +504,15 @@
     const id = modal.dataset.editId;
     if (!fullName) return notify('نام و نام خانوادگی الزامی است.', 'warn');
     if (!id && !username) return notify('نام کاربری الزامی است.', 'warn');
+    if (!id && (!password || password.length < 8)) return notify('رمز عبور باید حداقل ۸ کاراکتر باشد.', 'warn');
     await safe(async () => {
       const departmentField = $('[data-department-field]', modal);
       const departmentId = departmentField?.value || null;
       const isActive = $('[data-user-active]', modal)?.checked ?? true;
       if (id) await request(`/users/${id}`, { method: 'PUT', body: JSON.stringify({ fullName, email, mobile, departmentId, isActive }) });
       else {
-        const created = await request('/users', { method: 'POST', body: JSON.stringify({ username, fullName, role, email, mobile, departmentId, mustChangePassword: true }) });
-        modal.classList.remove('show');
-        await loadUsers();
-        const temporaryPassword = created?.temporaryPassword || '';
-        if (temporaryPassword) {
-          const message = `کاربر ساخته شد. رمز موقت فقط همین بار نمایش داده می‌شود: ${temporaryPassword}`;
-          showTemporaryPasswordModal(temporaryPassword);
-          notify('کاربر ساخته شد؛ رمز موقت را به‌صورت امن به او تحویل دهید.', 'ok');
-          return;
-        }
+        if (!password || password.length < 8) return notify('رمز عبور باید حداقل ۸ کاراکتر باشد.', 'warn');
+        await request('/users', { method: 'POST', body: JSON.stringify({ username, password, fullName, role, email, mobile, departmentId, mustChangePassword: false }) });
       }
       modal.classList.remove('show');
       await loadUsers();
@@ -763,12 +746,13 @@
     }
     const values = await showQuickCreateModal('ایجاد مدیر دپارتمان', [
       { name: 'fullName', label: 'نام و نام خانوادگی مدیر' },
-      { name: 'username', label: 'نام کاربری' }
+      { name: 'username', label: 'نام کاربری' },
+      { name: 'password', label: 'رمز عبور (حداقل ۸ کاراکتر)', type: 'password' }
     ]);
     if (!values) return;
     const created = await request('/users', {
       method: 'POST',
-      body: JSON.stringify({ username: values.username, fullName: values.fullName, role: 'Department', email: null, mobile: null, departmentId: null, mustChangePassword: true })
+      body: JSON.stringify({ username: values.username, password: values.password, fullName: values.fullName, role: 'Department', email: null, mobile: null, departmentId: null, mustChangePassword: false })
     });
     const select = $('#departmentManagerId');
     if (select) {
@@ -788,7 +772,8 @@
     }
     const values = await showQuickCreateModal('ایجاد حساب استاد', [
       { name: 'fullName', label: 'نام و نام خانوادگی استاد' },
-      { name: 'username', label: 'نام کاربری استاد' }
+      { name: 'username', label: 'نام کاربری استاد' },
+      { name: 'password', label: 'رمز عبور (حداقل ۸ کاراکتر)', type: 'password' }
     ]);
     if (!values) return;
     const { fullName, username } = values;
@@ -797,9 +782,8 @@
     if (role === 'superadmin' && !departmentId) return notify('ابتدا دپارتمان مقصد را انتخاب یا ایجاد کنید.', 'warn');
     const created = await request('/users', {
       method: 'POST',
-      body: JSON.stringify({ username, fullName, role: 'Teacher', email: null, mobile: null, departmentId, mustChangePassword: true })
+      body: JSON.stringify({ username, password: values.password, fullName, role: 'Teacher', email: null, mobile: null, departmentId, mustChangePassword: false })
     });
-    if (created.temporaryPassword) showTemporaryPasswordModal(created.temporaryPassword);
     await loadExamWizard();
     const newTeacherCard = $$('#teacherChoices .choice-card').find(card => card.dataset.id === created.id);
     if (newTeacherCard) {
