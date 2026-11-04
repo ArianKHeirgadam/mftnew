@@ -380,7 +380,7 @@ public class QuestionsController(AppDbContext db) : ControllerBase
         }
         ,  ct);
         if (q is null) return NotFound();
-        if (User.IsInRole("Teacher") && q.CreatedByUserId != User.UserId()) return Forbid();
+        if (User.IsInRole("Teacher") && (q.CreatedByUserId != User.UserId() || q.DepartmentId != User.DepartmentId())) return Forbid();
         if (User.IsInRole("Department") && q.DepartmentId != User.DepartmentId()) return Forbid();
         if (r.Type != q.Type && (await db.ExamQuestions.AnyAsync(item => item.QuestionId == id, ct) || await db.ExamAnswers.AnyAsync(item => item.QuestionId == id, ct))) return Conflict(new { message = "نوع سؤالی که در آزمون استفاده شده قابل تغییر نیست." });
         if (string.IsNullOrWhiteSpace(r.Text) || string.IsNullOrWhiteSpace(r.Category) || r.Score <= 0 || r.Type is not ("MultipleChoice" or "Essay" or "Matching") || r.Difficulty is not ("Easy" or "Medium" or "Hard")) return BadRequest(new {
@@ -409,7 +409,7 @@ public class QuestionsController(AppDbContext db) : ControllerBase
         }
         ,  ct);
         if (q is null) return NotFound();
-        if (User.IsInRole("Teacher") && q.CreatedByUserId != User.UserId()) return Forbid();
+        if (User.IsInRole("Teacher") && (q.CreatedByUserId != User.UserId() || q.DepartmentId != User.DepartmentId())) return Forbid();
         if (User.IsInRole("Department") && q.DepartmentId != User.DepartmentId()) return Forbid();
         if (await db.ExamQuestions.AnyAsync(item => item.QuestionId == id, ct) || await db.ExamAnswers.AnyAsync(item => item.QuestionId == id, ct)) return Conflict(new { message = "این سؤال در آزمون یا پاسخ ثبت‌شده استفاده شده و قابل حذف نیست." });
         db.Questions.Remove(q);
@@ -529,7 +529,7 @@ public class ExamsController(AppDbContext db) : ControllerBase
         var e = await db.Exams.Include(x => x.Questions).FirstOrDefaultAsync(x => x.Id == id, ct);
         if (e is null) return NotFound();
         if (User.IsInRole("Department") && e.DepartmentId != User.DepartmentId()) return Forbid();
-        if (User.IsInRole("Teacher") && e.CreatedByUserId != User.UserId()) return Forbid();
+        if (User.IsInRole("Teacher") && (e.CreatedByUserId != User.UserId() || e.DepartmentId != User.DepartmentId())) return Forbid();
         var ownerId = e.CreatedByUserId;
         if ((User.IsInRole("SuperAdmin") || User.IsInRole("Department")) && r.CreatedByUserId.HasValue){
             var owner = await db.Users.FirstOrDefaultAsync(u => u.Id == r.CreatedByUserId.Value && u.Role == UserRole.Teacher, ct);
@@ -561,7 +561,7 @@ public class ExamsController(AppDbContext db) : ControllerBase
         }
         );
         var validQuery = db.Questions.Where(q => ids.Contains(q.Id));
-        if (User.IsInRole("Teacher"))validQuery = validQuery.Where(q => q.CreatedByUserId == User.UserId());
+        if (User.IsInRole("Teacher"))validQuery = validQuery.Where(q => q.CreatedByUserId == User.UserId() && q.DepartmentId == User.DepartmentId());
         if (User.IsInRole("Department"))validQuery = validQuery.Where(question => question.DepartmentId == User.DepartmentId());
         var validIds = await validQuery.Select(q => q.Id).ToListAsync(ct);
         if (validIds.Count != ids.Length) return BadRequest(new {
@@ -596,7 +596,7 @@ public class ExamsController(AppDbContext db) : ControllerBase
         ,  ct);
         if (e is null) return NotFound();
         if (User.IsInRole("Department") && e.DepartmentId != User.DepartmentId()) return Forbid();
-        if (User.IsInRole("Teacher") && e.CreatedByUserId != User.UserId()) return Forbid();
+        if (User.IsInRole("Teacher") && (e.CreatedByUserId != User.UserId() || e.DepartmentId != User.DepartmentId())) return Forbid();
         db.Exams.Remove(e);
         await db.SaveChangesAsync(ct);
         return NoContent();
@@ -864,7 +864,7 @@ public class ResultsController(AppDbContext db) : ControllerBase
         if (a is null) return NotFound();
         if (a.Status == "InProgress") return BadRequest(new { message = "تا زمانی که دانشجو آزمون را ارسال نکرده، امکان ثبت نمره نیست." });
         if (User.IsInRole("Department") && a.Exam.DepartmentId != User.DepartmentId()) return Forbid();
-        if (User.IsInRole("Teacher") && a.Exam.CreatedByUserId != User.UserId()) return Forbid();
+        if (User.IsInRole("Teacher") && (a.Exam.CreatedByUserId != User.UserId() || a.Exam.DepartmentId != User.DepartmentId())) return Forbid();
         var maxScore = 100m;
         if (score>maxScore) return BadRequest(new {
             message =$"حداکثر نمره این آزمون {maxScore} است."
@@ -948,7 +948,7 @@ public class DashboardController(AppDbContext db) : ControllerBase
         var since = DateTime.UtcNow.AddDays(-7);
         var q = db.ExamAttempts.Where(x => x.StartedAt >= since).AsQueryable();
         if (User.IsInRole("Department"))q = q.Where(x => x.Exam.DepartmentId == User.DepartmentId());
-        if (User.IsInRole("Teacher"))q = q.Where(x => x.Exam.CreatedByUserId == User.UserId());
+        if (User.IsInRole("Teacher"))q = q.Where(x => x.Exam.CreatedByUserId == User.UserId() && x.Exam.DepartmentId == User.DepartmentId());
         if (User.IsInRole("Student"))q = q.Where(x => x.StudentId == User.UserId());
         var data = await q.GroupBy(x => x.StartedAt.Date).Select(g => new{
             date = g.Key, count = g.Count()
