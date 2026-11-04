@@ -102,16 +102,19 @@ public class UsersController(AppDbContext db) : ControllerBase
         var password = r.Password?.Trim();
         if (string.IsNullOrWhiteSpace(password) || password.Length < 8)
             return BadRequest(new { message = "رمز عبور باید حداقل ۸ کاراکتر باشد." });
-        if (r.DepartmentId.HasValue && !await db.Departments.AnyAsync(d => d.Id == r.DepartmentId.Value, ct)) return BadRequest(new {
-            message = "دپارتمان انتخاب‌شده معتبر نیست."
-        }
-        );
+        var assignedDepartmentId = User.IsInRole("Department") || User.IsInRole("Teacher")
+            ? User.DepartmentId()
+            : r.DepartmentId;
+        if ((role == UserRole.Student || role == UserRole.Teacher) && !assignedDepartmentId.HasValue)
+            return BadRequest(new { message = "برای ساخت دانشجو یا استاد، انتخاب دپارتمان الزامی است." });
+        if (assignedDepartmentId.HasValue && !await db.Departments.AnyAsync(d => d.Id == assignedDepartmentId.Value, ct))
+            return BadRequest(new { message = "دپارتمان انتخاب‌شده معتبر نیست." });
         if (await db.Users.AnyAsync(x => x.Username == normalizedUsername, ct)) return Conflict(new {
             message = "این نام کاربری قبلاً ثبت شده است."
         }
         );
         var u = new User{
-            Username = normalizedUsername, PasswordHash = BCrypt.Net.BCrypt.HashPassword(password), FullName = r.FullName.Trim(), Role = role, Email = r.Email, Mobile = r.Mobile, DepartmentId = User.IsInRole("Department") || User.IsInRole("Teacher")?User.DepartmentId():r.DepartmentId, MustChangePassword = false
+            Username = normalizedUsername, PasswordHash = BCrypt.Net.BCrypt.HashPassword(password), FullName = r.FullName.Trim(), Role = role, Email = r.Email, Mobile = r.Mobile, DepartmentId = assignedDepartmentId, MustChangePassword = false
         }
         ;
         db.Users.Add(u);
