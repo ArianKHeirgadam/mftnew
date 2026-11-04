@@ -87,7 +87,7 @@ public sealed class QuestionPdfImportController(AppDbContext db) : ControllerBas
                 })
             });
         }
-        catch (Exception ex) when (ex is InvalidOperationException or IOException or ArgumentException)
+        catch (Exception) when (!ct.IsCancellationRequested)
         {
             return BadRequest(new { message = "خواندن PDF ناموفق بود. مطمئن شوید فایل سالم و دارای متن قابل انتخاب است. PDF اسکن‌شده به OCR نیاز دارد." });
         }
