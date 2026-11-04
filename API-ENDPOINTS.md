@@ -30,7 +30,7 @@ Base URL: `https://localhost:7081/api` (ASP.NET launch profile). All routes requ
 | GET | `/questions?search=&type=&category=` | Teacher sees only their own questions; Department/SuperAdmin can view all current question records |
 | GET | `/questions/{id}` | Question detail, scoped for teachers |
 | POST / PUT / DELETE | `/questions[/{id}]` | Create/edit/delete questions; teacher ownership enforced; MCQ options/correct answer validated |
-| POST | `/questions/import-pdf` | TeacherOrAbove; imports structured MCQ, essay and matching questions from text-based PDF into the question bank (15 MB max; no OCR) |\n| GET | `/exams` | Student sees published exams; Teacher sees owned exams; Department sees department exams; SuperAdmin sees all |
+| POST | `/questions/import-pdf/preview` | TeacherOrAbove; parses a text-based PDF and returns a preview without saving |\n| POST | `/questions/import-pdf` | TeacherOrAbove; imports confirmed MCQ, essay and matching questions from text-based PDF into the question bank (15 MB max; no OCR) |\n| GET | `/exams` | Student sees published exams; Teacher sees owned exams; Department sees department exams; SuperAdmin sees all |
 | GET | `/exams/{id}` | Exam detail within role scope |
 | POST / PUT / DELETE | `/exams[/{id}]` | Create/update/delete exams; title, duration, pass mark (0–20), navigation setting, teacher ownership and selected question ownership validated; exam question points are normalized to a total of 20 |
 | POST | `/exams/{id}/start` | Student starts or resumes a published exam within its schedule; correct answers are not returned |
