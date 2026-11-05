@@ -86,7 +86,7 @@ The API's live Swagger document is the source of truth. These routes describe co
 - `GET /api/exam-files/exams/{examId}` — authenticated download. Students can download only a published exam in their department; its owner and authorized department/super admins can download it.
 - `POST /api/exam-files/attempts/{attemptId}` — student uploads/replaces their PDF answer while the attempt is in progress and before the server-side deadline.
 - `GET /api/exam-files/attempts/{attemptId}/info` — returns metadata for the authorized grader (or the student after result publication).
-- `GET /api/exam-files/attempts/{attemptId}` — authenticated download of the student's PDF answer; students can access their own file only after result publication.
+- `GET /api/exam-files/attempts/{attemptId}` — authenticated download of the student's PDF answer; students can access their own file only after the attempt is graded and results are published.
 - `PUT /api/results/{attemptId}/answers/{questionId}/grade` — per-question manual grade. JSON body: `{ "score": 2.5, "comment": "..." }`. The score is entered in the question's configured raw points; it is normalized to the exam's 100-point scale. Teacher ownership and department scope are checked.
 - `POST /api/results/exams/{examId}/publish` — publish results after all persisted answers requiring manual grading are graded.
 - `POST /api/results/exams/{examId}/unpublish` — withdraw publication.
