@@ -212,8 +212,9 @@
       const canGrade = ['teacher', 'department', 'superadmin'].includes(role);
       if (body) {
         body.innerHTML = result.answers.length ? result.answers.map((answer, index) => {
-          const gradeControl = canGrade && answer.isCorrect == null
-            ? `<div class="flex gap-8 mt-8"><input class="input" type="number" min="0" max="${Number(answer.maxRawScore || 0)}" step="0.01" value="0" data-grade-score style="max-width:100px" aria-label="نمره خام سؤال"><input class="input" type="text" maxlength="2000" data-grade-comment placeholder="توضیح تصحیح" style="max-width:180px"><button class="btn btn-primary btn-sm" data-grade-answer="${answer.questionId}">ثبت نمره</button></div><small class="text-soft">حداکثر نمره خام: ${faNumber(answer.maxRawScore || 0)}</small>`
+          const canEditGrade = canGrade && !result.resultsPublished && (answer.isCorrect == null || answer.isManuallyGraded);
+          const gradeControl = canEditGrade
+            ? `<div class="flex gap-8 mt-8"><input class="input" type="number" min="0" max="${Number(answer.maxRawScore || 0)}" step="0.01" value="${Number(answer.rawAwardedScore || 0)}" data-grade-score style="max-width:100px" aria-label="نمره خام سؤال"><input class="input" type="text" maxlength="2000" data-grade-comment value="${escapeHtml(answer.gradingComment || '')}" placeholder="توضیح تصحیح" style="max-width:180px"><button class="btn btn-primary btn-sm" data-grade-answer="${answer.questionId}">ثبت نمره</button></div><small class="text-soft">حداکثر نمره خام: ${faNumber(answer.maxRawScore || 0)}</small>`
             : (answer.isCorrect == null ? 'در انتظار تصحیح' : answer.isCorrect ? 'صحیح' : 'نادرست');
           return `<tr>
             <td>${faNumber(index + 1)}</td><td>${escapeHtml(answer.question || `سؤال ${answer.questionId}`)}</td>
