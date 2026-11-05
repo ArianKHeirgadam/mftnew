@@ -83,7 +83,7 @@ public sealed class ExamFilesController(AppDbContext db, IWebHostEnvironment env
         if (exam is null) return NotFound();
         if (User.IsInRole("Student"))
         {
-            if (!exam.IsPublished || exam.ResultsPublished || (exam.DepartmentId.HasValue && exam.DepartmentId != User.DepartmentId())) return NotFound();
+            if (!exam.IsPublished && !exam.ResultsPublished || (exam.DepartmentId.HasValue && exam.DepartmentId != User.DepartmentId())) return NotFound();
         }
         else if (!CanManage(exam)) return Forbid();
 
