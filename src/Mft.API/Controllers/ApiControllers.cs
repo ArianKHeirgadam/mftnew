@@ -831,9 +831,19 @@ public class ExamsController(AppDbContext db) : ControllerBase
         attempt.Status = "Submitted";
         attempt.SubmittedAt = DateTime.UtcNow;
 
+        var pendingManualCount = savedAnswers.Count(item => item.IsCorrect is null);
+        if (pendingManualCount == 0)
+        {
+            db.Notifications.Add(new Notification
+            {
+                UserId = attempt.StudentId,
+                Title = "نتیجه آزمون آماده است",
+                Message = $"نتیجه آزمون «{attempt.Exam.Title}» ثبت شد. نمره شما: {attempt.Score:0.##} از ۱۰۰."
+            });
+        }
+
         await db.SaveChangesAsync(ct);
 
-        var pendingManualCount = savedAnswers.Count(item => item.IsCorrect is null);
         return Ok(new
         {
             id = attempt.Id,
