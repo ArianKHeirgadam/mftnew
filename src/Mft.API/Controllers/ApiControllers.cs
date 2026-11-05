@@ -605,6 +605,7 @@ public class ExamsController(AppDbContext db) : ControllerBase
     public async Task<IActionResult> Start(Guid id, CancellationToken ct){
         var e = await db.Exams.Include(x => x.Questions).FirstOrDefaultAsync(x => x.Id == id && x.IsPublished, ct);
         if (e is null) return NotFound();
+        if (e.ResultsPublished) return BadRequest(new { message = "نتایج این آزمون منتشر شده و دیگر امکان شروع تلاش جدید وجود ندارد." });
         if (e.DepartmentId.HasValue && e.DepartmentId != User.DepartmentId()) return NotFound();
         var now = DateTime.UtcNow;
         if (e.StartsAt.HasValue && now<e.StartsAt.Value) return BadRequest(new {
@@ -840,7 +841,7 @@ public class ResultsController(AppDbContext db) : ControllerBase
     public async Task<IActionResult> List([FromQuery] Guid? examId, [FromQuery] Guid? studentId, CancellationToken ct)
     {
         var q = db.ExamAttempts.Include(x => x.Exam).AsQueryable();
-        if (User.IsInRole("Student")) q = q.Where(x => x.StudentId == User.UserId() && x.Exam.ResultsPublished);
+        if (User.IsInRole("Student")) q = q.Where(x => x.StudentId == User.UserId() && x.Exam.ResultsPublished && x.Status == "Graded");
         else if (User.IsInRole("Teacher")) q = q.Where(x => x.Exam.CreatedByUserId == User.UserId());
         else if (User.IsInRole("Department")) q = q.Where(x => x.Exam.DepartmentId == User.DepartmentId());
         if (examId.HasValue) q = q.Where(x => x.ExamId == examId.Value);
@@ -865,7 +866,7 @@ public class ResultsController(AppDbContext db) : ControllerBase
             .FirstOrDefaultAsync(x => x.Id == id, ct);
         if (a is null) return NotFound();
         var isStudent = User.IsInRole("Student");
-        if (isStudent && (a.StudentId != User.UserId() || !a.Exam.ResultsPublished)) return NotFound();
+        if (isStudent && (a.StudentId != User.UserId() || !a.Exam.ResultsPublished || a.Status != "Graded")) return NotFound();
         if (!isStudent && !CanManage(a.Exam)) return Forbid();
 
         var questionIds = a.Answers.Select(x => x.QuestionId).Distinct().ToArray();
@@ -947,7 +948,9 @@ public class ResultsController(AppDbContext db) : ControllerBase
         var exam = await db.Exams.FirstOrDefaultAsync(x => x.Id == examId, ct);
         if (exam is null) return NotFound();
         if (!CanManage(exam)) return Forbid();
-        var pending = await db.ExamAttempts.Where(x => x.ExamId == examId && x.Status != "InProgress")
+        var inProgress = await db.ExamAttempts.AnyAsync(x => x.ExamId == examId && x.Status == "InProgress", ct);
+        if (inProgress) return BadRequest(new { message = "هنوز دانشجویی در حال برگزاری آزمون است." });
+        var pending = await db.ExamAttempts.Where(x => x.ExamId == examId)
             .AnyAsync(x => x.Answers.Any(a => a.IsCorrect == null), ct);
         if (pending) return BadRequest(new { message = "هنوز پاسخ تشریحی تصحیح‌نشده وجود دارد." });
         exam.ResultsPublished = true;
