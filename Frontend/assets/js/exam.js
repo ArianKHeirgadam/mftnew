@@ -140,6 +140,28 @@
     document.getElementById('finishModal')?.classList.add('show');
   });
   document.getElementById('confirmFinishBtn')?.addEventListener('click', submitExam);
+  document.getElementById('uploadStudentPdf')?.addEventListener('click', async () => {
+    const input = document.getElementById('studentAnswerPdf');
+    const status = document.getElementById('studentPdfStatus');
+    const file = input?.files?.[0];
+    if (!file) { toast('ابتدا فایل PDF پاسخ را انتخاب کنید.', 'warn'); return; }
+    if (file.size > 20 * 1024 * 1024 || (!file.type.includes('pdf') && !file.name.toLowerCase().endsWith('.pdf'))) {
+      toast('فایل باید PDF و حداکثر ۲۰ مگابایت باشد.', 'warn'); return;
+    }
+    const form = new FormData(); form.append('file', file);
+    const button = document.getElementById('uploadStudentPdf');
+    if (button) button.disabled = true;
+    if (status) status.textContent = 'در حال بارگذاری...';
+    try {
+      const result = await api.request(`/exam-files/attempts/${encodeURIComponent(attempt.attemptId)}`, { method: 'POST', body: form });
+      if (status) status.textContent = `فایل «${result.fileName}» با موفقیت بارگذاری شد.`;
+      toast('فایل پاسخ با موفقیت ذخیره شد.', 'ok');
+    } catch (error) {
+      if (status) status.textContent = error.message;
+      toast(error.message || 'بارگذاری فایل ناموفق بود.', 'danger');
+    } finally { if (button) button.disabled = false; }
+  });
+
 
   try {
     if (!api) throw new Error('لایه اتصال به سرویس در دسترس نیست.');
