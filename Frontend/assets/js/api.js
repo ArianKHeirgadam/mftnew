@@ -264,7 +264,7 @@
     const header = $('body[data-active="results"] table thead tr');
     if (header) header.innerHTML = '<th>#</th><th>آزمون</th><th>دانشجو</th><th>وضعیت</th><th>نمره</th>';
     renderRows('body[data-active="results"] table tbody', rows, row => `<tr>
-      <td>${escapeHtml(String(row.id).slice(0, 8))}</td><td>${escapeHtml(row.examTitle)}</td><td>${escapeHtml(row.studentName || '—')}</td>
+      <td><a href="results.html?attemptId=${encodeURIComponent(row.id)}">${escapeHtml(String(row.id).slice(0, 8))}</a></td><td>${escapeHtml(row.examTitle)}</td><td>${escapeHtml(row.studentName || '—')}</td>
       <td>${row.status === 'InProgress' ? 'در حال برگزاری' : row.status === 'AwaitingPublication' ? 'آماده انتشار نتیجه' : row.status === 'Submitted' ? 'ثبت شده / در انتظار تصحیح' : 'تصحیح شده'}</td>
       <td>${row.score == null ? (row.resultsPublished ? 'در انتظار تصحیح' : 'منتشر نشده') : faNumber(row.score)}</td></tr>`, 5);
 
