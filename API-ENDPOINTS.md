@@ -78,3 +78,18 @@ The API's live Swagger document is the source of truth. These routes describe co
 - For CSV/TSV/Excel, use two columns: question number in the exam order, then answer. Headers are optional. JSON accepts an array or `{ "entries": [...] }`; XML accepts `<entry questionNumber="1" value="A" />`; TXT and PDF lines use `1,A` or `Question 1: A` style.
 - For multiple-choice items, an answer may be the exact option text or a letter A-E (also Persian alef/b/j/d forms) matching the option's order. The endpoint validates the exam scope and caller's role/ownership. PDF files must contain selectable text; scanned PDFs require OCR before upload. Maximum upload size is 15 MB.
 - UI: `Frontend/answer-key-upload.html`.\n- Question PDF import: `Frontend/question-import.html`; format uses `Q1:`, `A)`, `ANSWER:`, and `PAIR: left => right` markers. Scanned PDFs need OCR outside the app before upload. Matching questions are automatically graded proportionally per correct pair.
+
+
+## PDF exam, manual grading and result publication workflow
+
+- `POST /api/exam-files/exams/{examId}` — teacher/department/super-admin uploads the exam PDF as multipart field `file` (20 MB maximum).
+- `GET /api/exam-files/exams/{examId}` — authenticated download. Students can download only a published exam in their department; its owner and authorized department/super admins can download it.
+- `POST /api/exam-files/attempts/{attemptId}` — student uploads/replaces their PDF answer while the attempt is in progress and before the server-side deadline.
+- `GET /api/exam-files/attempts/{attemptId}/info` — returns metadata for the authorized grader (or the student after result publication).
+- `GET /api/exam-files/attempts/{attemptId}` — authenticated download of the student's PDF answer; students can access their own file only after result publication.
+- `PUT /api/results/{attemptId}/answers/{questionId}/grade` — per-question manual grade. JSON body: `{ "score": 2.5, "comment": "..." }`. The score is entered in the question's configured raw points; it is normalized to the exam's 100-point scale. Teacher ownership and department scope are checked.
+- `POST /api/results/exams/{examId}/publish` — publish results after all persisted answers requiring manual grading are graded.
+- `POST /api/results/exams/{examId}/unpublish` — withdraw publication.
+- Student result list/detail endpoints intentionally hide unpublished results and answer keys. The teacher's result detail page exposes manual-grading inputs and the protected PDF download control.
+
+The SQL Server patch is `database/patch-exam-pdf-workflow.sql`. Back up the database and test the additive patch on a development copy before applying it. PDFs are stored under the API's private `App_Data/exam-files` directory, outside `wwwroot`, using generated filenames. The application must have write access to this directory, and deployment backups must include it.
