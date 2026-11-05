@@ -191,33 +191,52 @@
     const params = new URLSearchParams(location.search);
     const attemptId = params.get('attemptId');
     const examId = params.get('examId');
+    const role = (currentUser()?.role || '').toLowerCase();
     if (attemptId) {
-      const result = await request(`/results/${encodeURIComponent(attemptId)}`);
+      let result;
+      try { result = await request(`/results/${encodeURIComponent(attemptId)}`); }
+      catch (error) {
+        const heading = $('body[data-active="results"] h1');
+        if (heading) heading.textContent = 'نتیجه هنوز منتشر نشده یا در دسترس نیست';
+        const body = $('body[data-active="results"] .card table tbody');
+        if (body) body.innerHTML = '<tr><td colspan="5" style="text-align:center;padding:28px">پس از تصحیح و انتشار رسمی نتیجه، جزئیات این آزمون نمایش داده می‌شود.</td></tr>';
+        return;
+      }
       const heading = $('body[data-active="results"] h1');
       if (heading) {
-        const scoreLabel = result.score == null ? 'در انتظار تصحیح' : `${faNumber(result.score)} از ${faNumber(result.maxScore)}`;
+        const scoreLabel = result.score == null ? (result.resultsPublished ? 'در انتظار تکمیل تصحیح' : 'منتشر نشده') : `${faNumber(result.score)} از ${faNumber(result.maxScore)}`;
         const outcome = result.score == null ? '' : (Number(result.score) >= Number(result.passingScore) ? ' — قبول' : ' — نیازمند تلاش بیشتر');
-        heading.textContent = `نتیجه آزمون: ${result.exam} — نمره ${scoreLabel}${outcome}`;
+        heading.textContent = `نتیجه آزمون: ${result.exam} — ${scoreLabel}${outcome}`;
       }
-      const scoreText = $$('body[data-active="results"] .stat-card b');
-      if (scoreText[3]) scoreText[3].textContent = result.score == null ? 'در انتظار تصحیح' : faNumber(result.score);
       const body = $('body[data-active="results"] .card table tbody');
-      const answerCounts = { correct: result.answers.filter(answer => answer.isCorrect === true).length, incorrect: result.answers.filter(answer => answer.isCorrect === false).length, pending: result.answers.filter(answer => answer.isCorrect == null).length };
-      window.MftChartData = { ...(window.MftChartData || {}), resultCounts: answerCounts };
-      document.dispatchEvent(new Event('mft:data-ready'));
       if (body) body.innerHTML = result.answers.length ? result.answers.map((answer, index) => `<tr>
         <td>${faNumber(index + 1)}</td><td>${escapeHtml(answer.question || `سؤال ${answer.questionId}`)}</td>
-        <td>${escapeHtml(answer.answer || 'بدون پاسخ')}</td><td>${escapeHtml(answer.correctAnswer || 'نیازمند تصحیح')}</td>
-        <td>${answer.isCorrect == null ? 'در انتظار تصحیح' : answer.isCorrect ? 'صحیح' : 'نادرست'}</td></tr>`).join('') : '<tr><td colspan="5">پاسخی ثبت نشده است.</td></tr>';
+        <td>${escapeHtml(answer.answer || 'بدون پاسخ')}</td><td>${escapeHtml(answer.correctAnswer || '—')}</td>
+        <td>${answer.isCorrect == null ? '—' : answer.isCorrect ? 'صحیح' : 'نادرست'}</td></tr>`).join('') : '<tr><td colspan="5">پاسخی ثبت نشده است.</td></tr>';
       return;
     }
     const rows = await request(`/results${examId ? `?examId=${encodeURIComponent(examId)}` : ''}`);
     const header = $('body[data-active="results"] table thead tr');
-    if (header) header.innerHTML = '<th>#</th><th>آزمون</th><th>دانشجو</th><th>وضعیت</th><th>نمره</th>' ;
+    if (header) header.innerHTML = '<th>#</th><th>آزمون</th><th>دانشجو</th><th>وضعیت</th><th>نمره</th>';
     renderRows('body[data-active="results"] table tbody', rows, row => `<tr>
       <td>${escapeHtml(String(row.id).slice(0, 8))}</td><td>${escapeHtml(row.examTitle)}</td><td>${escapeHtml(row.studentName || '—')}</td>
-      <td>${row.status === 'InProgress' ? 'در حال برگزاری' : row.status === 'Submitted' ? 'ثبت شده' : 'تصحیح شده'}</td>
-      <td>${row.score == null ? 'در انتظار تصحیح' : faNumber(row.score)}</td></tr>`, 5);
+      <td>${row.status === 'InProgress' ? 'در حال برگزاری' : row.status === 'AwaitingPublication' ? 'آماده انتشار نتیجه' : row.status === 'Submitted' ? 'ثبت شده / در انتظار تصحیح' : 'تصحیح شده'}</td>
+      <td>${row.score == null ? (row.resultsPublished ? 'در انتظار تصحیح' : 'منتشر نشده') : faNumber(row.score)}</td></tr>`, 5);
+
+    const publishButton = $('#publishExamResults');
+    if (publishButton) {
+      publishButton.hidden = !examId || role === 'student';
+      publishButton.onclick = async () => {
+        if (!examId || publishButton.disabled) return;
+        publishButton.disabled = true;
+        try {
+          await request(`/results/exams/${encodeURIComponent(examId)}/publish`, { method: 'POST' });
+          notify('نتایج آزمون منتشر شد.', 'ok');
+          await loadResults();
+        } catch (error) { notify(error.message || 'انتشار نتایج ناموفق بود.', 'danger'); }
+        finally { publishButton.disabled = false; }
+      };
+    }
   }
 
   async function loadTeacherGrades() {
