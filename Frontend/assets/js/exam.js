@@ -130,6 +130,11 @@
     }, 1000);
   }
 
+  document.getElementById('downloadExamPdf')?.addEventListener('click', async () => {
+    if (!attempt?.exam?.id) return toast('شناسه آزمون در دسترس نیست.', 'warn');
+    try { await api.download(`/exam-files/exams/${encodeURIComponent(attempt.exam.id)}`); }
+    catch (error) { toast(error.message || 'فایل PDF آزمون در دسترس نیست.', 'danger'); }
+  });
   document.getElementById('examNext')?.addEventListener('click', () => renderQuestion(current + 1));
   document.getElementById('examPrev')?.addEventListener('click', () => renderQuestion(current - 1));
   document.getElementById('flagQuestion')?.addEventListener('click', () => { if (flagged.has(current)) flagged.delete(current); else flagged.add(current); renderQuestion(current); });
