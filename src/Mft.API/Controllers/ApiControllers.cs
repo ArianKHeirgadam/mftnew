@@ -856,7 +856,7 @@ public class ResultsController(AppDbContext db) : ControllerBase
             .ToDictionaryAsync(x => x.QuestionId, x => x.Score, ct);
         return Ok(new
         {
-            id = a.Id, exam = a.Exam.Title,
+            id = a.Id, examId = a.ExamId, exam = a.Exam.Title,
             score = a.Exam.ResultsPublished ? a.Score : null,
             autoScore = isStudent ? null : a.Score,
             pendingManualCount = a.Answers.Count(x => x.IsCorrect == null),
