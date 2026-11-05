@@ -217,13 +217,11 @@ function renderTopbar() {
         <button class="icon-btn" data-theme-toggle data-theme-icon aria-label="تغییر پوسته"></button>
         <div class="dropdown">
           <button class="icon-btn" data-dropdown-toggle="notifDrop" aria-label="اعلان‌ها">
-            ${ICON.bell}<span class="dot-ping"></span>
+            ${ICON.bell}<span class="dot-ping" data-unread-indicator hidden></span>
           </button>
           <div class="dropdown-menu" id="notifDrop" style="width:300px">
             <div style="padding:10px 12px;font-weight:700;font-size:13px">اعلان‌های اخیر</div>
-            <a href="notifications.html">📝 نمره‌ی آزمون میان‌ترم اعلام شد</a>
-            <a href="notifications.html">📅 آزمون ساختمان داده فردا برگزار می‌شود</a>
-            <a href="notifications.html">✅ ثبت‌نام شما تایید شد</a>
+            <div id="topbarNotificationList"><div class="text-soft text-sm" style="padding:12px">در حال دریافت اعلان‌ها...</div></div>
             <hr>
             <a href="notifications.html" style="justify-content:center;color:var(--primary)">مشاهده همه</a>
           </div>
