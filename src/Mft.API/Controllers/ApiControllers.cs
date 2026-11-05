@@ -150,20 +150,6 @@ public class UsersController(AppDbContext db) : ControllerBase
         u.IsActive = r.IsActive;
         if (User.IsInRole("SuperAdmin")) u.DepartmentId = r.DepartmentId;
         await db.SaveChangesAsync(ct);
-        if (!wasPublished && e.IsPublished)
-        {
-            var studentIds = await db.Users
-                .Where(user => user.Role == UserRole.Student && user.IsActive && user.DepartmentId == e.DepartmentId)
-                .Select(user => user.Id)
-                .ToListAsync(ct);
-            db.Notifications.AddRange(studentIds.Select(studentId => new Notification
-            {
-                UserId = studentId,
-                Title = "آزمون جدید منتشر شد",
-                Message = $"آزمون «{e.Title}» برای شما منتشر شد."
-            }));
-            if (studentIds.Count > 0) await db.SaveChangesAsync(ct);
-        }
         return NoContent();
     }
     [HttpDelete("{id:guid}"), Authorize(Policy = "TeacherOrAbove")]
@@ -615,6 +601,20 @@ public class ExamsController(AppDbContext db) : ControllerBase
             );
         }
         await db.SaveChangesAsync(ct);
+        if (!wasPublished && e.IsPublished)
+        {
+            var studentIds = await db.Users
+                .Where(user => user.Role == UserRole.Student && user.IsActive && user.DepartmentId == e.DepartmentId)
+                .Select(user => user.Id)
+                .ToListAsync(ct);
+            db.Notifications.AddRange(studentIds.Select(studentId => new Notification
+            {
+                UserId = studentId,
+                Title = "آزمون جدید منتشر شد",
+                Message = $"آزمون «{e.Title}» برای شما منتشر شد."
+            }));
+            if (studentIds.Count > 0) await db.SaveChangesAsync(ct);
+        }
         return NoContent();
     }
     [HttpDelete("{id:guid}"), Authorize(Policy = "TeacherOrAbove")]
