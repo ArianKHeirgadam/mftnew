@@ -62,6 +62,11 @@ IF COL_LENGTH('dbo.ExamAnswers', 'GradedByUserId') IS NULL
     ALTER TABLE dbo.ExamAnswers ADD GradedByUserId uniqueidentifier NULL;
 IF COL_LENGTH('dbo.ExamAnswers', 'GradedAt') IS NULL
     ALTER TABLE dbo.ExamAnswers ADD GradedAt datetime2 NULL;
+IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id = OBJECT_ID(N'dbo.ExamAnswers') AND name = N'IsManuallyGraded' AND is_nullable = 1)
+BEGIN
+    UPDATE dbo.ExamAnswers SET IsManuallyGraded = 0 WHERE IsManuallyGraded IS NULL;
+    ALTER TABLE dbo.ExamAnswers ALTER COLUMN IsManuallyGraded bit NOT NULL;
+END;
 IF NOT EXISTS (
     SELECT 1 FROM sys.default_constraints dc
     JOIN sys.columns c ON c.object_id = dc.parent_object_id AND c.column_id = dc.parent_column_id
