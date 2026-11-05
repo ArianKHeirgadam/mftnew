@@ -217,7 +217,13 @@
       const examPdf = document.getElementById("examPdfFile")?.files?.[0];
       if (examPdf) {
         const form = new FormData(); form.append("file", examPdf);
-        await api.request(`/exam-files/exams/${encodeURIComponent(createdExam.id)}`, { method: "POST", body: form });
+        try {
+          await api.request(`/exam-files/exams/${encodeURIComponent(createdExam.id)}`, { method: "POST", body: form });
+        } catch (uploadError) {
+          showToast(`آزمون ایجاد شد، اما بارگذاری PDF ناموفق بود: ${uploadError.message}`, "warn");
+          setTimeout(() => location.href = "dashboard-teacher.html", 1800);
+          return;
+        }
       }
       showToast("آزمون با موفقیت ذخیره و منتشر شد.", "ok");
       setTimeout(() => location.href = "dashboard-teacher.html", 700);
