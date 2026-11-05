@@ -91,6 +91,7 @@
         <div class="wpanel" id="step4">
           <h3 style="margin-bottom:16px">اطلاعات آزمون، مدت زمان و نمره قبولی</h3>
           <div class="field"><label>عنوان آزمون</label><input class="input" id="examTitle" required placeholder="مثلاً آزمون میان‌ترم"></div>
+          <div class="field"><label>فایل PDF برگه آزمون (اختیاری، حداکثر ۲۰ مگابایت)</label><input class="input" id="examPdfFile" type="file" accept="application/pdf,.pdf"><small class="text-soft">فایل پس از ایجاد آزمون به‌صورت خصوصی ذخیره می‌شود و فقط کاربران مجاز به آن دسترسی دارند.</small></div>
           <div class="field"><label>درس / موضوع</label><input class="input" id="examSubject" placeholder="نام درس"></div>
           <div class="field"><label>توضیحات</label><textarea class="textarea" id="examDescription" rows="2" placeholder="توضیحات اختیاری"></textarea></div>
           <div class="grid-2" style="grid-template-columns:1fr 1fr">
@@ -204,7 +205,7 @@
     const time = document.getElementById("examTime").value;
     if (date) startsAt = new Date(`${date}T${time || "00:00"}`).toISOString();
     try {
-      await api.request("/exams", { method: "POST", body: JSON.stringify({
+      const createdExam = await api.request("/exams", { method: "POST", body: JSON.stringify({
         title: document.getElementById("examTitle").value.trim(),
         subject: document.getElementById("examSubject").value.trim() || null,
         description: document.getElementById("examDescription").value.trim() || null,
@@ -213,6 +214,11 @@
         createdByUserId: selectedTeacher?.dataset.id || null,
         questionIds
       }) });
+      const examPdf = document.getElementById("examPdfFile")?.files?.[0];
+      if (examPdf) {
+        const form = new FormData(); form.append("file", examPdf);
+        await api.request(`/exam-files/exams/${encodeURIComponent(createdExam.id)}`, { method: "POST", body: form });
+      }
       showToast("آزمون با موفقیت ذخیره و منتشر شد.", "ok");
       setTimeout(() => location.href = "dashboard-teacher.html", 700);
     } catch (error) { showToast(error.message || "ذخیره آزمون ناموفق بود.", "danger"); }
