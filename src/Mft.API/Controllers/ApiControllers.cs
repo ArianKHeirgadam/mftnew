@@ -792,12 +792,11 @@ public class ExamsController(AppDbContext db) : ControllerBase
         }
 
         attempt.Score = savedAnswers.Sum(item => item.AwardedScore);
-        attempt.Status = "Submitted";
+        var pendingManualCount = savedAnswers.Count(item => item.IsCorrect is null);
+        attempt.Status = pendingManualCount == 0 ? "Graded" : "Submitted";
         attempt.SubmittedAt = DateTime.UtcNow;
 
         await db.SaveChangesAsync(ct);
-
-        var pendingManualCount = savedAnswers.Count(item => item.IsCorrect is null);
         return Ok(new
         {
             id = attempt.Id,
