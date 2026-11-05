@@ -28,13 +28,15 @@ public sealed class ExamFilesController(AppDbContext db, IWebHostEnvironment env
         var header = new byte[5];
         var read = await input.ReadAsync(header.AsMemory(0, header.Length), ct);
         if (read != 5 || !header.AsSpan().SequenceEqual("%PDF-"u8)) return null;
-        input.Position = 0;
 
         Directory.CreateDirectory(StorageDirectory);
         var stored = $"{Guid.NewGuid():N}.pdf";
         var fullPath = Path.Combine(StorageDirectory, stored);
         await using (var output = new FileStream(fullPath, FileMode.CreateNew, FileAccess.Write, FileShare.None, 81920, true))
+        {
+            await output.WriteAsync(header.AsMemory(), ct);
             await input.CopyToAsync(output, ct);
+        }
 
         var original = new string(Path.GetFileName(file.FileName.Replace('\\', '/'))
             .Where(character => !char.IsControl(character)).ToArray()).Trim();
