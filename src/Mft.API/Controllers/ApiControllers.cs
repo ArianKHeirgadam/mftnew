@@ -753,10 +753,8 @@ public class ExamsController(AppDbContext db) : ControllerBase
                     var expected = JsonSerializer.Deserialize<Dictionary<string, string>>(question.CorrectAnswer ?? "") ?? new();
                     var submitted = JsonSerializer.Deserialize<Dictionary<string, string>>(saved.Answer ?? "") ?? new();
                     var correctCount = expected.Count(pair => submitted.TryGetValue(pair.Key, out var value) && string.Equals(value, pair.Value, StringComparison.OrdinalIgnoreCase));
-                    var questionCount = attempt.Exam.Questions.Count;
-                    var baseQuestionScore = questionCount == 0 ? 0m : Math.Floor(100m / questionCount * 100m) / 100m;
-                    var isLastQuestion = examQuestion.Order == attempt.Exam.Questions.Max(item => item.Order);
-                    var normalizedQuestionScore = isLastQuestion ? 100m - baseQuestionScore * (questionCount - 1) : baseQuestionScore;
+                    var totalExamPoints = attempt.Exam.Questions.Sum(item => item.Score);
+                    var normalizedQuestionScore = totalExamPoints <= 0 ? 0m : examQuestion.Score * 100m / totalExamPoints;
                     saved.IsCorrect = expected.Count > 0 && correctCount == expected.Count;
                     saved.AwardedScore = expected.Count == 0 ? 0m : Math.Round(normalizedQuestionScore * correctCount / expected.Count, 2);
                 }
@@ -776,15 +774,10 @@ public class ExamsController(AppDbContext db) : ControllerBase
                     saved.Answer?.Trim(),
                     StringComparison.OrdinalIgnoreCase);
 
-                var questionCount = attempt.Exam.Questions.Count;
-                var baseQuestionScore = questionCount == 0
+                var totalExamPoints = attempt.Exam.Questions.Sum(item => item.Score);
+                var normalizedQuestionScore = totalExamPoints <= 0
                     ? 0m
-                    : Math.Floor(100m / questionCount * 100m) / 100m;
-                var isLastQuestion = examQuestion.Order ==
-                    attempt.Exam.Questions.Max(item => item.Order);
-                var normalizedQuestionScore = isLastQuestion
-                    ? 100m - baseQuestionScore * (questionCount - 1)
-                    : baseQuestionScore;
+                    : examQuestion.Score * 100m / totalExamPoints;
 
                 saved.AwardedScore = saved.IsCorrect == true
                     ? normalizedQuestionScore
@@ -838,7 +831,7 @@ public class ResultsController(AppDbContext db) : ControllerBase
         {
             id = x.Id, examId = x.ExamId, examTitle = x.Exam.Title,
             studentId = x.StudentId,
-            studentName = User.IsInRole("Student") ? null : db.Users.Where(u => u.Id == x.StudentId).Select(u => u.FullName).FirstOrDefault(),
+            studentName = db.Users.Where(u => u.Id == x.StudentId).Select(u => u.FullName).FirstOrDefault(),
             startedAt = x.StartedAt, submittedAt = x.SubmittedAt,
             score = x.Exam.ResultsPublished ? x.Score : null,
             status = x.Exam.ResultsPublished ? x.Status : "AwaitingPublication",
