@@ -83,7 +83,7 @@ public sealed class ExamFilesController(AppDbContext db, IWebHostEnvironment env
         if (exam is null) return NotFound();
         if (User.IsInRole("Student"))
         {
-            if (!exam.IsPublished || (exam.DepartmentId.HasValue && exam.DepartmentId != User.DepartmentId())) return NotFound();
+            if (!exam.IsPublished || exam.ResultsPublished || (exam.DepartmentId.HasValue && exam.DepartmentId != User.DepartmentId())) return NotFound();
         }
         else if (!CanManage(exam)) return Forbid();
 
@@ -131,7 +131,7 @@ public sealed class ExamFilesController(AppDbContext db, IWebHostEnvironment env
         if (attempt is null) return NotFound();
         if (User.IsInRole("Student"))
         {
-            if (attempt.StudentId != User.UserId() || !attempt.Exam.ResultsPublished) return NotFound();
+            if (attempt.StudentId != User.UserId() || !attempt.Exam.ResultsPublished || attempt.Status != "Graded") return NotFound();
         }
         else if (!CanManage(attempt.Exam)) return Forbid();
         var doc = await db.ExamSubmissionDocuments.FirstOrDefaultAsync(x => x.AttemptId == attemptId, ct);
