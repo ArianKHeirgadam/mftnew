@@ -244,6 +244,20 @@
           $('#downloadSubmissionPdf')?.addEventListener('click', () => window.MftApi.download(`/exam-files/attempts/${encodeURIComponent(attemptId)}`).catch(error => notify(error.message, 'danger')));
         } catch { pdfBox.hidden = true; pdfBox.innerHTML = ''; }
       } else if (pdfBox) { pdfBox.hidden = true; pdfBox.innerHTML = ''; }
+
+      const publishButton = $('#publishExamResults');
+      if (publishButton) {
+        publishButton.hidden = !canGrade || result.resultsPublished === true;
+        publishButton.onclick = async () => {
+          publishButton.disabled = true;
+          try {
+            await request(`/results/exams/${encodeURIComponent(result.examId)}/publish`, { method: 'POST' });
+            notify('نتایج آزمون منتشر شد.', 'ok');
+            await loadResults();
+          } catch (error) { notify(error.message || 'انتشار نتایج ناموفق بود.', 'danger'); }
+          finally { publishButton.disabled = false; }
+        };
+      }
       return;
     }
     const rows = await request(`/results${examId ? `?examId=${encodeURIComponent(examId)}` : ''}`);
