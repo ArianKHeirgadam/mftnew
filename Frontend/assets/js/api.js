@@ -259,6 +259,19 @@
           finally { publishButton.disabled = false; }
         };
       }
+      const unpublishButton = $('#unpublishExamResults');
+      if (unpublishButton) {
+        unpublishButton.hidden = !canGrade || result.resultsPublished !== true;
+        unpublishButton.onclick = async () => {
+          unpublishButton.disabled = true;
+          try {
+            await request(`/results/exams/${encodeURIComponent(result.examId)}/unpublish`, { method: 'POST' });
+            notify('انتشار نتایج لغو شد؛ اکنون می‌توانید نمرات را اصلاح کنید.', 'ok');
+            await loadResults();
+          } catch (error) { notify(error.message || 'لغو انتشار ناموفق بود.', 'danger'); }
+          finally { unpublishButton.disabled = false; }
+        };
+      }
       return;
     }
     const rows = await request(`/results${examId ? `?examId=${encodeURIComponent(examId)}` : ''}`);
@@ -271,7 +284,7 @@
 
     const publishButton = $('#publishExamResults');
     if (publishButton) {
-      publishButton.hidden = !examId || role === 'student';
+      publishButton.hidden = !examId || role === 'student' || rows.some(row => row.resultsPublished);
       publishButton.onclick = async () => {
         if (!examId || publishButton.disabled) return;
         publishButton.disabled = true;
@@ -281,6 +294,20 @@
           await loadResults();
         } catch (error) { notify(error.message || 'انتشار نتایج ناموفق بود.', 'danger'); }
         finally { publishButton.disabled = false; }
+      };
+    }
+    const unpublishButton = $('#unpublishExamResults');
+    if (unpublishButton) {
+      unpublishButton.hidden = !examId || role === 'student' || !rows.some(row => row.resultsPublished);
+      unpublishButton.onclick = async () => {
+        if (!examId || unpublishButton.disabled) return;
+        unpublishButton.disabled = true;
+        try {
+          await request(`/results/exams/${encodeURIComponent(examId)}/unpublish`, { method: 'POST' });
+          notify('انتشار نتایج لغو شد؛ می‌توانید نمرات را اصلاح کنید.', 'ok');
+          await loadResults();
+        } catch (error) { notify(error.message || 'لغو انتشار ناموفق بود.', 'danger'); }
+        finally { unpublishButton.disabled = false; }
       };
     }
   }
