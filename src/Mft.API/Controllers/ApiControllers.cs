@@ -954,6 +954,7 @@ public class ResultsController(AppDbContext db) : ControllerBase
             .AnyAsync(x => x.Answers.Any(a => a.IsCorrect == null), ct);
         if (pending) return BadRequest(new { message = "هنوز پاسخ تشریحی تصحیح‌نشده وجود دارد." });
         exam.ResultsPublished = true;
+        exam.IsPublished = false;
         exam.ResultsPublishedAt = DateTime.UtcNow;
         exam.ResultsPublishedByUserId = User.UserId();
         await db.SaveChangesAsync(ct);
