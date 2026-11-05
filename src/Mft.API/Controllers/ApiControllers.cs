@@ -150,6 +150,20 @@ public class UsersController(AppDbContext db) : ControllerBase
         u.IsActive = r.IsActive;
         if (User.IsInRole("SuperAdmin")) u.DepartmentId = r.DepartmentId;
         await db.SaveChangesAsync(ct);
+        if (!wasPublished && e.IsPublished)
+        {
+            var studentIds = await db.Users
+                .Where(user => user.Role == UserRole.Student && user.IsActive && user.DepartmentId == e.DepartmentId)
+                .Select(user => user.Id)
+                .ToListAsync(ct);
+            db.Notifications.AddRange(studentIds.Select(studentId => new Notification
+            {
+                UserId = studentId,
+                Title = "آزمون جدید منتشر شد",
+                Message = $"آزمون «{e.Title}» برای شما منتشر شد."
+            }));
+            if (studentIds.Count > 0) await db.SaveChangesAsync(ct);
+        }
         return NoContent();
     }
     [HttpDelete("{id:guid}"), Authorize(Policy = "TeacherOrAbove")]
@@ -508,6 +522,20 @@ public class ExamsController(AppDbContext db) : ControllerBase
         }
         db.Exams.Add(e);
         await db.SaveChangesAsync(ct);
+        if (e.IsPublished)
+        {
+            var studentIds = await db.Users
+                .Where(user => user.Role == UserRole.Student && user.IsActive && user.DepartmentId == e.DepartmentId)
+                .Select(user => user.Id)
+                .ToListAsync(ct);
+            db.Notifications.AddRange(studentIds.Select(studentId => new Notification
+            {
+                UserId = studentId,
+                Title = "آزمون جدید منتشر شد",
+                Message = $"آزمون «{e.Title}» برای شما منتشر شد."
+            }));
+            if (studentIds.Count > 0) await db.SaveChangesAsync(ct);
+        }
         return CreatedAtAction(nameof(Get), new {
             id = e.Id
         }
@@ -528,6 +556,7 @@ public class ExamsController(AppDbContext db) : ControllerBase
         );
         var e = await db.Exams.Include(x => x.Questions).FirstOrDefaultAsync(x => x.Id == id, ct);
         if (e is null) return NotFound();
+        var wasPublished = e.IsPublished;
         if (User.IsInRole("Department") && e.DepartmentId != User.DepartmentId()) return Forbid();
         if (User.IsInRole("Teacher") && e.CreatedByUserId != User.UserId()) return Forbid();
         var ownerId = e.CreatedByUserId;
@@ -870,8 +899,18 @@ public class ResultsController(AppDbContext db) : ControllerBase
             message =$"حداکثر نمره این آزمون {maxScore} است."
         }
         );
+        var scoreChanged = a.Score != score || a.Status != "Graded";
         a.Score = score;
-        a.Status ="Graded";
+        a.Status = "Graded";
+        if (scoreChanged)
+        {
+            db.Notifications.Add(new Notification
+            {
+                UserId = a.StudentId,
+                Title = "نتیجه آزمون ثبت شد",
+                Message = $"نمره آزمون «{a.Exam.Title}» ثبت شد. برای مشاهده نتیجه وارد بخش نتایج شوید."
+            });
+        }
         await db.SaveChangesAsync(ct);
         return NoContent();
     }
@@ -1062,10 +1101,13 @@ public sealed class AttendanceController(AppDbContext db) : ControllerBase
         var existing = await db.AttendanceRecords
             .Where(x => x.DepartmentId == effectiveDepartmentId.Value && x.AttendanceDate == request.Date && ids.Contains(x.StudentUserId))
             .ToDictionaryAsync(x => x.StudentUserId, ct);
+        var attendanceNotifications = new List<Notification>();
 
         foreach (var item in request.Records)
         {
-            if (existing.TryGetValue(item.StudentId, out var record))
+            var changed = !existing.TryGetValue(item.StudentId, out var record) ||
+                !string.Equals(record.Status, item.Status, StringComparison.OrdinalIgnoreCase);
+            if (existing.TryGetValue(item.StudentId, out record))
             {
                 record.Status = item.Status;
                 record.RecordedByUserId = User.UserId();
@@ -1081,7 +1123,26 @@ public sealed class AttendanceController(AppDbContext db) : ControllerBase
                     Status = item.Status
                 });
             }
+
+            if (changed)
+            {
+                var statusLabel = item.Status switch
+                {
+                    "Present" => "حاضر",
+                    "Absent" => "غایب",
+                    _ => "ثبت‌نشده"
+                };
+                attendanceNotifications.Add(new Notification
+                {
+                    UserId = item.StudentId,
+                    Title = item.Status == "Absent" ? "غیبت برای شما ثبت شد" : "وضعیت حضور و غیاب ثبت شد",
+                    Message = $"وضعیت حضور و غیاب شما در تاریخ {request.Date:yyyy/MM/dd} «{statusLabel}» ثبت شد."
+                });
+            }
         }
+
+        if (attendanceNotifications.Count > 0)
+            db.Notifications.AddRange(attendanceNotifications);
 
         await db.SaveChangesAsync(ct);
         return Ok(new { message = "حضور و غیاب ذخیره شد.", saved = request.Records.Count, date = request.Date });
