@@ -128,24 +128,26 @@
     }
   }
 
-  async function loadDashboardManagers() {
-    if (!document.body.matches('body[data-active="dashboard"][data-role="superadmin"]')) return;
-    const body = $('#dashboardManagersBody');
-    const count = $('#dashboardManagersCount');
-    if (!body) return;
+  async function loadManagers() {
+    if (!document.body.matches('body[data-active="managers"]')) return;
+    if ((currentUser()?.role || '').toLowerCase() !== 'superadmin') {
+      location.href = 'dashboard-student.html';
+      return;
+    }
+    const body = $('body[data-active="managers"] table tbody');
+    if (body) body.innerHTML = '<tr><td colspan="4" class="text-soft">در حال دریافت مدیران...</td></tr>';
     try {
       const managers = await request('/users?role=Department');
-      if (count) count.textContent = `${faNumber(managers.length)} مدیر`;
-      renderRows('#dashboardManagersBody', managers, manager => `<tr>
-        <td>${escapeHtml(manager.fullName || '—')}</td>
+      renderRows('body[data-active="managers"] table tbody', managers, manager => `<tr>
+        <td><div class="row-user"><div class="mohr sm"><div class="mohr-inner"><b>${escapeHtml((manager.fullName || 'م').slice(0, 1))}</b></div></div><div><b>${escapeHtml(manager.fullName || '—')}</b><span>مدیر دپارتمان</span></div></div></td>
         <td>${escapeHtml(manager.username || '—')}</td>
         <td>${escapeHtml(manager.department || 'تخصیص‌نیافته')}</td>
         <td><span class="badge ${manager.isActive ? 'badge-ok' : 'badge-muted'}">${manager.isActive ? 'فعال' : 'غیرفعال'}</span></td>
       </tr>`, 4);
+      const count = $('#managersCount');
+      if (count) count.textContent = `${faNumber(managers.length)} مدیر`;
     } catch (error) {
-      if (count) count.textContent = 'خطا در دریافت';
-      renderRows('#dashboardManagersBody', [], null, 4);
-      throw error;
+      if (body) body.innerHTML = `<tr><td colspan="4" class="text-danger">${escapeHtml(error.message || 'دریافت مدیران ناموفق بود.')}</td></tr>`;
     }
   }
 
@@ -831,7 +833,7 @@
         [loadResults, ['results']],
         [loadNotifications, ['notifications']],
         [loadDashboard, ['dashboard']],
-        [loadDashboardManagers, ['dashboard']],
+        [loadManagers, ['managers']],
         [loadTeacherGrades, ['dashboard']],
         [loadDashboardExtras, ['dashboard']],
         [loadStudentPerformance, ['dashboard']],
@@ -850,7 +852,7 @@
       }
       if (document.body.dataset.active === 'students') attachSearch('body[data-active="students"] .search-box input', loadUsers);
       if (document.body.dataset.active === 'teachers') attachSearch('body[data-active="teachers"] .search-box input', loadUsers);
-      if (document.body.dataset.active === 'departments') attachSearch('body[data-active="departments"] .search-box input', loadDepartments);
+      if (document.body.dataset.active === 'departments') attachSearch('body[data-active="departments"] .search-box input', loadDepartments);\n      if (document.body.dataset.active === 'managers') attachSearch('body[data-active="managers"] .search-box input', loadManagers);
       if (document.body.dataset.active === 'bank') attachSearch('body[data-active="bank"] .search-box input', loadQuestions);
     });
   }
