@@ -885,6 +885,7 @@ public class ResultsController(AppDbContext db) : ControllerBase
         var a = await db.ExamAttempts.Include(x => x.Exam).FirstOrDefaultAsync(x => x.Id == id, ct);
         if (a is null) return NotFound();
         if (!CanManage(a.Exam)) return Forbid();
+        if (a.Exam.ResultsPublished) return BadRequest(new { message = "برای تغییر نمره، ابتدا انتشار نتایج آزمون را لغو کنید." });
         if (a.Status == "InProgress") return BadRequest(new { message = "ابتدا دانشجو باید آزمون را ارسال کند." });
         var pending = await db.ExamAnswers.Where(x => x.ExamAttemptId == id && x.IsCorrect == null).ToListAsync(ct);
         if (pending.Count > 0) return BadRequest(new { message = "برای تصحیح، از مسیر نمره‌دهی سؤال‌به‌سؤال استفاده کنید." });
@@ -901,6 +902,7 @@ public class ResultsController(AppDbContext db) : ControllerBase
         var attempt = await db.ExamAttempts.Include(x => x.Exam).FirstOrDefaultAsync(x => x.Id == attemptId, ct);
         if (attempt is null) return NotFound();
         if (!CanManage(attempt.Exam)) return Forbid();
+        if (attempt.Exam.ResultsPublished) return BadRequest(new { message = "برای تغییر نمره، ابتدا انتشار نتایج آزمون را لغو کنید." });
         if (attempt.Status == "InProgress") return BadRequest(new { message = "آزمون هنوز ارسال نشده است." });
         var answer = await db.ExamAnswers.FirstOrDefaultAsync(x => x.ExamAttemptId == attemptId && x.QuestionId == questionId, ct);
         var examQuestion = await db.ExamQuestions.FirstOrDefaultAsync(x => x.ExamId == attempt.ExamId && x.QuestionId == questionId, ct);
