@@ -124,6 +124,20 @@ public sealed class ExamFilesController(AppDbContext db, IWebHostEnvironment env
         return Ok(new { attemptId, fileName = old.OriginalFileName, size = old.FileSize, uploadedAt = old.UploadedAt });
     }
 
+    [HttpGet("attempts/{attemptId:guid}/info")]
+    public async Task<IActionResult> StudentPdfInfo(Guid attemptId, CancellationToken ct)
+    {
+        var attempt = await db.ExamAttempts.Include(x => x.Exam).FirstOrDefaultAsync(x => x.Id == attemptId, ct);
+        if (attempt is null) return NotFound();
+        if (User.IsInRole("Student"))
+        {
+            if (attempt.StudentId != User.UserId() || !attempt.Exam.ResultsPublished) return NotFound();
+        }
+        else if (!CanManage(attempt.Exam)) return Forbid();
+        var doc = await db.ExamSubmissionDocuments.FirstOrDefaultAsync(x => x.AttemptId == attemptId, ct);
+        return doc is null ? NotFound() : Ok(new { fileName = doc.OriginalFileName, size = doc.FileSize, uploadedAt = doc.UploadedAt });
+    }
+
     [HttpGet("attempts/{attemptId:guid}")]
     public async Task<IActionResult> DownloadStudentPdf(Guid attemptId, CancellationToken ct)
     {
