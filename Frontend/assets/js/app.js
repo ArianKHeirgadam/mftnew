@@ -37,6 +37,7 @@ const NAV_BY_ROLE = {
     {
       section: "مدیریت آموزشی", items: [
         { key: "departments", label: "دپارتمان‌ها", href: "departments.html", icon: ICON.building },
+        { key: "managers", label: "مدیران", href: "managers.html", icon: ICON.teacher },
         { key: "students", label: "دانشجویان", href: "students.html", icon: ICON.students },
         { key: "teachers", label: "اساتید", href: "teachers.html", icon: ICON.teacher },
         { key: "bank", label: "بانک سوالات", href: "question-bank.html", icon: ICON.bank },

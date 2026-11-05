@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>مدیران دپارتمان | سامانه سنجش</title>
+<link rel="stylesheet" href="assets/css/style.css">
+<link rel="stylesheet" href="assets/css/responsive.css">
+<link rel="stylesheet" href="assets/css/dark.css">
+</head>
+<body data-role="superadmin" data-active="managers">
+<div class="app-shell">
+  <div id="sidebar-root"></div>
+  <div class="main-col">
+    <div id="topbar-root" data-title="مدیران"></div>
+    <main class="content fade-in">
+      <div class="page-head">
+        <div>
+          <div class="breadcrumb">سامانه سنجش <span>/</span> <b>مدیریت مدیران</b></div>
+          <h1>مدیران دپارتمان</h1>
+          <p class="text-soft">فهرست حساب مدیران و دپارتمان مرتبط با هر حساب</p>
+        </div>
+      </div>
+      <div class="card card-pad">
+        <div class="table-toolbar">
+          <div class="search-box">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.2-3.2"/></svg>
+            <input type="text" placeholder="جستجوی نام، نام کاربری یا دپارتمان...">
+          </div>
+          <div class="topbar-spacer"></div>
+          <span class="text-soft text-sm" id="managersCount">در حال دریافت...</span>
+        </div>
+        <div class="table-wrap">
+          <table class="dt">
+            <thead><tr><th>مدیر</th><th>نام کاربری</th><th>دپارتمان</th><th>وضعیت حساب</th></tr></thead>
+            <tbody><tr><td colspan="4" class="text-soft">در حال دریافت اطلاعات مدیران...</td></tr></tbody>
+          </table>
+        </div>
+      </div>
+    </main>
+  </div>
+</div>
+<script src="assets/js/theme.js"></script>
+<script src="assets/js/app.js"></script>
+<script src="assets/js/api.js"></script>
+</body>
+</html>
