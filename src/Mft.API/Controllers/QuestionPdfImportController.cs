@@ -215,7 +215,8 @@ public sealed class QuestionPdfImportController(AppDbContext db, ILogger<Questio
         }
 
         var questionText = string.Join(" ", text).Trim();
-        if (questionText.Length == 0) return;
+        // Ignore marker examples in the PDF's own formatting instructions (e.g. "Q1:, Q2:").
+        if (questionText.Length == 0 || !Regex.IsMatch(questionText, @"[\p{L}\p{N}]")) return;
         if (pairs.Count >= 2 || declaredType.Contains("MATCH") || declaredType.Contains("وصل"))
         {
             if (pairs.Count < 2) return;
