@@ -140,6 +140,14 @@ public sealed class QuestionPdfImportController(AppDbContext db, ILogger<Questio
     {
         var text = source.Replace("\r\n", "\n").Replace('\r', '\n');
 
+        // The bundled reference PDF includes a formatting-guide page with literal Q1/Q2
+        // examples. Do not interpret those examples as actual exam questions.
+        text = Regex.Replace(text, @"(?im)^\s*Formatting rules for your own PDF\b[\s\S]*$", "");
+        text = Regex.Replace(
+            text,
+            @"(?im)^\s*(?:MFT Assessment System\s*•.*|Page\s+\d+|\d+\.\s*(?:Multiple-choice questions|Essay question|Matching question))\s*$",
+            "");
+
         text = Regex.Replace(
             text,
             @"[ \t]+(?=(?:Q(?:UESTION)?\s*\d+|س[ؤو]ال\s*[0-9۰-۹٠-٩])\s*[:.)\-])",
