@@ -901,8 +901,9 @@ public class ResultsController(AppDbContext db) : ControllerBase
         var answer = await db.ExamAnswers.FirstOrDefaultAsync(x => x.ExamAttemptId == attemptId && x.QuestionId == questionId, ct);
         var examQuestion = await db.ExamQuestions.FirstOrDefaultAsync(x => x.ExamId == attempt.ExamId && x.QuestionId == questionId, ct);
         if (answer is null || examQuestion is null) return NotFound();
-        if (request.Score > examQuestion.Score) return BadRequest(new { message = $"حداکثر نمره این سؤال {examQuestion.Score} است." });
-        answer.AwardedScore = request.Score;
+        if (request.Score > examQuestion.Score) return BadRequest(new { message = $"حداکثر نمره خام این سؤال {examQuestion.Score} است." });
+        var totalExamPoints = await db.ExamQuestions.Where(x => x.ExamId == attempt.ExamId).SumAsync(x => (decimal?)x.Score, ct) ?? 0m;
+        answer.AwardedScore = totalExamPoints <= 0 ? 0m : request.Score * 100m / totalExamPoints;
         answer.IsCorrect = request.Score > 0;
         answer.IsManuallyGraded = true;
         answer.GradingComment = string.IsNullOrWhiteSpace(request.Comment) ? null : request.Comment.Trim();
