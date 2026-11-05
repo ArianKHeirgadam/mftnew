@@ -316,22 +316,46 @@
     const link = document.createElement('a'); link.href = url; link.download = 'mft-department-report.csv'; link.click(); URL.revokeObjectURL(url);
   }
 
+  async function loadTopbarNotifications() {
+    const menu = $('#topbarNotificationList');
+    const indicator = $('[data-unread-indicator]');
+    if (!menu) return;
+    try {
+      const rows = await request('/notifications');
+      const unread = rows.filter(row => !row.isRead).length;
+      if (indicator) indicator.hidden = unread === 0;
+      menu.innerHTML = rows.length
+        ? rows.slice(0, 4).map(row => `<a href="notifications.html" class="${row.isRead ? '' : 'unread'}"><b>${escapeHtml(row.title)}</b><small>${new Date(row.createdAt).toLocaleString('fa-IR')}</small></a>`).join('')
+        : '<div class="text-soft text-sm" style="padding:12px">اعلان جدیدی ندارید.</div>';
+    } catch {
+      if (indicator) indicator.hidden = true;
+      menu.innerHTML = '<div class="text-soft text-sm" style="padding:12px">دریافت اعلان‌ها ممکن نیست.</div>';
+    }
+  }
+
   async function loadNotifications() {
     if (!document.body.matches('[data-active="notifications"]')) return;
     const rows = await request('/notifications');
-    const list = $('[data-notification-list]') || $('.notification-list');
-    if (!list) return;
-    const renderNotification = row => `<article class="notification-item ${row.isRead ? '' : 'unread'}" data-notification-id="${row.id}">
-      <div><b>${escapeHtml(row.title)}</b><p>${escapeHtml(row.message)}</p><small>${new Date(row.createdAt).toLocaleString('fa-IR')}</small></div>
-      <div class="flex gap-8"><button class="btn btn-sm" data-notification-read="${row.id}" ${row.isRead ? 'disabled' : ''}>خوانده شد</button>
-      <button class="btn btn-sm btn-danger" data-notification-delete="${row.id}">حذف</button></div></article>`;
-    list.innerHTML = rows.length ? rows.map(renderNotification).join('') : '<div class="empty-state">اعلانی وجود ندارد.</div>';
+    const renderNotification = row => `<article class="notif-item ${row.isRead ? '' : 'unread'}" data-notification-id="${row.id}">
+      <div class="notif-icon" style="background:var(--surface-2);color:var(--primary)">${row.isRead ? '✓' : '●'}</div>
+      <div style="flex:1;min-width:0"><b style="font-size:13.5px">${escapeHtml(row.title)}</b><p class="text-soft text-sm mt-8">${escapeHtml(row.message)}</p><span class="text-soft" style="font-size:11px">${new Date(row.createdAt).toLocaleString('fa-IR')}</span></div>
+      <div class="flex gap-8"><button class="btn btn-ghost btn-sm" data-notification-read="${row.id}" ${row.isRead ? 'disabled' : ''}>خوانده شد</button>
+      <button class="btn btn-ghost btn-sm" data-notification-delete="${row.id}">حذف</button></div></article>`;
+    const allList = $('[data-notification-list]');
+    if (allList) allList.innerHTML = rows.length ? rows.map(renderNotification).join('') : '<div class="text-soft" style="padding:24px;text-align:center">اعلانی برای نمایش وجود ندارد.</div>';
+    const unreadRows = rows.filter(row => !row.isRead);
+    const readRows = rows.filter(row => row.isRead);
     const unreadPanel = $('#tUnread');
     const readPanel = $('#tRead');
-    if (unreadPanel) unreadPanel.innerHTML = rows.some(row => !row.isRead) ? rows.filter(row => !row.isRead).map(renderNotification).join('') : '<div class="empty-state">اعلان خوانده‌نشده‌ای وجود ندارد.</div>';
-    if (readPanel) readPanel.innerHTML = rows.some(row => row.isRead) ? rows.filter(row => row.isRead).map(renderNotification).join('') : '<div class="empty-state">اعلان خوانده‌شده‌ای وجود ندارد.</div>';
-    const tabs = $$('[data-tabs] .tab-btn');
-    if (tabs.length >= 3) { tabs[0].textContent = `همه (${faNumber(rows.length)})`; tabs[1].textContent = `خوانده‌نشده (${faNumber(rows.filter(row => !row.isRead).length)})`; tabs[2].textContent = `خوانده‌شده (${faNumber(rows.filter(row => row.isRead).length)})`; }
+    if (unreadPanel) unreadPanel.innerHTML = unreadRows.length ? unreadRows.map(renderNotification).join('') : '<div class="text-soft" style="padding:24px;text-align:center">اعلان خوانده‌نشده‌ای وجود ندارد.</div>';
+    if (readPanel) readPanel.innerHTML = readRows.length ? readRows.map(renderNotification).join('') : '<div class="text-soft" style="padding:24px;text-align:center">اعلان خوانده‌شده‌ای وجود ندارد.</div>';
+    const tabs = $('[data-tabs] .tab-btn');
+    if (tabs.length >= 3) {
+      tabs[0].textContent = `همه (${faNumber(rows.length)})`;
+      tabs[1].textContent = `خوانده‌نشده (${faNumber(unreadRows.length)})`;
+      tabs[2].textContent = `خوانده‌شده (${faNumber(readRows.length)})`;
+    }
+    await loadTopbarNotifications();
   }
 
   async function loadDashboard() {
@@ -822,6 +846,7 @@
     if ($('#departmentExamsBody')) $('#departmentExamsBody').replaceChildren();
     await safe(async () => {
       await loadCurrentUser();
+      await loadTopbarNotifications().catch(() => {});
       const isSuperAdmin = (currentUser()?.role || '').toLowerCase() === 'superadmin';
       $$('[data-create-department], [data-create-manager]').forEach(button => { button.hidden = !isSuperAdmin; });
       $$('[data-create-teacher]').forEach(button => { button.hidden = !['superadmin', 'department'].includes((currentUser()?.role || '').toLowerCase()); });
@@ -852,7 +877,8 @@
       }
       if (document.body.dataset.active === 'students') attachSearch('body[data-active="students"] .search-box input', loadUsers);
       if (document.body.dataset.active === 'teachers') attachSearch('body[data-active="teachers"] .search-box input', loadUsers);
-      if (document.body.dataset.active === 'departments') attachSearch('body[data-active="departments"] .search-box input', loadDepartments);\n      if (document.body.dataset.active === 'managers') attachSearch('body[data-active="managers"] .search-box input', loadManagers);
+      if (document.body.dataset.active === 'departments') attachSearch('body[data-active="departments"] .search-box input', loadDepartments);
+      if (document.body.dataset.active === 'managers') attachSearch('body[data-active="managers"] .search-box input', loadManagers);
       if (document.body.dataset.active === 'bank') attachSearch('body[data-active="bank"] .search-box input', loadQuestions);
     });
   }
