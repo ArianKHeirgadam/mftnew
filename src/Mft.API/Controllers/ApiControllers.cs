@@ -957,6 +957,13 @@ public class ResultsController(AppDbContext db) : ControllerBase
         var pending = await db.ExamAttempts.Where(x => x.ExamId == examId)
             .AnyAsync(x => x.Answers.Any(a => a.IsCorrect == null), ct);
         if (pending) return BadRequest(new { message = "هنوز پاسخ تشریحی تصحیح‌نشده وجود دارد." });
+        var completedAttempts = await db.ExamAttempts.Include(x => x.Answers)
+            .Where(x => x.ExamId == examId && x.Status != "InProgress").ToListAsync(ct);
+        foreach (var attempt in completedAttempts)
+        {
+            if (attempt.Answers.Count > 0) attempt.Score = attempt.Answers.Sum(answer => answer.AwardedScore);
+            attempt.Status = "Graded";
+        }
         exam.ResultsPublished = true;
         exam.IsPublished = false;
         exam.ResultsPublishedAt = DateTime.UtcNow;
