@@ -852,6 +852,8 @@ public class ResultsController(AppDbContext db) : ControllerBase
         var questionIds = a.Answers.Select(x => x.QuestionId).Distinct().ToArray();
         var questionDetails = await db.Questions.Where(x => questionIds.Contains(x.Id))
             .Select(x => new { x.Id, x.Text, x.CorrectAnswer }).ToDictionaryAsync(x => x.Id, ct);
+        var questionScores = await db.ExamQuestions.Where(x => x.ExamId == a.ExamId && questionIds.Contains(x.QuestionId))
+            .ToDictionaryAsync(x => x.QuestionId, x => x.Score, ct);
         return Ok(new
         {
             id = a.Id, exam = a.Exam.Title,
@@ -869,7 +871,9 @@ public class ResultsController(AppDbContext db) : ControllerBase
                 answer = answer.Answer,
                 isCorrect = a.Exam.ResultsPublished ? answer.IsCorrect : null,
                 awardedScore = a.Exam.ResultsPublished ? answer.AwardedScore : (decimal?)null,
-                gradingComment = a.Exam.ResultsPublished ? answer.GradingComment : null
+                maxRawScore = questionScores.TryGetValue(answer.QuestionId, out var maxRaw) ? maxRaw : 0m,
+                isManuallyGraded = answer.IsManuallyGraded,
+                gradingComment = answer.GradingComment
             })
         });
     }
