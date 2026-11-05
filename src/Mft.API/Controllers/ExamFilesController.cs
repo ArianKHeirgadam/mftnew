@@ -36,7 +36,9 @@ public sealed class ExamFilesController(AppDbContext db, IWebHostEnvironment env
         await using (var output = new FileStream(fullPath, FileMode.CreateNew, FileAccess.Write, FileShare.None, 81920, true))
             await input.CopyToAsync(output, ct);
 
-        var original = Path.GetFileName(file.FileName);
+        var original = new string(Path.GetFileName(file.FileName.Replace('\\', '/'))
+            .Where(character => !char.IsControl(character)).ToArray()).Trim();
+        if (string.IsNullOrWhiteSpace(original)) original = "document.pdf";
         if (original.Length > 255) original = original[^255..];
         return (fullPath, original);
     }
