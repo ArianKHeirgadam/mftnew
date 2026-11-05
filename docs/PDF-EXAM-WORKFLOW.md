@@ -20,7 +20,7 @@ Use a development database and test accounts for one teacher, one student in the
 5. Teacher opens the attempt result detail, downloads the student's PDF, and grades the essay answer question-by-question.
 6. Verify the teacher cannot enter a score greater than the question's configured raw points.
 7. Verify publication is rejected while any saved answer still needs manual grading.
-8. Teacher publishes results. Verify the student can now read the result, correct answers, awarded scores, and download their own submitted PDF.
+8. Teacher publishes results. Verify the student can now read the result, correct answers, awarded scores, and download their own submitted PDF. Verify the exam is closed to new attempts after publication.
 9. Verify the student cannot read another student's attempt or download another student's PDF.
 10. Verify a teacher cannot grade an exam owned by another teacher, and a department manager cannot grade outside their department.
 11. Unpublish results before making any correction; grading endpoints reject changes while results remain published.
