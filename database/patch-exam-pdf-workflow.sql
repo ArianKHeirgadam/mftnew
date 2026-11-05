@@ -10,6 +10,8 @@ IF OBJECT_ID(N'dbo.Exams', N'U') IS NULL
     THROW 51100, 'dbo.Exams table was not found.', 1;
 IF OBJECT_ID(N'dbo.ExamQuestions', N'U') IS NULL
     THROW 51100, 'dbo.ExamQuestions table was not found.', 1;
+IF OBJECT_ID(N'dbo.ExamQuestions', N'U') IS NULL
+    THROW 51100, 'dbo.ExamQuestions table was not found.', 1;
 IF OBJECT_ID(N'dbo.ExamAttempts', N'U') IS NULL
     THROW 51100, 'dbo.ExamAttempts table was not found.', 1;
 IF OBJECT_ID(N'dbo.ExamAnswers', N'U') IS NULL
@@ -23,9 +25,33 @@ IF COL_LENGTH('dbo.Exams', 'ResultsPublishedAt') IS NULL
 IF COL_LENGTH('dbo.Exams', 'ResultsPublishedByUserId') IS NULL
     ALTER TABLE dbo.Exams ADD ResultsPublishedByUserId uniqueidentifier NULL;
 
+IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id = OBJECT_ID(N'dbo.Exams') AND name = N'ResultsPublished' AND is_nullable = 1)
+BEGIN
+    UPDATE dbo.Exams SET ResultsPublished = 0 WHERE ResultsPublished IS NULL;
+    ALTER TABLE dbo.Exams ALTER COLUMN ResultsPublished bit NOT NULL;
+END;
+IF NOT EXISTS (
+    SELECT 1 FROM sys.default_constraints dc
+    JOIN sys.columns c ON c.object_id = dc.parent_object_id AND c.column_id = dc.parent_column_id
+    WHERE dc.parent_object_id = OBJECT_ID(N'dbo.Exams') AND c.name = N'ResultsPublished'
+)
+    ALTER TABLE dbo.Exams ADD CONSTRAINT DF_Exams_ResultsPublished_Mft DEFAULT (0) FOR ResultsPublished;
+
 IF COL_LENGTH('dbo.ExamQuestions', 'Score') IS NULL
     ALTER TABLE dbo.ExamQuestions ADD Score decimal(18,2) NOT NULL
         CONSTRAINT DF_ExamQuestions_Score_Mft DEFAULT (1) WITH VALUES;
+ELSE
+BEGIN
+    UPDATE dbo.ExamQuestions SET Score = 1 WHERE Score IS NULL;
+    IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id = OBJECT_ID(N'dbo.ExamQuestions') AND name = N'Score' AND is_nullable = 1)
+        ALTER TABLE dbo.ExamQuestions ALTER COLUMN Score decimal(18,2) NOT NULL;
+END;
+IF NOT EXISTS (
+    SELECT 1 FROM sys.default_constraints dc
+    JOIN sys.columns c ON c.object_id = dc.parent_object_id AND c.column_id = dc.parent_column_id
+    WHERE dc.parent_object_id = OBJECT_ID(N'dbo.ExamQuestions') AND c.name = N'Score'
+)
+    ALTER TABLE dbo.ExamQuestions ADD CONSTRAINT DF_ExamQuestions_Score_Mft DEFAULT (1) FOR Score;
 
 IF COL_LENGTH('dbo.ExamAnswers', 'IsManuallyGraded') IS NULL
     ALTER TABLE dbo.ExamAnswers ADD IsManuallyGraded bit NOT NULL
@@ -36,6 +62,12 @@ IF COL_LENGTH('dbo.ExamAnswers', 'GradedByUserId') IS NULL
     ALTER TABLE dbo.ExamAnswers ADD GradedByUserId uniqueidentifier NULL;
 IF COL_LENGTH('dbo.ExamAnswers', 'GradedAt') IS NULL
     ALTER TABLE dbo.ExamAnswers ADD GradedAt datetime2 NULL;
+IF NOT EXISTS (
+    SELECT 1 FROM sys.default_constraints dc
+    JOIN sys.columns c ON c.object_id = dc.parent_object_id AND c.column_id = dc.parent_column_id
+    WHERE dc.parent_object_id = OBJECT_ID(N'dbo.ExamAnswers') AND c.name = N'IsManuallyGraded'
+)
+    ALTER TABLE dbo.ExamAnswers ADD CONSTRAINT DF_ExamAnswers_IsManuallyGraded_Mft DEFAULT (0) FOR IsManuallyGraded;
 
 IF OBJECT_ID(N'dbo.ExamDocuments', N'U') IS NULL
 BEGIN
