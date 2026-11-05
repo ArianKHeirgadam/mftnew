@@ -723,6 +723,26 @@ public class ExamsController(AppDbContext db) : ControllerBase
             }
         }
 
+        // Create explicit empty answer rows for unanswered questions. This keeps blank
+        // essay questions available for manual grading from the student's uploaded PDF.
+        var existingQuestionIds = await db.ExamAnswers
+            .Where(item => item.ExamAttemptId == attemptId)
+            .Select(item => item.QuestionId)
+            .ToHashSetAsync(ct);
+        foreach (var examQuestion in attempt.Exam.Questions)
+        {
+            if (existingQuestionIds.Add(examQuestion.QuestionId))
+            {
+                db.ExamAnswers.Add(new ExamAnswer
+                {
+                    ExamAttemptId = attemptId,
+                    QuestionId = examQuestion.QuestionId,
+                    Answer = null
+                });
+            }
+        }
+        await db.SaveChangesAsync(ct);
+
         // Grade the complete persisted answer set, not only the final request body.
         var savedAnswers = await db.ExamAnswers
             .Where(item => item.ExamAttemptId == attemptId)
