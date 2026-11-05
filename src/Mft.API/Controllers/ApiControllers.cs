@@ -961,7 +961,9 @@ public class ResultsController(AppDbContext db) : ControllerBase
             .Where(x => x.ExamId == examId && x.Status != "InProgress").ToListAsync(ct);
         foreach (var attempt in completedAttempts)
         {
-            if (attempt.Answers.Count > 0) attempt.Score = attempt.Answers.Sum(answer => answer.AwardedScore);
+            attempt.Score = attempt.Answers.Count > 0
+                ? attempt.Answers.Sum(answer => answer.AwardedScore)
+                : attempt.Score ?? 0m;
             attempt.Status = "Graded";
         }
         exam.ResultsPublished = true;
