@@ -12,6 +12,8 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
     public DbSet<ExamQuestion> ExamQuestions => Set<ExamQuestion>();
     public DbSet<ExamAttempt> ExamAttempts => Set<ExamAttempt>();
     public DbSet<ExamAnswer> ExamAnswers => Set<ExamAnswer>();
+    public DbSet<ExamDocument> ExamDocuments => Set<ExamDocument>();
+    public DbSet<ExamSubmissionDocument> ExamSubmissionDocuments => Set<ExamSubmissionDocument>();
     public DbSet<Notification> Notifications => Set<Notification>();
     // The supplied database schema has no settings table. Keep the entity available for API compatibility,
     // but do not assume that EF can persist it to a table that does not exist.
@@ -85,6 +87,9 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
             entity.Ignore(x => x.Description);
             entity.Ignore(x => x.EndsAt);
             entity.Ignore(x => x.CreatedAt);
+            entity.Property(x => x.ResultsPublished).HasDefaultValue(false);
+            entity.Property(x => x.ResultsPublishedAt);
+            entity.Property(x => x.ResultsPublishedByUserId);
             entity.Property(x => x.AllowQuestionNavigation).HasColumnName("AllowNavigation");
         });
 
@@ -93,7 +98,7 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
             entity.ToTable("ExamQuestions");
             entity.HasKey(x => new { x.ExamId, x.QuestionId });
             entity.Property(x => x.Order).HasColumnName("SortOrder");
-            entity.Ignore(x => x.Score);
+            entity.Property(x => x.Score).HasPrecision(18, 2).HasDefaultValue(1m);
             entity.HasOne(x => x.Exam).WithMany(x => x.Questions).HasForeignKey(x => x.ExamId).OnDelete(DeleteBehavior.Cascade);
             entity.HasOne<Question>().WithMany().HasForeignKey(x => x.QuestionId).OnDelete(DeleteBehavior.Restrict);
         });
@@ -117,9 +122,35 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
             entity.Property(x => x.Answer).HasColumnName("EssayText");
             entity.Property(x => x.AwardedScore).HasColumnName("Score").HasPrecision(18, 2);
             entity.Property(x => x.IsCorrect);
+            entity.Property(x => x.IsManuallyGraded).HasDefaultValue(false);
+            entity.Property(x => x.GradingComment).HasMaxLength(2000);
+            entity.Property(x => x.GradedByUserId);
+            entity.Property(x => x.GradedAt);
             entity.Ignore(x => x.UpdatedAt);
             entity.HasOne(x => x.Attempt).WithMany(x => x.Answers).HasForeignKey(x => x.ExamAttemptId).OnDelete(DeleteBehavior.Cascade);
             entity.HasOne<Question>().WithMany().HasForeignKey(x => x.QuestionId).OnDelete(DeleteBehavior.Restrict);
+        });
+
+        modelBuilder.Entity<ExamDocument>(entity =>
+        {
+            entity.ToTable("ExamDocuments");
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.Id).HasColumnType("uniqueidentifier").ValueGeneratedNever();
+            entity.Property(x => x.StoredFileName).HasMaxLength(100).IsRequired();
+            entity.Property(x => x.OriginalFileName).HasMaxLength(255).IsRequired();
+            entity.HasIndex(x => x.ExamId).IsUnique();
+            entity.HasOne<Exam>().WithMany().HasForeignKey(x => x.ExamId).OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<ExamSubmissionDocument>(entity =>
+        {
+            entity.ToTable("ExamSubmissionDocuments");
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.Id).HasColumnType("uniqueidentifier").ValueGeneratedNever();
+            entity.Property(x => x.StoredFileName).HasMaxLength(100).IsRequired();
+            entity.Property(x => x.OriginalFileName).HasMaxLength(255).IsRequired();
+            entity.HasIndex(x => x.AttemptId).IsUnique();
+            entity.HasOne<ExamAttempt>().WithMany().HasForeignKey(x => x.AttemptId).OnDelete(DeleteBehavior.Cascade);
         });
 
         modelBuilder.Entity<Notification>(entity =>
