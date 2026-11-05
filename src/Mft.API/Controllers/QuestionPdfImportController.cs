@@ -10,7 +10,7 @@ using UglyToad.PdfPig;
 namespace Mft.API.Controllers;
 
 [ApiController, Route("api/questions"), Authorize(Policy = "TeacherOrAbove")]
-public sealed class QuestionPdfImportController(AppDbContext db) : ControllerBase
+public sealed class QuestionPdfImportController(AppDbContext db, ILogger<QuestionPdfImportController> logger) : ControllerBase
 {
     private static readonly Regex QuestionStart = new(@"^(?:Q(?:UESTION)?\s*\d+|س[ؤو]ال\s*[0-9۰-۹٠-٩]+)\s*[:.)\-]\s*(.*)$", RegexOptions.IgnoreCase | RegexOptions.Compiled);
     // PdfPig may return RTL text with the Persian question marker at the END of the line,
@@ -31,7 +31,13 @@ public sealed class QuestionPdfImportController(AppDbContext db) : ControllerBas
         {
             await using var stream = file.OpenReadStream();
             using var pdf = PdfDocument.Open(stream);
-            var blocks = Parse(string.Join("\n", pdf.GetPages().Select(page => page.Text)));
+            var extractedText = string.Join("\n", pdf.GetPages().Select(page => page.Text));
+            var blocks = Parse(NormalizeExtractedText(extractedText));
+            if (blocks.Count == 0)
+                logger.LogWarning("PDF preview extraction found no question blocks. File={FileName}, Pages={PageCount}, Characters={CharacterCount}, EnglishMarkers={EnglishMarkers}, PersianMarkers={PersianMarkers}",
+                    Path.GetFileName(file.FileName), pdf.NumberOfPages, extractedText.Length,
+                    Regex.Matches(extractedText, @"Q(?:UESTION)?\s*\d+\s*[:.)\-]", RegexOptions.IgnoreCase).Count,
+                    Regex.Matches(extractedText, @"س[ؤو]ال\s*[0-9۰-۹٠-٩]+\s*[:.)\-]").Count);
             if (blocks.Count == 0)
                 return BadRequest(new { message = "سؤالی پیدا نشد. ساختار PDF را مطابق راهنمای صفحه بارگذاری تنظیم کنید." });
             return Ok(new
@@ -85,7 +91,8 @@ public sealed class QuestionPdfImportController(AppDbContext db) : ControllerBas
         {
             await using var stream = file.OpenReadStream();
             using var pdf = PdfDocument.Open(stream);
-            blocks = Parse(string.Join("\n", pdf.GetPages().Select(page => page.Text)));
+            var extractedText = string.Join("\n", pdf.GetPages().Select(page => page.Text));
+            blocks = Parse(NormalizeExtractedText(extractedText));
         }
         catch (Exception) when (!ct.IsCancellationRequested)
         {
@@ -126,6 +133,41 @@ public sealed class QuestionPdfImportController(AppDbContext db) : ControllerBas
     }
 
     private sealed record ParsedQuestion(string Text, string Type, string[] Options, string? CorrectAnswer);
+
+    // PdfPig can return visually separate PDF lines joined into one text line depending
+    // on the document's text layout. Reinsert line boundaries before import markers.
+    private static string NormalizeExtractedText(string source)
+    {
+        var text = source.Replace("\r\n", "\n").Replace('\r', '\n');
+
+        // The bundled reference PDF includes a formatting-guide page with literal Q1/Q2
+        // examples. Do not interpret those examples as actual exam questions.
+        text = Regex.Replace(text, @"(?im)^\s*Formatting rules for your own PDF\b[\s\S]*$", "");
+        text = Regex.Replace(
+            text,
+            @"(?im)^\s*(?:MFT Assessment System\s*•.*|Page\s+\d+|\d+\.\s*(?:Multiple-choice questions|Essay question|Matching question))\s*$",
+            "");
+
+        text = Regex.Replace(
+            text,
+            @"[ \t]+(?=(?:Q(?:UESTION)?\s*\d+|س[ؤو]ال\s*[0-9۰-۹٠-٩])\s*[:.)\-])",
+            "\n",
+            RegexOptions.IgnoreCase);
+
+        text = Regex.Replace(
+            text,
+            @"[ \t]+(?=(?:[A-E]|[الفبجد])[).:\-]\s*)",
+            "\n",
+            RegexOptions.IgnoreCase);
+
+        text = Regex.Replace(
+            text,
+            @"[ \t]+(?=(?:ANSWER|TYPE|PAIR|پاسخ|نوع|جفت)\s*[:=])",
+            "\n",
+            RegexOptions.IgnoreCase);
+
+        return text;
+    }
 
     private static List<ParsedQuestion> Parse(string source)
     {
@@ -181,7 +223,8 @@ public sealed class QuestionPdfImportController(AppDbContext db) : ControllerBas
         }
 
         var questionText = string.Join(" ", text).Trim();
-        if (questionText.Length == 0) return;
+        // Ignore marker examples in the PDF's own formatting instructions (e.g. "Q1:, Q2:").
+        if (questionText.Length == 0 || !Regex.IsMatch(questionText, @"[\p{L}\p{N}]")) return;
         if (pairs.Count >= 2 || declaredType.Contains("MATCH") || declaredType.Contains("وصل"))
         {
             if (pairs.Count < 2) return;
