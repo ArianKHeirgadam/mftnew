@@ -209,10 +209,41 @@
         heading.textContent = `نتیجه آزمون: ${result.exam} — ${scoreLabel}${outcome}`;
       }
       const body = $('body[data-active="results"] .card table tbody');
-      if (body) body.innerHTML = result.answers.length ? result.answers.map((answer, index) => `<tr>
-        <td>${faNumber(index + 1)}</td><td>${escapeHtml(answer.question || `سؤال ${answer.questionId}`)}</td>
-        <td>${escapeHtml(answer.answer || 'بدون پاسخ')}</td><td>${escapeHtml(answer.correctAnswer || '—')}</td>
-        <td>${answer.isCorrect == null ? '—' : answer.isCorrect ? 'صحیح' : 'نادرست'}</td></tr>`).join('') : '<tr><td colspan="5">پاسخی ثبت نشده است.</td></tr>';
+      const canGrade = ['teacher', 'department', 'superadmin'].includes(role);
+      if (body) {
+        body.innerHTML = result.answers.length ? result.answers.map((answer, index) => {
+          const gradeControl = canGrade && answer.isCorrect == null
+            ? `<div class="flex gap-8 mt-8"><input class="input" type="number" min="0" max="${Number(answer.maxRawScore || 0)}" step="0.01" value="0" data-grade-score style="max-width:100px" aria-label="نمره خام سؤال"><input class="input" type="text" maxlength="2000" data-grade-comment placeholder="توضیح تصحیح" style="max-width:180px"><button class="btn btn-primary btn-sm" data-grade-answer="${answer.questionId}">ثبت نمره</button></div><small class="text-soft">حداکثر نمره خام: ${faNumber(answer.maxRawScore || 0)}</small>`
+            : (answer.isCorrect == null ? 'در انتظار تصحیح' : answer.isCorrect ? 'صحیح' : 'نادرست');
+          return `<tr>
+            <td>${faNumber(index + 1)}</td><td>${escapeHtml(answer.question || `سؤال ${answer.questionId}`)}</td>
+            <td>${escapeHtml(answer.answer || 'بدون پاسخ')}</td><td>${escapeHtml(answer.correctAnswer || '—')}</td>
+            <td>${gradeControl}</td></tr>`;
+        }).join('') : '<tr><td colspan="5">پاسخی ثبت نشده است.</td></tr>';
+
+        if (canGrade) body.querySelectorAll('[data-grade-answer]').forEach(button => button.addEventListener('click', async () => {
+          const row = button.closest('tr');
+          const score = Number(row?.querySelector('[data-grade-score]')?.value);
+          const comment = row?.querySelector('[data-grade-comment]')?.value || null;
+          if (!Number.isFinite(score) || score < 0) return notify('نمره واردشده معتبر نیست.', 'warn');
+          button.disabled = true;
+          try {
+            await request(`/results/${encodeURIComponent(attemptId)}/answers/${encodeURIComponent(button.dataset.gradeAnswer)}/grade`, { method: 'PUT', body: JSON.stringify({ score, comment }) });
+            notify('نمره سؤال ثبت شد.', 'ok');
+            await loadResults();
+          } catch (error) { notify(error.message || 'ثبت نمره ناموفق بود.', 'danger'); button.disabled = false; }
+        }));
+      }
+
+      const pdfBox = $('#submissionPdfBox');
+      if (pdfBox && canGrade) {
+        try {
+          const info = await request(`/exam-files/attempts/${encodeURIComponent(attemptId)}/info`);
+          pdfBox.hidden = false;
+          pdfBox.innerHTML = `<div class="section-title"><h3>فایل PDF پاسخ دانشجو</h3></div><p class="text-soft text-sm">${escapeHtml(info.fileName)} — ${faNumber(Math.ceil(info.size / 1024))} کیلوبایت</p><button type="button" class="btn btn-outline" id="downloadSubmissionPdf">دریافت فایل پاسخ</button>`;
+          $('#downloadSubmissionPdf')?.addEventListener('click', () => window.MftApi.download(`/exam-files/attempts/${encodeURIComponent(attemptId)}`).catch(error => notify(error.message, 'danger')));
+        } catch { pdfBox.hidden = true; pdfBox.innerHTML = ''; }
+      } else if (pdfBox) { pdfBox.hidden = true; pdfBox.innerHTML = ''; }
       return;
     }
     const rows = await request(`/results${examId ? `?examId=${encodeURIComponent(examId)}` : ''}`);
