@@ -77,7 +77,7 @@ Before using this workflow on an existing database, back up the database and run
 - `POST /api/results/exams/{examId}/publish`: teacher/department/super-admin publishes results after all saved answers needing manual grading have been graded.
 - `POST /api/results/exams/{examId}/unpublish`: authorized manager withdraws publication.
 
-The existing student result endpoints return no result details until the exam's `ResultsPublished` flag is enabled. Uploads are stored outside the web root and downloaded through authenticated endpoints.
+Student result endpoints return no result details until the exam's `ResultsPublished` flag is enabled and that student's attempt has reached `Graded`. Uploads are stored outside the web root and downloaded through authenticated endpoints.
 
 ## Run the frontend
 
