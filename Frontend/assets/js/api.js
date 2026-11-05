@@ -184,29 +184,83 @@
   async function loadExams() {
     const role = (document.body.dataset.role || currentUser()?.role || '').toLowerCase();
     if (role !== 'student' || document.body.dataset.active !== 'dashboard') return;
-    const rows = await request('/exams');
-    renderRows('body[data-active="dashboard"] tbody', rows, row => `<tr>
-      <td>${escapeHtml(row.title)}</td><td>${escapeHtml(row.subject || '—')}</td>
-      <td>${row.startsAt ? new Date(row.startsAt).toLocaleDateString('fa-IR') : '—'}</td>
-      <td>${faNumber(row.durationMinutes)} دقیقه</td><td>${row.isPublished ? 'آماده برگزاری' : 'منتشر نشده'}</td>
-      <td>${row.isPublished ? `<button class="btn btn-primary" data-exam-start="${row.id}">شروع آزمون</button>` : '—'}</td></tr>`, 6);
-    const nextExam = rows.filter(row => row.isPublished && (!row.startsAt || new Date(row.startsAt).getTime() >= Date.now())).sort((a, b) => (a.startsAt ? new Date(a.startsAt).getTime() : Infinity) - (b.startsAt ? new Date(b.startsAt).getTime() : Infinity))[0];
+
+    const [rows, attempts] = await Promise.all([
+      request('/exams'),
+      request('/results')
+    ]);
+    const latestAttemptByExam = new Map();
+    attempts
+      .slice()
+      .sort((a, b) => new Date(b.startedAt || 0).getTime() - new Date(a.startedAt || 0).getTime())
+      .forEach(attempt => {
+        if (!latestAttemptByExam.has(attempt.examId)) latestAttemptByExam.set(attempt.examId, attempt);
+      });
+
+    const now = Date.now();
+    const getState = exam => {
+      const attempt = latestAttemptByExam.get(exam.id);
+      if (attempt?.status === 'InProgress') return { label: 'در حال برگزاری', action: `<button class="btn btn-primary btn-sm" data-exam-start="${exam.id}">ادامه آزمون</button>` };
+      if (attempt) return {
+        label: attempt.status === 'Graded' ? 'تصحیح شده' : 'ثبت شده؛ در انتظار تصحیح',
+        action: `<a class="btn btn-ghost btn-sm" href="results.html?attemptId=${encodeURIComponent(attempt.id)}">مشاهده نتیجه</a>`
+      };
+      if (exam.startsAt && new Date(exam.startsAt).getTime() > now) return {
+        label: 'زمان شروع نرسیده',
+        action: '<button class="btn btn-outline btn-sm" disabled>هنوز شروع نشده</button>'
+      };
+      return { label: 'آماده شروع', action: `<button class="btn btn-primary btn-sm" data-exam-start="${exam.id}">شروع آزمون</button>` };
+    };
+
+    renderRows('body[data-active="dashboard"] tbody', rows, row => {
+      const state = getState(row);
+      return `<tr>
+        <td>${escapeHtml(row.title)}</td><td>${escapeHtml(row.subject || '—')}</td>
+        <td>${row.startsAt ? new Date(row.startsAt).toLocaleString('fa-IR') : '—'}</td>
+        <td>${faNumber(row.durationMinutes)} دقیقه</td><td>${state.label}</td>
+        <td>${state.action}</td></tr>`;
+    }, 6);
+
+    const available = rows
+      .filter(row => row.isPublished)
+      .map(row => ({ exam: row, state: getState(row) }))
+      .filter(item => latestAttemptByExam.get(item.exam.id)?.status === 'InProgress' ||
+        !latestAttemptByExam.has(item.exam.id))
+      .sort((a, b) => {
+        const aActive = latestAttemptByExam.get(a.exam.id)?.status === 'InProgress' ? 0 : 1;
+        const bActive = latestAttemptByExam.get(b.exam.id)?.status === 'InProgress' ? 0 : 1;
+        if (aActive !== bActive) return aActive - bActive;
+        return new Date(a.exam.startsAt || 0).getTime() - new Date(b.exam.startsAt || 0).getTime();
+      });
+    const nextItem = available[0];
     const nextCard = $('body[data-active="dashboard"] .eyebrow');
     if (nextCard?.textContent.includes('آزمون پیش رو')) {
       const card = nextCard.closest('.card');
-      const title = $('h2', card); const details = $('p', card); const link = $('a', card);
-      if (nextExam) {
-        if (title) title.textContent = nextExam.title;
-        if (details) details.textContent = `${nextExam.startsAt ? new Date(nextExam.startsAt).toLocaleString('fa-IR') : 'زمان شروع اعلام نشده'} — مدت زمان: ${faNumber(nextExam.durationMinutes)} دقیقه`;
-        if (link) { link.dataset.examStart = String(nextExam.id); link.href = '#'; link.textContent = 'شروع آزمون'; }
-      } else {
-        if (title) title.textContent = 'آزمون زمان‌بندی‌شده‌ای وجود ندارد';
-        if (details) details.textContent = 'پس از انتشار آزمون توسط استاد، این بخش به‌روزرسانی می‌شود.';
-        if (link) link.remove();
-      }
+      const title = $('h2', card), details = $('p', card), link = $('a', card);
       const hours = $('.mohr.lg.gold .mohr-inner', card);
-      if (hours) hours.innerHTML = '<b>—</b><span>ساعت مانده</span>';
+      if (nextItem) {
+        const { exam, state } = nextItem;
+        if (title) title.textContent = exam.title;
+        if (details) details.textContent = `${exam.startsAt ? new Date(exam.startsAt).toLocaleString('fa-IR') : 'زمان شروع اعلام نشده'} — مدت زمان: ${faNumber(exam.durationMinutes)} دقیقه — ${state.label}`;
+        if (link) {
+          link.outerHTML = state.action.replace('btn-sm', 'btn-gold mt-16');
+          const replacement = $('a[data-exam-start], button[data-exam-start]', card);
+          if (replacement?.tagName === 'A') replacement.href = '#';
+        }
+        if (hours) hours.innerHTML = '<b>—</b><span>ساعت مانده</span>';
+      } else {
+        if (title) title.textContent = 'آزمون فعالی در دسترس نیست';
+        if (details) details.textContent = 'آزمون‌های منتشرشده و زمان‌بندی‌شده در این بخش نمایش داده می‌شوند.';
+        link?.remove();
+        if (hours) hours.innerHTML = '<b>—</b><span>آزمون فعال</span>';
+      }
     }
+
+    const greeting = $('body[data-active="dashboard"] .page-head h1');
+    const name = currentUser()?.fullName;
+    if (greeting && name) greeting.textContent = `سلام ${name}، موفق باشی!`;
+    const departmentBadge = $('body[data-active="dashboard"] .page-head > .badge');
+    if (departmentBadge && currentUser()?.department) departmentBadge.textContent = currentUser().department;
   }
 
   async function loadResults() {
@@ -262,6 +316,15 @@
     const attempts = await request('/results');
     const scored = attempts.filter(attempt => attempt.score != null).sort((a, b) => new Date(a.submittedAt || a.startedAt) - new Date(b.submittedAt || b.startedAt));
     window.MftChartData = { ...(window.MftChartData || {}), performance: scored.map((attempt, index) => ({ label: attempt.examTitle || `آزمون ${index + 1}`, score: attempt.score })) };
+    const metrics = {
+      completed: attempts.filter(attempt => ['Submitted', 'Graded'].includes(attempt.status)).length,
+      averageScore: scored.length ? Math.round(scored.reduce((sum, attempt) => sum + Number(attempt.score), 0) / scored.length) : 0,
+      attempts: attempts.length
+    };
+    Object.entries(metrics).forEach(([key, value]) => {
+      const element = document.querySelector(`[data-metric="${key}"]`);
+      if (element) element.textContent = faNumber(value);
+    });
     document.dispatchEvent(new Event('mft:data-ready'));
   }
 
