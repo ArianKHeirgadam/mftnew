@@ -874,6 +874,8 @@ public class ResultsController(AppDbContext db) : ControllerBase
             .Select(x => new { x.Id, x.Text, x.CorrectAnswer }).ToDictionaryAsync(x => x.Id, ct);
         var questionScores = await db.ExamQuestions.Where(x => x.ExamId == a.ExamId && questionIds.Contains(x.QuestionId))
             .ToDictionaryAsync(x => x.QuestionId, x => x.Score, ct);
+        var totalRawPoints = await db.ExamQuestions.Where(x => x.ExamId == a.ExamId)
+            .SumAsync(x => (decimal?)x.Score, ct) ?? 0m;
         return Ok(new
         {
             id = a.Id, examId = a.ExamId, exam = a.Exam.Title,
@@ -892,6 +894,7 @@ public class ResultsController(AppDbContext db) : ControllerBase
                 isCorrect = (!isStudent || a.Exam.ResultsPublished) ? answer.IsCorrect : null,
                 awardedScore = (!isStudent || a.Exam.ResultsPublished) ? answer.AwardedScore : (decimal?)null,
                 maxRawScore = questionScores.TryGetValue(answer.QuestionId, out var maxRaw) ? maxRaw : 0m,
+                rawAwardedScore = totalRawPoints <= 0 ? 0m : answer.AwardedScore * totalRawPoints / 100m,
                 isManuallyGraded = answer.IsManuallyGraded,
                 gradingComment = answer.GradingComment
             })
