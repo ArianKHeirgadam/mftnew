@@ -230,7 +230,7 @@
         const aActive = latestAttemptByExam.get(a.exam.id)?.status === 'InProgress' ? 0 : 1;
         const bActive = latestAttemptByExam.get(b.exam.id)?.status === 'InProgress' ? 0 : 1;
         if (aActive !== bActive) return aActive - bActive;
-        return new Date(a.exam.startsAt || 0).getTime() - new Date(b.exam.startsAt || 0).getTime();
+        return new Date(a.exam.startsAt || '9999-12-31').getTime() - new Date(b.exam.startsAt || '9999-12-31').getTime();
       });
     const nextItem = available[0];
     const nextCard = $('body[data-active="dashboard"] .eyebrow');
