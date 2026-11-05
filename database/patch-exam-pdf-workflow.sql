@@ -10,8 +10,6 @@ IF OBJECT_ID(N'dbo.Exams', N'U') IS NULL
     THROW 51100, 'dbo.Exams table was not found.', 1;
 IF OBJECT_ID(N'dbo.ExamQuestions', N'U') IS NULL
     THROW 51100, 'dbo.ExamQuestions table was not found.', 1;
-IF OBJECT_ID(N'dbo.ExamQuestions', N'U') IS NULL
-    THROW 51100, 'dbo.ExamQuestions table was not found.', 1;
 IF OBJECT_ID(N'dbo.ExamAttempts', N'U') IS NULL
     THROW 51100, 'dbo.ExamAttempts table was not found.', 1;
 IF OBJECT_ID(N'dbo.ExamAnswers', N'U') IS NULL
