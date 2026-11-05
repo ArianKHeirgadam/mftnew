@@ -69,6 +69,9 @@ public class Exam
     [System.ComponentModel.DataAnnotations.Schema.NotMapped]
     public DateTime? EndsAt { get; set; }
     public bool IsPublished { get; set; }
+    public bool ResultsPublished { get; set; }
+    public DateTime? ResultsPublishedAt { get; set; }
+    public Guid? ResultsPublishedByUserId { get; set; }
     public Guid CreatedByUserId { get; set; }
     public Guid? DepartmentId { get; set; }
     [System.ComponentModel.DataAnnotations.Schema.NotMapped]
@@ -106,6 +109,10 @@ public class ExamAnswer
     public string? Answer { get; set; }
     public bool? IsCorrect { get; set; }
     public decimal AwardedScore { get; set; }
+    public bool IsManuallyGraded { get; set; }
+    public string? GradingComment { get; set; }
+    public Guid? GradedByUserId { get; set; }
+    public DateTime? GradedAt { get; set; }
     [System.ComponentModel.DataAnnotations.Schema.NotMapped]
     public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
     public ExamAttempt Attempt { get; set; } = null!;
@@ -141,4 +148,27 @@ public class AttendanceRecord
     public DateOnly AttendanceDate { get; set; }
     public string Status { get; set; } = "Present";
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+}
+
+
+public class ExamDocument
+{
+    public Guid Id { get; set; } = Guid.NewGuid();
+    public Guid ExamId { get; set; }
+    public string StoredFileName { get; set; } = "";
+    public string OriginalFileName { get; set; } = "";
+    public long FileSize { get; set; }
+    public Guid UploadedByUserId { get; set; }
+    public DateTime UploadedAt { get; set; } = DateTime.UtcNow;
+}
+
+public class ExamSubmissionDocument
+{
+    public Guid Id { get; set; } = Guid.NewGuid();
+    public Guid AttemptId { get; set; }
+    public string StoredFileName { get; set; } = "";
+    public string OriginalFileName { get; set; } = "";
+    public long FileSize { get; set; }
+    public Guid UploadedByUserId { get; set; }
+    public DateTime UploadedAt { get; set; } = DateTime.UtcNow;
 }
