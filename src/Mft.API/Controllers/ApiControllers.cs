@@ -819,63 +819,139 @@ public class ExamsController(AppDbContext db) : ControllerBase
 [ApiController, Route("api/results"), Authorize]
 public class ResultsController(AppDbContext db) : ControllerBase
 {
+    private bool CanManage(Exam exam) =>
+        User.IsInRole("SuperAdmin") ||
+        User.IsInRole("Department") && exam.DepartmentId == User.DepartmentId() ||
+        User.IsInRole("Teacher") && exam.CreatedByUserId == User.UserId();
+
     [HttpGet]
-    public async Task<IActionResult> List([FromQuery]Guid? examId, [FromQuery]Guid? studentId, CancellationToken ct){
+    public async Task<IActionResult> List([FromQuery] Guid? examId, [FromQuery] Guid? studentId, CancellationToken ct)
+    {
         var q = db.ExamAttempts.Include(x => x.Exam).AsQueryable();
-        if (User.IsInRole("Student"))q = q.Where(x => x.StudentId == User.UserId());
-        if (User.IsInRole("Teacher"))q = q.Where(x => x.Exam.CreatedByUserId == User.UserId());
-        if (User.IsInRole("Department"))q = q.Where(x => x.Exam.DepartmentId == User.DepartmentId());
-        if (examId.HasValue)q = q.Where(x => x.ExamId == examId);
-        if (studentId.HasValue)q = q.Where(x => x.StudentId == studentId);
-        return Ok(await q.OrderByDescending(x => x.SubmittedAt).Select(x => new{
-            id = x.Id, examId = x.ExamId, examTitle = x.Exam.Title, studentId = x.StudentId, studentName = db.Users.Where(u => u.Id == x.StudentId).Select(u => u.FullName).FirstOrDefault(), startedAt = x.StartedAt, submittedAt = x.SubmittedAt, score = x.Status == "Graded" || !x.Answers.Any(answer => answer.IsCorrect == null) ? x.Score : null, status = x.Status
-        }
-        ).ToListAsync(ct));
+        if (User.IsInRole("Student")) q = q.Where(x => x.StudentId == User.UserId() && x.Exam.ResultsPublished);
+        else if (User.IsInRole("Teacher")) q = q.Where(x => x.Exam.CreatedByUserId == User.UserId());
+        else if (User.IsInRole("Department")) q = q.Where(x => x.Exam.DepartmentId == User.DepartmentId());
+        if (examId.HasValue) q = q.Where(x => x.ExamId == examId.Value);
+        if (studentId.HasValue && !User.IsInRole("Student")) q = q.Where(x => x.StudentId == studentId.Value);
+
+        return Ok(await q.OrderByDescending(x => x.SubmittedAt).Select(x => new
+        {
+            id = x.Id, examId = x.ExamId, examTitle = x.Exam.Title,
+            studentId = x.StudentId,
+            studentName = User.IsInRole("Student") ? null : db.Users.Where(u => u.Id == x.StudentId).Select(u => u.FullName).FirstOrDefault(),
+            startedAt = x.StartedAt, submittedAt = x.SubmittedAt,
+            score = x.Exam.ResultsPublished ? x.Score : null,
+            status = x.Exam.ResultsPublished ? x.Status : "AwaitingPublication",
+            resultsPublished = x.Exam.ResultsPublished
+        }).ToListAsync(ct));
     }
+
     [HttpGet("{id:guid}")]
-    public async Task<IActionResult> Get(Guid id, CancellationToken ct){
-        var a = await db.ExamAttempts.Include(x => x.Exam).Include(x => x.Answers).FirstOrDefaultAsync(x => x.Id == id, ct);
+    public async Task<IActionResult> Get(Guid id, CancellationToken ct)
+    {
+        var a = await db.ExamAttempts.Include(x => x.Exam).Include(x => x.Answers)
+            .FirstOrDefaultAsync(x => x.Id == id, ct);
         if (a is null) return NotFound();
-        if (User.IsInRole("Student") && a.StudentId != User.UserId()) return Forbid();
-        if (User.IsInRole("Student") && a.Status == "InProgress") return Forbid();
-        if (User.IsInRole("Teacher") && a.Exam.CreatedByUserId != User.UserId()) return Forbid();
-        if (User.IsInRole("Department") && a.Exam.DepartmentId != User.DepartmentId()) return Forbid();
-        var maxScore = 100m;
-        var questionIds = a.Answers.Select(answer => answer.QuestionId).Distinct().ToArray();
-        var questionDetails = await db.Questions.Where(question => questionIds.Contains(question.Id)).Select(question => new{
-            question.Id, question.Text, question.CorrectAnswer
-        }
-        ).ToDictionaryAsync(question => question.Id, ct);
-        return Ok(new {
-            id = a.Id, exam = a.Exam.Title, score = a.Status == "Graded" || !a.Answers.Any(answer => answer.IsCorrect == null) ? a.Score : null, autoScore = a.Score, pendingManualCount = a.Answers.Count(answer => answer.IsCorrect == null), maxScore, passingScore = a.Exam.PassingScore, status = a.Status, answers = a.Answers.Select(answer => new{
-                questionId = answer.QuestionId, question = questionDetails.TryGetValue(answer.QuestionId, out var detail)?detail.Text:null, correctAnswer = a.Status == "InProgress"?null:questionDetails.TryGetValue(answer.QuestionId, out var correct)?correct.CorrectAnswer:null, answer = answer.Answer, isCorrect = answer.IsCorrect, awardedScore = answer.AwardedScore
-            }
-            )
-        }
-        );
+        var isStudent = User.IsInRole("Student");
+        if (isStudent && (a.StudentId != User.UserId() || !a.Exam.ResultsPublished)) return NotFound();
+        if (!isStudent && !CanManage(a.Exam)) return Forbid();
+
+        var questionIds = a.Answers.Select(x => x.QuestionId).Distinct().ToArray();
+        var questionDetails = await db.Questions.Where(x => questionIds.Contains(x.Id))
+            .Select(x => new { x.Id, x.Text, x.CorrectAnswer }).ToDictionaryAsync(x => x.Id, ct);
+        return Ok(new
+        {
+            id = a.Id, exam = a.Exam.Title,
+            score = a.Exam.ResultsPublished ? a.Score : null,
+            autoScore = isStudent ? null : a.Score,
+            pendingManualCount = a.Answers.Count(x => x.IsCorrect == null),
+            maxScore = 100m, passingScore = a.Exam.PassingScore,
+            status = a.Exam.ResultsPublished ? a.Status : "AwaitingPublication",
+            resultsPublished = a.Exam.ResultsPublished,
+            answers = a.Answers.Select(answer => new
+            {
+                questionId = answer.QuestionId,
+                question = questionDetails.TryGetValue(answer.QuestionId, out var detail) ? detail.Text : null,
+                correctAnswer = a.Exam.ResultsPublished && questionDetails.TryGetValue(answer.QuestionId, out var correct) ? correct.CorrectAnswer : null,
+                answer = answer.Answer,
+                isCorrect = a.Exam.ResultsPublished ? answer.IsCorrect : null,
+                awardedScore = a.Exam.ResultsPublished ? answer.AwardedScore : (decimal?)null,
+                gradingComment = a.Exam.ResultsPublished ? answer.GradingComment : null
+            })
+        });
     }
+
     [HttpPut("{id:guid}/grade"), Authorize(Policy = "TeacherOrAbove")]
-    public async Task<IActionResult> Grade(Guid id, [FromBody]decimal score, CancellationToken ct){
-        if (score < 0) return BadRequest(new {
-            message = "نمره نمی‌تواند منفی باشد."
-        }
-        );
+    public async Task<IActionResult> Grade(Guid id, [FromBody] decimal score, CancellationToken ct)
+    {
+        if (score < 0 || score > 100) return BadRequest(new { message = "نمره باید بین صفر تا ۱۰۰ باشد." });
         var a = await db.ExamAttempts.Include(x => x.Exam).FirstOrDefaultAsync(x => x.Id == id, ct);
         if (a is null) return NotFound();
-        if (a.Status == "InProgress") return BadRequest(new { message = "تا زمانی که دانشجو آزمون را ارسال نکرده، امکان ثبت نمره نیست." });
-        if (User.IsInRole("Department") && a.Exam.DepartmentId != User.DepartmentId()) return Forbid();
-        if (User.IsInRole("Teacher") && a.Exam.CreatedByUserId != User.UserId()) return Forbid();
-        var maxScore = 100m;
-        if (score>maxScore) return BadRequest(new {
-            message =$"حداکثر نمره این آزمون {maxScore} است."
-        }
-        );
+        if (!CanManage(a.Exam)) return Forbid();
+        if (a.Status == "InProgress") return BadRequest(new { message = "ابتدا دانشجو باید آزمون را ارسال کند." });
+        var pending = await db.ExamAnswers.Where(x => x.ExamAttemptId == id && x.IsCorrect == null).ToListAsync(ct);
+        if (pending.Count > 0) return BadRequest(new { message = "برای تصحیح، از مسیر نمره‌دهی سؤال‌به‌سؤال استفاده کنید." });
         a.Score = score;
-        a.Status ="Graded";
+        a.Status = "Graded";
+        await db.SaveChangesAsync(ct);
+        return NoContent();
+    }
+
+    [HttpPut("{attemptId:guid}/answers/{questionId:guid}/grade"), Authorize(Policy = "TeacherOrAbove")]
+    public async Task<IActionResult> GradeAnswer(Guid attemptId, Guid questionId, [FromBody] ManualGradeRequest request, CancellationToken ct)
+    {
+        if (request.Score < 0) return BadRequest(new { message = "نمره سؤال نمی‌تواند منفی باشد." });
+        var attempt = await db.ExamAttempts.Include(x => x.Exam).FirstOrDefaultAsync(x => x.Id == attemptId, ct);
+        if (attempt is null) return NotFound();
+        if (!CanManage(attempt.Exam)) return Forbid();
+        if (attempt.Status == "InProgress") return BadRequest(new { message = "آزمون هنوز ارسال نشده است." });
+        var answer = await db.ExamAnswers.FirstOrDefaultAsync(x => x.ExamAttemptId == attemptId && x.QuestionId == questionId, ct);
+        var examQuestion = await db.ExamQuestions.FirstOrDefaultAsync(x => x.ExamId == attempt.ExamId && x.QuestionId == questionId, ct);
+        if (answer is null || examQuestion is null) return NotFound();
+        if (request.Score > examQuestion.Score) return BadRequest(new { message = $"حداکثر نمره این سؤال {examQuestion.Score} است." });
+        answer.AwardedScore = request.Score;
+        answer.IsCorrect = request.Score > 0;
+        answer.IsManuallyGraded = true;
+        answer.GradingComment = string.IsNullOrWhiteSpace(request.Comment) ? null : request.Comment.Trim();
+        answer.GradedByUserId = User.UserId();
+        answer.GradedAt = DateTime.UtcNow;
+        var answers = await db.ExamAnswers.Where(x => x.ExamAttemptId == attemptId).ToListAsync(ct);
+        attempt.Score = answers.Sum(x => x.AwardedScore);
+        if (answers.All(x => x.IsCorrect != null)) attempt.Status = "Graded";
+        await db.SaveChangesAsync(ct);
+        return Ok(new { attemptId, questionId, answer.AwardedScore, attempt.Score, pendingManualCount = answers.Count(x => x.IsCorrect == null), status = attempt.Status });
+    }
+
+    [HttpPost("exams/{examId:guid}/publish"), Authorize(Policy = "TeacherOrAbove")]
+    public async Task<IActionResult> Publish(Guid examId, CancellationToken ct)
+    {
+        var exam = await db.Exams.FirstOrDefaultAsync(x => x.Id == examId, ct);
+        if (exam is null) return NotFound();
+        if (!CanManage(exam)) return Forbid();
+        var pending = await db.ExamAttempts.Where(x => x.ExamId == examId && x.Status != "InProgress")
+            .AnyAsync(x => x.Answers.Any(a => a.IsCorrect == null), ct);
+        if (pending) return BadRequest(new { message = "هنوز پاسخ تشریحی تصحیح‌نشده وجود دارد." });
+        exam.ResultsPublished = true;
+        exam.ResultsPublishedAt = DateTime.UtcNow;
+        exam.ResultsPublishedByUserId = User.UserId();
+        await db.SaveChangesAsync(ct);
+        return Ok(new { examId, resultsPublished = true, publishedAt = exam.ResultsPublishedAt });
+    }
+
+    [HttpPost("exams/{examId:guid}/unpublish"), Authorize(Policy = "TeacherOrAbove")]
+    public async Task<IActionResult> Unpublish(Guid examId, CancellationToken ct)
+    {
+        var exam = await db.Exams.FirstOrDefaultAsync(x => x.Id == examId, ct);
+        if (exam is null) return NotFound();
+        if (!CanManage(exam)) return Forbid();
+        exam.ResultsPublished = false;
+        exam.ResultsPublishedAt = null;
+        exam.ResultsPublishedByUserId = null;
         await db.SaveChangesAsync(ct);
         return NoContent();
     }
 }
+
 [ApiController, Route("api/notifications"), Authorize]
 public class NotificationsController(AppDbContext db) : ControllerBase
 {
