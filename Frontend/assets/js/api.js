@@ -845,7 +845,8 @@
     if ($('body[data-active="dashboard"] table tbody')) $('body[data-active="dashboard"] table tbody').replaceChildren();
     if ($('#departmentExamsBody')) $('#departmentExamsBody').replaceChildren();
     await safe(async () => {
-      await loadCurrentUser();\n      await loadTopbarNotifications().catch(() => {});
+      await loadCurrentUser();
+      await loadTopbarNotifications().catch(() => {});
       const isSuperAdmin = (currentUser()?.role || '').toLowerCase() === 'superadmin';
       $$('[data-create-department], [data-create-manager]').forEach(button => { button.hidden = !isSuperAdmin; });
       $$('[data-create-teacher]').forEach(button => { button.hidden = !['superadmin', 'department'].includes((currentUser()?.role || '').toLowerCase()); });
@@ -876,7 +877,8 @@
       }
       if (document.body.dataset.active === 'students') attachSearch('body[data-active="students"] .search-box input', loadUsers);
       if (document.body.dataset.active === 'teachers') attachSearch('body[data-active="teachers"] .search-box input', loadUsers);
-      if (document.body.dataset.active === 'departments') attachSearch('body[data-active="departments"] .search-box input', loadDepartments);\n      if (document.body.dataset.active === 'managers') attachSearch('body[data-active="managers"] .search-box input', loadManagers);
+      if (document.body.dataset.active === 'departments') attachSearch('body[data-active="departments"] .search-box input', loadDepartments);
+      if (document.body.dataset.active === 'managers') attachSearch('body[data-active="managers"] .search-box input', loadManagers);
       if (document.body.dataset.active === 'bank') attachSearch('body[data-active="bank"] .search-box input', loadQuestions);
     });
   }
