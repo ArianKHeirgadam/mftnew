@@ -852,8 +852,28 @@
     });
   }
 
+  async function download(path) {
+    const headers = new Headers();
+    if (token()) headers.set('Authorization', `Bearer ${token()}`);
+    const response = await fetch(`${API_BASE}${path}`, { headers });
+    if (!response.ok) {
+      const payload = await response.json().catch(() => null);
+      throw new Error(payload?.message || `خطای دریافت فایل (${response.status})`);
+    }
+    const blob = await response.blob();
+    const disposition = response.headers.get('content-disposition') || '';
+    const encoded = disposition.match(/filename\*=UTF-8''([^;]+)/i);
+    const plain = disposition.match(/filename="?([^";]+)"?/i);
+    const filename = encoded ? decodeURIComponent(encoded[1]) : (plain?.[1] || 'submission.pdf');
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement('a');
+    anchor.href = url; anchor.download = filename; document.body.appendChild(anchor); anchor.click(); anchor.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  }
+
   window.MftApi = {
     request,
+    download,
     logout() { clearSession(); location.href = 'login.html'; },
     refresh: init
   };
