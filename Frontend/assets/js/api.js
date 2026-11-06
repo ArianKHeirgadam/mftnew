@@ -358,7 +358,17 @@
     if (!modal) return;
     modal.dataset.attemptId = String(id);
     $('#gradeExamTitle', modal).textContent = `${result.exam} — ${result.answers.length} پاسخ`;
-    $('#gradeAnswerDetails', modal).innerHTML = result.answers.map((answer, index) => `<div style="padding:8px 0;border-bottom:1px solid var(--border)"><b>سؤال ${faNumber(index + 1)}:</b> ${escapeHtml(answer.question || '')}<br><span>پاسخ دانشجو: ${escapeHtml(answer.answer || 'بدون پاسخ')}</span><br><span>نمره خودکار: ${faNumber(answer.awardedScore)}</span></div>`).join('') || 'پاسخی برای نمایش وجود ندارد.';
+    const answerDetails = $('#gradeAnswerDetails', modal);
+    answerDetails.innerHTML = result.answers.map((answer, index) => `<div style="padding:8px 0;border-bottom:1px solid var(--border)"><b>سؤال ${faNumber(index + 1)}:</b> ${escapeHtml(answer.question || '')}<br><span>پاسخ دانشجو: ${escapeHtml(answer.answer || 'بدون پاسخ')}</span><br><span>نمره خودکار: ${faNumber(answer.awardedScore)}</span></div>`).join('') || 'پاسخ متنی ثبت نشده است؛ برگه دست‌نویس را از دکمه زیر بررسی کنید.';
+    const submissionDownload = document.createElement('button');
+    submissionDownload.type = 'button';
+    submissionDownload.className = 'btn btn-outline btn-block mt-8';
+    submissionDownload.textContent = 'مشاهده / دانلود برگه پاسخ دانشجو';
+    submissionDownload.addEventListener('click', async () => {
+      try { await window.MftApi.download(`/exam-files/attempts/${encodeURIComponent(id)}`); }
+      catch (error) { notify(error.message || 'فایل پاسخ دانشجو در دسترس نیست.', 'danger'); }
+    });
+    answerDetails.append(submissionDownload);
     const score = $('[data-grade-score]', modal);
     if (score) { score.max = String(result.maxScore ?? 0); score.value = result.score ?? ''; score.placeholder = `حداکثر ${result.maxScore ?? 0}`; }
     modal.classList.add('show');
