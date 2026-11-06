@@ -36,6 +36,11 @@ builder.Services.AddDbContext<CanonicalAcademicDbContext>(options =>
     options.UseSqlServer(
         builder.Configuration.GetConnectionString("DefaultConnection")));
 
+ // Operational feature tables also use canonical bigint identifiers.
+builder.Services.AddDbContext<CanonicalOperationsDbContext>(options =>
+    options.UseSqlServer(
+        builder.Configuration.GetConnectionString("DefaultConnection")));
+
 builder.Services.AddScoped<IAuthService, AuthService>();
 builder.Services.AddScoped<ITokenService, TokenService>();
 
