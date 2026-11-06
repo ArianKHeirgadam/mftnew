@@ -161,11 +161,10 @@ public sealed class CanonicalUsersController(CanonicalIdentityDbContext db) : Co
             return BadRequest(new { message = "نام کاربری و نام کامل الزامی است." });
         if (string.IsNullOrWhiteSpace(password) || password.Length < 8)
             return BadRequest(new { message = "رمز عبور باید حداقل ۸ کاراکتر باشد." });
-        if (string.IsNullOrWhiteSpace(phoneNumber))
-            return BadRequest(new { message = "شماره تماس الزامی است؛ شماره تماس در دیتابیس یکتا است." });
-        if (username.Length > 100 || fullName.Length > 200 || phoneNumber.Length > 20 ||
-            (request.Email?.Length ?? 0) > 256)
-            return BadRequest(new { message = "طول یکی از فیلدها از محدودیت دیتابیس بیشتر است." });
+        if (phoneNumber?.Length > 40 || (request.Email?.Length ?? 0) > 512)
+            return BadRequest(new { message = "طول شماره تماس یا ایمیل از محدودیت دیتابیس بیشتر است." });
+        if (username.Length > 200 || fullName.Length > 400)
+            return BadRequest(new { message = "طول نام کاربری یا نام کامل از محدودیت دیتابیس بیشتر است." });
 
         var departmentId = User.IsInRole("Department") || User.IsInRole("Teacher")
             ? User.CanonicalDepartmentId()
@@ -182,8 +181,11 @@ public sealed class CanonicalUsersController(CanonicalIdentityDbContext db) : Co
                 item.UserRoles.Any(ur => ur.Role.Name == CanonicalRoleNames.DepartmentAdmin), ct))
             return Conflict(new { message = "این دپارتمان از قبل مدیر دارد." });
 
-        if (await db.Users.AnyAsync(item => item.Username == username || item.PhoneNumber == phoneNumber, ct))
-            return Conflict(new { message = "نام کاربری یا شماره تماس قبلاً ثبت شده است." });
+        if (await db.Users.AnyAsync(item => item.Username == username, ct))
+            return Conflict(new { message = "این نام کاربری قبلاً ثبت شده است." });
+        if (phoneNumber is not null &&
+            await db.Users.AnyAsync(item => item.PhoneNumber == phoneNumber, ct))
+            return Conflict(new { message = "این شماره تماس قبلاً ثبت شده است." });
 
         var role = await db.Roles.SingleOrDefaultAsync(item => item.Name == databaseRole, ct);
         if (role is null) return StatusCode(500, new { message = "نقش موردنظر در جدول Roles تعریف نشده است." });
@@ -228,12 +230,11 @@ public sealed class CanonicalUsersController(CanonicalIdentityDbContext db) : Co
             return BadRequest(new { message = "دپارتمان انتخاب‌شده معتبر نیست." });
 
         var phoneNumber = request.Mobile?.Trim();
-        if (string.IsNullOrWhiteSpace(phoneNumber))
-            return BadRequest(new { message = "شماره تماس الزامی است." });
-        if (request.FullName.Trim().Length > 200 || phoneNumber.Length > 20 ||
-            (request.Email?.Length ?? 0) > 256)
+        if (request.FullName.Trim().Length > 400 || phoneNumber?.Length > 40 ||
+            (request.Email?.Length ?? 0) > 512)
             return BadRequest(new { message = "طول یکی از فیلدها از محدودیت دیتابیس بیشتر است." });
-        if (await db.Users.AnyAsync(item => item.Id != id && item.PhoneNumber == phoneNumber, ct))
+        if (phoneNumber is not null &&
+            await db.Users.AnyAsync(item => item.Id != id && item.PhoneNumber == phoneNumber, ct))
             return Conflict(new { message = "این شماره تماس قبلاً ثبت شده است." });
 
         user.FullName = request.FullName.Trim();
@@ -297,12 +298,11 @@ public sealed class CanonicalUsersController(CanonicalIdentityDbContext db) : Co
             return BadRequest(new { message = "نام کامل الزامی است." });
 
         var phoneNumber = request.Mobile?.Trim();
-        if (string.IsNullOrWhiteSpace(phoneNumber))
-            return BadRequest(new { message = "شماره تماس الزامی است." });
-        if (request.FullName.Trim().Length > 200 || phoneNumber.Length > 20 ||
-            (request.Email?.Length ?? 0) > 256)
+        if (request.FullName.Trim().Length > 400 || phoneNumber?.Length > 40 ||
+            (request.Email?.Length ?? 0) > 512)
             return BadRequest(new { message = "طول یکی از فیلدها از محدودیت دیتابیس بیشتر است." });
-        if (await db.Users.AnyAsync(item => item.Id != id.Value && item.PhoneNumber == phoneNumber, ct))
+        if (phoneNumber is not null &&
+            await db.Users.AnyAsync(item => item.Id != id.Value && item.PhoneNumber == phoneNumber, ct))
             return Conflict(new { message = "این شماره تماس قبلاً ثبت شده است." });
 
         user.FullName = request.FullName.Trim();
