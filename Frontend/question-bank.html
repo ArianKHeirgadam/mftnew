@@ -20,7 +20,7 @@
           <h1>بانک سوالات</h1>
         </div>
         <div class="flex gap-8">
-          <a class="btn btn-outline" href="question-import.html">ورود سؤال از PDF</a>
+          
           <button class="btn btn-outline"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 15V3m0 12 4-4m-4 4-4-4M4 21h16"/></svg> خروجی (Export)</button>
           <button class="btn btn-primary" data-modal-open="questionModal">+ سوال جدید</button>
         </div>
@@ -65,6 +65,7 @@
     <div class="modal-head"><h3 style="font-size:16px">افزودن / ویرایش سوال</h3><button class="icon-btn" data-modal-close>✕</button></div>
     <div class="modal-body">
       <div class="field"><label>متن سوال</label><textarea class="textarea" rows="3" placeholder="متن سوال را وارد کنید..." data-question-text></textarea></div>
+      <div class="field"><label>دپارتمان</label><select class="select" id="questionDepartment" required><option value="">در حال دریافت دپارتمان‌ها...</option></select></div>
       <div class="grid-2" style="grid-template-columns:1fr 1fr">
         <div class="field"><label>نوع سوال</label><select class="select" id="qType"><option value="MultipleChoice">چهارگزینه‌ای</option><option value="Essay">تشریحی</option><option value="Matching">وصل‌کردنی</option></select></div>
         <div class="field"><label>سطح دشواری</label><select class="select" data-question-difficulty><option value="Easy">آسان</option><option value="Medium" selected>متوسط</option><option value="Hard">سخت</option></select></div>
@@ -72,10 +73,11 @@
       <div class="field"><label>دسته‌بندی</label><select class="select" data-question-category><option>الگوریتم</option><option>ساختمان داده</option><option>پایگاه داده</option></select></div>
       <div id="mcqOptions">
         <label style="font-size:12.5px;font-weight:700;display:block;margin-bottom:7px">گزینه‌ها</label>
-        <div class="field"><div class="checkbox-row"><input type="radio" name="correct" checked><input class="input" data-question-option placeholder="گزینه ۱ (صحیح)" style="flex:1"></div></div>
-        <div class="field"><div class="checkbox-row"><input type="radio" name="correct"><input class="input" data-question-option placeholder="گزینه ۲" style="flex:1"></div></div>
-        <div class="field"><div class="checkbox-row"><input type="radio" name="correct"><input class="input" data-question-option placeholder="گزینه ۳" style="flex:1"></div></div>
-        <div class="field"><div class="checkbox-row"><input type="radio" name="correct"><input class="input" data-question-option placeholder="گزینه ۴" style="flex:1"></div></div>
+        <div class="field"><input class="input" data-question-option placeholder="گزینه ۱"></div>
+        <div class="field"><input class="input" data-question-option placeholder="گزینه ۲"></div>
+        <div class="field"><input class="input" data-question-option placeholder="گزینه ۳"></div>
+        <div class="field"><input class="input" data-question-option placeholder="گزینه ۴"></div>
+        <div class="field"><label for="correctOption">گزینه صحیح</label><select class="select" id="correctOption"><option value="">انتخاب گزینه صحیح</option><option value="1">۱</option><option value="2">۲</option><option value="3">۳</option><option value="4">۴</option></select></div>
       </div>
       <div id="matchingOptions" hidden>
         <label style="font-size:12.5px;font-weight:700;display:block;margin-bottom:7px">جفت‌های وصل‌کردنی</label>
@@ -96,10 +98,41 @@
 <script src="assets/js/app.js"></script>
 <script src="assets/js/api.js"></script>
 <script>
-  document.getElementById("qType").addEventListener("change", function(){
-    document.getElementById("mcqOptions").style.display = this.value === "MultipleChoice" ? "block" : "none";
-    document.getElementById("matchingOptions").hidden = this.value !== "Matching";
-  });
+(() => {
+ const api=window.MftApi, dept=document.getElementById('questionDepartment'), modal=document.getElementById('questionModal'), correct=document.getElementById('correctOption');
+ const inputs=[...document.querySelectorAll('[data-question-option]')];
+ const notify=(m,t='info')=>window.showToast?.(m,t);
+ const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+ async function loadDepartments(){
+  try{
+   const rows=await api.request('/departments');
+   dept.innerHTML='<option value="">انتخاب دپارتمان</option>'+rows.filter(x=>x.isActive!==false).map(x=>'<option value="'+x.id+'">'+esc(x.name)+'</option>').join('');
+   const me=await api.request('/auth/me').catch(()=>null);
+   if(me?.departmentId) dept.value=me.departmentId;
+   if(rows.length===1) dept.value=rows[0].id;
+  }catch(e){dept.innerHTML='<option value="">دریافت دپارتمان ناموفق بود</option>';notify(e.message,'danger');}
+ }
+ document.getElementById('qType').addEventListener('change',function(){
+  document.getElementById('mcqOptions').style.display=this.value==='MultipleChoice'?'block':'none';
+  document.getElementById('matchingOptions').hidden=this.value!=='Matching';
+ });
+ document.querySelector('[data-question-save]').addEventListener('click',async()=>{
+  const text=document.querySelector('[data-question-text]').value.trim(), type=document.getElementById('qType').value;
+  const options=inputs.map(x=>x.value.trim()).filter(Boolean), idx=Number(correct.value)-1;
+  if(!text)return notify('متن سؤال را وارد کنید.','warn');
+  if(!dept.value)return notify('یک دپارتمان معتبر انتخاب کنید.','warn');
+  if(type==='MultipleChoice'&&(options.length!==4||!correct.value||!options[idx]))return notify('هر چهار گزینه را وارد و گزینه صحیح را انتخاب کنید.','warn');
+  const body={text,departmentId:dept.value,category:document.querySelector('[data-question-category]').value,type,difficulty:document.querySelector('[data-question-difficulty]').value,options:type==='MultipleChoice'?options:[],correctAnswer:type==='MultipleChoice'?options[idx]:null,score:1};
+  try{
+   await api.request('/questions',{method:'POST',body:JSON.stringify(body)});
+   notify('سؤال با موفقیت ذخیره شد.','ok');modal.classList.remove('show');
+   document.querySelector('[data-question-text]').value='';inputs.forEach(x=>x.value='');correct.value='';
+   const rows=await api.request('/questions'), tbody=document.querySelector('body[data-active="bank"] table tbody');
+   if(tbody)tbody.innerHTML=rows.map(r=>'<tr><td>'+esc(r.text)+'</td><td>'+esc(r.category)+'</td><td>'+esc(r.type)+'</td><td>'+esc(r.difficulty)+'</td><td>—</td></tr>').join('');
+  }catch(e){notify(e.message||'ذخیره سؤال ناموفق بود.','danger');}
+ });
+ loadDepartments();
+})();
 </script>
 </body>
 </html>
