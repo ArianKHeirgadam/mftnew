@@ -193,7 +193,6 @@ using (var scope = app.Services.CreateScope())
                     ?? "",
 
                 Role = UserRole.SuperAdmin,
-                MustChangePassword = false,
                 IsActive = true
             });
 
@@ -240,7 +239,6 @@ using (var scope = app.Services.CreateScope())
                 Mobile = "",
 
                 Role = UserRole.SuperAdmin,
-                MustChangePassword = false,
                 IsActive = true
             });
 
