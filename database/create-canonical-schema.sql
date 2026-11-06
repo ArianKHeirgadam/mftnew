@@ -234,6 +234,41 @@ CREATE INDEX IX_StudentAnswers_ExamAttemptId ON dbo.StudentAnswers(ExamAttemptId
 CREATE INDEX IX_StudentAnswers_ExamQuestionId ON dbo.StudentAnswers(ExamQuestionId);
 CREATE UNIQUE INDEX UX_StudentAnswers_Attempt_Question ON dbo.StudentAnswers(ExamAttemptId, ExamQuestionId);
 
+-- Operational tables used by the canonical notifications, settings and attendance APIs.
+CREATE TABLE dbo.Notifications (
+    Id bigint IDENTITY(1,1) NOT NULL CONSTRAINT PK_Notifications PRIMARY KEY,
+    UserId bigint NOT NULL,
+    Title nvarchar(250) NOT NULL,
+    Message nvarchar(max) NOT NULL,
+    IsRead bit NOT NULL CONSTRAINT DF_Notifications_IsRead DEFAULT (0),
+    CreatedAt datetime2 NOT NULL CONSTRAINT DF_Notifications_CreatedAt DEFAULT SYSUTCDATETIME(),
+    CONSTRAINT FK_Notifications_Users FOREIGN KEY (UserId) REFERENCES dbo.Users(Id) ON DELETE CASCADE
+);
+CREATE INDEX IX_Notifications_UserId_CreatedAt ON dbo.Notifications(UserId, CreatedAt DESC);
+
+CREATE TABLE dbo.AppSettings (
+    Id bigint IDENTITY(1,1) NOT NULL CONSTRAINT PK_AppSettings PRIMARY KEY,
+    [Key] nvarchar(100) NOT NULL,
+    [Value] nvarchar(max) NOT NULL,
+    UpdatedAt datetime2 NOT NULL CONSTRAINT DF_AppSettings_UpdatedAt DEFAULT SYSUTCDATETIME()
+);
+CREATE UNIQUE INDEX UX_AppSettings_Key ON dbo.AppSettings([Key]);
+
+CREATE TABLE dbo.AttendanceRecords (
+    Id bigint IDENTITY(1,1) NOT NULL CONSTRAINT PK_AttendanceRecords PRIMARY KEY,
+    StudentUserId bigint NOT NULL,
+    DepartmentId bigint NOT NULL,
+    RecordedByUserId bigint NOT NULL,
+    AttendanceDate date NOT NULL,
+    Status nvarchar(20) NOT NULL,
+    CreatedAt datetime2 NOT NULL CONSTRAINT DF_AttendanceRecords_CreatedAt DEFAULT SYSUTCDATETIME(),
+    CONSTRAINT FK_AttendanceRecords_Student FOREIGN KEY (StudentUserId) REFERENCES dbo.Users(Id) ON DELETE CASCADE,
+    CONSTRAINT FK_AttendanceRecords_Department FOREIGN KEY (DepartmentId) REFERENCES dbo.Departments(Id) ON DELETE CASCADE,
+    CONSTRAINT FK_AttendanceRecords_RecordedBy FOREIGN KEY (RecordedByUserId) REFERENCES dbo.Users(Id) ON DELETE NO ACTION
+);
+CREATE UNIQUE INDEX UX_AttendanceRecords_Student_Date ON dbo.AttendanceRecords(StudentUserId, AttendanceDate);
+CREATE INDEX IX_AttendanceRecords_Department_Date ON dbo.AttendanceRecords(DepartmentId, AttendanceDate);
+
 INSERT dbo.Roles(Id, Name) VALUES
     (1, N'SuperAdmin'),
     (2, N'DepartmentAdmin'),
