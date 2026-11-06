@@ -82,6 +82,8 @@ public sealed class CanonicalExamsController(
         var exam = await academic.Exams.FirstOrDefaultAsync(x => x.Id == id, ct);
         if (exam is null) return NotFound();
         if (!await CanManage(exam, ct)) return Forbid();
+        if (await academic.ExamAttempts.AnyAsync(x => x.ExamId == id, ct))
+            return Conflict(new { message = "پس از ثبت اولین تلاش دانشجو، ساختار آزمون و سؤال‌های آن قابل تغییر نیستند تا سوابق پاسخ‌ها مخدوش نشوند." });
         var validation = await Validate(request, ct);
         if (validation is not null) return validation;
         exam.Title = request.Title.Trim();
