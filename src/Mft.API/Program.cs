@@ -23,6 +23,12 @@ builder.Services.AddDbContext<AppDbContext>(options =>
     options.UseSqlServer(
         builder.Configuration.GetConnectionString("DefaultConnection")));
 
+ // Canonical identity mappings use bigint IDs and normalized UserRoles/Roles.
+ // The legacy AppDbContext remains temporarily for modules not yet cut over.
+builder.Services.AddDbContext<CanonicalIdentityDbContext>(options =>
+    options.UseSqlServer(
+        builder.Configuration.GetConnectionString("DefaultConnection")));
+
 builder.Services.AddScoped<IAuthService, AuthService>();
 builder.Services.AddScoped<ITokenService, TokenService>();
 
