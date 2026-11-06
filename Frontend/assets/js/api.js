@@ -344,13 +344,21 @@
     if (!document.body.matches('[data-active="dashboard"]')) return;
     const role = (currentUser()?.role || '').toLowerCase();
     if (role === 'superadmin') {
-      const [activity, notifications] = await Promise.all([request('/dashboard/activity'), request('/notifications').catch(() => [])]);
+      const [activity, departments, notifications] = await Promise.all([
+        request('/dashboard/activity'),
+        request('/reports/departments').catch(() => []),
+        request('/notifications').catch(() => [])
+      ]);
+      window.MftChartData = { ...(window.MftChartData || {}), activity, departments };
+      document.dispatchEvent(new Event('mft:data-ready'));
       const activityList = $('#dashboardRecentActivity');
       if (activityList) activityList.innerHTML = activity.length ? activity.slice(-5).reverse().map(item => `<li><b>${new Date(item.date).toLocaleDateString('fa-IR')}</b><div class="text-soft text-sm">${faNumber(item.count)} تلاش آزمون ثبت شده است.</div></li>`).join('') : '<li class="text-soft">در بازه اخیر فعالیت آزمونی ثبت نشده است.</li>';
       const unreadCount = $('#dashboardUnreadCount');
       if (unreadCount) unreadCount.textContent = `${faNumber(notifications.filter(item => !item.isRead).length)} خوانده‌نشده`;
       const notificationList = $('#dashboardRecentNotifications');
-      if (notificationList) notificationList.innerHTML = notifications.length ? notifications.slice(0, 3).map(item => `<li class="alert alert-info"><b>${escapeHtml(item.title)}</b><div>${escapeHtml(item.message)}</div></li>`).join('') : '<li class="text-soft">اعلانی ثبت نشده است.</li>';
+      if (notificationList) notificationList.innerHTML = notifications.length
+        ? notifications.slice(0, 3).map(item => `<li class="alert alert-info"><b>${escapeHtml(item.title)}</b><div>${escapeHtml(item.message)}</div></li>`).join('')
+        : '<li class="text-soft">اعلانی ثبت نشده است.</li>';
     }
     if (role === 'department') {
       const exams = await request('/exams');
@@ -408,6 +416,22 @@
     const blob = new Blob(['\uFEFF', csv], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a'); link.href = url; link.download = 'mft-department-report.csv'; link.click(); URL.revokeObjectURL(url);
+  }
+
+  async function loadNotificationIndicators() {
+    const [unread, recent] = await Promise.all([
+      request('/notifications?unread=true').catch(() => []),
+      request('/notifications').catch(() => [])
+    ]);
+    const count = Array.isArray(unread) ? unread.length : 0;
+    $('[data-notification-count]').forEach(element => {
+      element.textContent = faNumber(count);
+      element.hidden = count === 0;
+    });
+    const recentBox = $('#topbarRecentNotifications');
+    if (recentBox) recentBox.innerHTML = recent.length
+      ? recent.slice(0, 4).map(item => `<a href="notifications.html" style="display:block;padding:8px 10px;border-bottom:1px solid var(--border);white-space:normal"><b>${escapeHtml(item.title)}</b><div class="text-soft text-sm">${escapeHtml(item.message)}</div></a>`).join('')
+      : '<div class="text-soft">اعلانی وجود ندارد.</div>';
   }
 
   async function loadNotifications() {
@@ -514,7 +538,7 @@
     const averagePassRate = rows.length ? rows.reduce((sum, row) => sum + Number(row.passRate || 0), 0) / rows.length : 0;
     const totalStudents = rows.reduce((sum, row) => sum + Number(row.students || 0), 0);
     const totalAttempts = rows.reduce((sum, row) => sum + Number(row.participation || 0), 0);
-    const metrics = { exams: totalExams, passRate: averagePassRate, participation: totalStudents ? Math.min(100, totalAttempts / totalStudents * 100) : 0 };
+    const metrics = { exams: totalExams, passRate: averagePassRate, participation: totalAttempts, students: totalStudents };
     $$('body[data-active="reports"] [data-metric]').forEach(element => {
       const key = element.dataset.metric;
       if (key in metrics) element.textContent = faNumber(Math.round(metrics[key] * 10) / 10);
@@ -923,6 +947,7 @@
     if ($('#departmentExamsBody')) $('#departmentExamsBody').replaceChildren();
     await safe(async () => {
       await loadCurrentUser();
+      await loadNotificationIndicators();
       const isSuperAdmin = (currentUser()?.role || '').toLowerCase() === 'superadmin';
       $$('[data-create-department], [data-create-manager]').forEach(button => { button.hidden = !isSuperAdmin; });
       $$('[data-create-teacher]').forEach(button => { button.hidden = !['superadmin', 'department'].includes((currentUser()?.role || '').toLowerCase()); });
