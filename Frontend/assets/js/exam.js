@@ -190,6 +190,7 @@
           <input class="input" id="pdfOnlyAnswerFile" type="file" accept=".pdf,.jpg,.jpeg,.png,application/pdf,image/jpeg,image/png">
           <small class="text-soft">می‌توانید فایل PDF چندصفحه‌ای یا تصویر واضح پاسخ‌نامه را ارسال کنید.</small>
         </div>
+        <div id="pdfOnlyPreview" style="margin-top:12px"></div>
         <div id="pdfOnlyUploadStatus" class="text-soft text-sm" aria-live="polite"></div>
         <div class="flex gap-8" style="margin-top:18px;flex-wrap:wrap">
           <button type="button" class="btn btn-primary" id="pdfOnlyUpload">بارگذاری پاسخ‌نامه</button>
@@ -198,6 +199,22 @@
       document.getElementById('pdfOnlyDownload')?.addEventListener('click', async () => {
         try { await api.download(`/exam-files/exams/${encodeURIComponent(attempt.exam.id)}`); }
         catch (error) { toast(error.message || 'دانلود PDF ناموفق بود.', 'danger'); }
+      });
+      document.getElementById('pdfOnlyAnswerFile')?.addEventListener('change', event => {
+        const file = event.target.files?.[0];
+        const preview = document.getElementById('pdfOnlyPreview');
+        if (!preview) return;
+        preview.replaceChildren();
+        if (!file) return;
+        const url = URL.createObjectURL(file);
+        const ext = file.name.toLowerCase().split('.').pop();
+        if (ext === 'pdf') {
+          const frame = document.createElement('iframe');
+          frame.src = url; frame.title = 'پیش‌نمایش پاسخ‌نامه'; frame.style.width = '100%'; frame.style.height = '420px'; frame.style.border = '1px solid var(--border)'; preview.append(frame);
+        } else {
+          const image = document.createElement('img');
+          image.src = url; image.alt = 'پیش‌نمایش پاسخ‌نامه'; image.style.maxWidth = '100%'; image.style.maxHeight = '420px'; image.style.objectFit = 'contain'; preview.append(image);
+        }
       });
       document.getElementById('pdfOnlyUpload')?.addEventListener('click', async () => {
         const input = document.getElementById('pdfOnlyAnswerFile');
