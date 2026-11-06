@@ -20,6 +20,9 @@ public sealed class CanonicalAcademicDbContext(
     public DbSet<CanonicalExam> Exams => Set<CanonicalExam>();
     public DbSet<CanonicalExamSection> ExamSections => Set<CanonicalExamSection>();
     public DbSet<CanonicalExamQuestion> ExamQuestions => Set<CanonicalExamQuestion>();
+    public DbSet<CanonicalExamAttempt> ExamAttempts => Set<CanonicalExamAttempt>();
+    public DbSet<CanonicalExamAttemptStatus> ExamAttemptStatuses => Set<CanonicalExamAttemptStatus>();
+    public DbSet<CanonicalStudentAnswer> StudentAnswers => Set<CanonicalStudentAnswer>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -121,6 +124,40 @@ public sealed class CanonicalAcademicDbContext(
             e.HasOne<CanonicalExamSection>().WithMany().HasForeignKey(x => x.ExamSectionId).OnDelete(DeleteBehavior.Cascade);
             e.HasOne<CanonicalQuestion>().WithMany().HasForeignKey(x => x.QuestionId).OnDelete(DeleteBehavior.NoAction);
         });
+        modelBuilder.Entity<CanonicalExamAttemptStatus>(e =>
+        {
+            e.ToTable("ExamAttemptStatuses"); e.HasKey(x => x.Id);
+            e.Property(x => x.Id).HasColumnType("tinyint").ValueGeneratedNever();
+            e.Property(x => x.Code).HasMaxLength(30).IsRequired();
+            e.HasIndex(x => x.Code).IsUnique();
+        });
+        modelBuilder.Entity<CanonicalExamAttempt>(e =>
+        {
+            e.ToTable("ExamAttempts"); e.HasKey(x => x.Id);
+            e.Property(x => x.Id).HasColumnType("bigint").UseIdentityColumn();
+            e.Property(x => x.StartedAt).HasColumnType("datetime2").HasDefaultValueSql("sysutcdatetime()");
+            e.Property(x => x.SubmittedAt).HasColumnType("datetime2");
+            e.Property(x => x.AutoGradedScore).HasPrecision(7, 2);
+            e.Property(x => x.FinalScore).HasPrecision(7, 2);
+            e.HasIndex(x => new { x.ExamId, x.StudentUserId }).IsUnique();
+            e.HasIndex(x => x.StudentUserId);
+            e.HasOne<CanonicalExam>().WithMany().HasForeignKey(x => x.ExamId).OnDelete(DeleteBehavior.NoAction);
+            e.HasOne<CanonicalUser>().WithMany().HasForeignKey(x => x.StudentUserId).OnDelete(DeleteBehavior.NoAction);
+            e.HasOne<CanonicalExamAttemptStatus>().WithMany().HasForeignKey(x => x.StatusId).OnDelete(DeleteBehavior.NoAction);
+        });
+        modelBuilder.Entity<CanonicalStudentAnswer>(e =>
+        {
+            e.ToTable("StudentAnswers"); e.HasKey(x => x.Id);
+            e.Property(x => x.Id).HasColumnType("bigint").UseIdentityColumn();
+            e.Property(x => x.AnswerJson).HasColumnType("nvarchar(max)").IsRequired();
+            e.Property(x => x.Score).HasPrecision(6, 2);
+            e.Property(x => x.GradedAt).HasColumnType("datetime2");
+            e.HasIndex(x => x.ExamAttemptId); e.HasIndex(x => x.ExamQuestionId);
+            e.HasIndex(x => new { x.ExamAttemptId, x.ExamQuestionId }).IsUnique();
+            e.HasOne<CanonicalExamAttempt>().WithMany().HasForeignKey(x => x.ExamAttemptId).OnDelete(DeleteBehavior.Cascade);
+            e.HasOne<CanonicalExamQuestion>().WithMany().HasForeignKey(x => x.ExamQuestionId).OnDelete(DeleteBehavior.NoAction);
+            e.HasOne<CanonicalUser>().WithMany().HasForeignKey(x => x.GradedByUserId).OnDelete(DeleteBehavior.NoAction);
+        });
     }
 }
 
@@ -134,3 +171,7 @@ public sealed class CanonicalEssayGradingCriterion { public long Id { get; set; 
 public sealed class CanonicalExam { public long Id { get; set; } public string Title { get; set; } = ""; public long ExamCategoryId { get; set; } public long DepartmentId { get; set; } public long CreatedByUserId { get; set; } public DateTime StartAt { get; set; } public DateTime EndAt { get; set; } public int DurationMinutes { get; set; } public bool IsPublished { get; set; } public DateTime CreatedAt { get; set; } }
 public sealed class CanonicalExamSection { public long Id { get; set; } public long ExamId { get; set; } public long SkillId { get; set; } public int DurationMinutes { get; set; } public int DisplayOrder { get; set; } public decimal WeightPercent { get; set; } }
 public sealed class CanonicalExamQuestion { public long Id { get; set; } public long ExamSectionId { get; set; } public long QuestionId { get; set; } public int DisplayOrder { get; set; } public decimal? PointsOverride { get; set; } }
+
+public sealed class CanonicalExamAttemptStatus { public byte Id { get; set; } public string Code { get; set; } = ""; }
+public sealed class CanonicalExamAttempt { public long Id { get; set; } public long ExamId { get; set; } public long StudentUserId { get; set; } public DateTime StartedAt { get; set; } public DateTime? SubmittedAt { get; set; } public byte StatusId { get; set; } public decimal? AutoGradedScore { get; set; } public decimal? FinalScore { get; set; } }
+public sealed class CanonicalStudentAnswer { public long Id { get; set; } public long ExamAttemptId { get; set; } public long ExamQuestionId { get; set; } public string AnswerJson { get; set; } = ""; public bool IsAutoGraded { get; set; } public decimal? Score { get; set; } public long? GradedByUserId { get; set; } public DateTime? GradedAt { get; set; } }
