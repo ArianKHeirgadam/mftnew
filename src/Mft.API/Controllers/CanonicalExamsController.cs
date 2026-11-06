@@ -21,9 +21,10 @@ public sealed class CanonicalExamsController(
     {
         var isStudent = User.IsInRole("Student");
         var studentId = CurrentUserId;
+        if (isStudent && studentId is null) return Unauthorized();
         var q = academic.Exams.AsNoTracking().AsQueryable();
         if (isStudent)
-            q = q.Where(x => x.IsPublished && x.ClassId.HasValue &&
+            q = q.Where(x => x.IsPublished && x.DepartmentId == CurrentDepartmentId && x.ClassId.HasValue &&
                 academic.ClassMembers.Any(m => m.ClassId == x.ClassId.Value && m.StudentUserId == studentId));
         else if (User.IsInRole("Department"))
             q = q.Where(x => x.DepartmentId == CurrentDepartmentId);
@@ -51,7 +52,8 @@ public sealed class CanonicalExamsController(
     {
         var exam = await academic.Exams.AsNoTracking().FirstOrDefaultAsync(x => x.Id == id, ct);
         if (exam is null) return NotFound();
-        var isEnrolledStudent = User.IsInRole("Student") && exam.IsPublished && exam.ClassId.HasValue &&
+        var isEnrolledStudent = User.IsInRole("Student") && exam.IsPublished &&
+            exam.DepartmentId == CurrentDepartmentId && exam.ClassId.HasValue &&
             await academic.ClassMembers.AnyAsync(m => m.ClassId == exam.ClassId.Value && m.StudentUserId == CurrentUserId, ct);
         if (!await CanManage(exam, ct) && !isEnrolledStudent)
             return Forbid();
