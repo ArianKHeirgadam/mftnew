@@ -1175,6 +1175,7 @@ public class ReportsController(AppDbContext db) : ControllerBase
 
         var rows = await q.Select(d => new
         {
+            departmentId = (Guid?)d.Id,
             department = d.Name,
             students = db.Users.Count(u => u.DepartmentId == d.Id && u.Role == UserRole.Student),
             teachers = db.Users.Count(u => u.DepartmentId == d.Id && u.Role == UserRole.Teacher),
@@ -1194,6 +1195,7 @@ public class ReportsController(AppDbContext db) : ControllerBase
             {
                 rows.Add(new
                 {
+                    departmentId = (Guid?)null,
                     department = "بدون دپارتمان",
                     students = unassignedStudents,
                     teachers = unassignedTeachers,
