@@ -533,7 +533,7 @@
     if (!document.body.matches('[data-active="reports"]')) return;
     const rows = await request('/reports/departments');
     const table = $('body[data-active="reports"] table tbody');
-    if (table) renderRows('body[data-active="reports"] table tbody', rows, row => `<tr><td>${escapeHtml(row.department)}</td><td>${faNumber(row.exams)}</td><td>${Number(row.averageScore || 0).toLocaleString('fa-IR')}</td><td>${Number(row.passRate || 0).toLocaleString('fa-IR', { maximumFractionDigits: 1 })}%</td><td>${faNumber(row.participation)}</td></tr>`, 5);
+    if (table) renderRows('body[data-active="reports"] table tbody', rows, row => `<tr><td>${escapeHtml(row.department)}</td><td>${faNumber(row.students)}</td><td>${faNumber(row.teachers)}</td><td>${faNumber(row.exams)}</td><td>${Number(row.averageScore || 0).toLocaleString('fa-IR')}</td><td>${Number(row.passRate || 0).toLocaleString('fa-IR', { maximumFractionDigits: 1 })}%</td><td>${faNumber(row.participation)}</td></tr>`, 7);
     const totalExams = rows.reduce((sum, row) => sum + Number(row.exams || 0), 0);
     const averagePassRate = rows.length ? rows.reduce((sum, row) => sum + Number(row.passRate || 0), 0) / rows.length : 0;
     const totalStudents = rows.reduce((sum, row) => sum + Number(row.students || 0), 0);
