@@ -163,6 +163,9 @@ public sealed class CanonicalUsersController(CanonicalIdentityDbContext db) : Co
             return BadRequest(new { message = "رمز عبور باید حداقل ۸ کاراکتر باشد." });
         if (string.IsNullOrWhiteSpace(phoneNumber))
             return BadRequest(new { message = "شماره تماس الزامی است؛ شماره تماس در دیتابیس یکتا است." });
+        if (username.Length > 100 || fullName.Length > 200 || phoneNumber.Length > 20 ||
+            (request.Email?.Length ?? 0) > 256)
+            return BadRequest(new { message = "طول یکی از فیلدها از محدودیت دیتابیس بیشتر است." });
 
         var departmentId = User.IsInRole("Department") || User.IsInRole("Teacher")
             ? User.CanonicalDepartmentId()
@@ -222,6 +225,9 @@ public sealed class CanonicalUsersController(CanonicalIdentityDbContext db) : Co
         var phoneNumber = request.Mobile?.Trim();
         if (string.IsNullOrWhiteSpace(phoneNumber))
             return BadRequest(new { message = "شماره تماس الزامی است." });
+        if (request.FullName.Trim().Length > 200 || phoneNumber.Length > 20 ||
+            (request.Email?.Length ?? 0) > 256)
+            return BadRequest(new { message = "طول یکی از فیلدها از محدودیت دیتابیس بیشتر است." });
         if (await db.Users.AnyAsync(item => item.Id != id && item.PhoneNumber == phoneNumber, ct))
             return Conflict(new { message = "این شماره تماس قبلاً ثبت شده است." });
 
@@ -288,6 +294,9 @@ public sealed class CanonicalUsersController(CanonicalIdentityDbContext db) : Co
         var phoneNumber = request.Mobile?.Trim();
         if (string.IsNullOrWhiteSpace(phoneNumber))
             return BadRequest(new { message = "شماره تماس الزامی است." });
+        if (request.FullName.Trim().Length > 200 || phoneNumber.Length > 20 ||
+            (request.Email?.Length ?? 0) > 256)
+            return BadRequest(new { message = "طول یکی از فیلدها از محدودیت دیتابیس بیشتر است." });
         if (await db.Users.AnyAsync(item => item.Id != id.Value && item.PhoneNumber == phoneNumber, ct))
             return Conflict(new { message = "این شماره تماس قبلاً ثبت شده است." });
 
@@ -395,6 +404,8 @@ public sealed class CanonicalDepartmentsController(CanonicalIdentityDbContext db
                 .SingleOrDefaultAsync(item => item.Id == request.ManagerUserId.Value, ct);
             if (manager is null || !manager.UserRoles.Any(item => item.Role.Name == CanonicalRoleNames.DepartmentAdmin))
                 return BadRequest(new { message = "مدیر انتخاب‌شده باید حسابی با نقش DepartmentAdmin داشته باشد." });
+            if (manager.DepartmentId.HasValue)
+                return BadRequest(new { message = "این مدیر قبلاً به یک دپارتمان متصل شده است." });
         }
 
         var department = new CanonicalDepartment
@@ -440,6 +451,8 @@ public sealed class CanonicalDepartmentsController(CanonicalIdentityDbContext db
                 .SingleOrDefaultAsync(item => item.Id == request.ManagerUserId.Value, ct);
             if (newManager is null || !newManager.UserRoles.Any(item => item.Role.Name == CanonicalRoleNames.DepartmentAdmin))
                 return BadRequest(new { message = "مدیر انتخاب‌شده باید حسابی با نقش DepartmentAdmin داشته باشد." });
+            if (newManager.DepartmentId.HasValue && newManager.DepartmentId.Value != id)
+                return BadRequest(new { message = "این مدیر قبلاً به دپارتمان دیگری متصل شده است." });
         }
 
         var previousManagers = await db.Users
