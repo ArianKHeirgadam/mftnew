@@ -111,10 +111,14 @@ public sealed class CanonicalClassesController(
 
         await using var transaction = await academic.Database.BeginTransactionAsync(ct);
         var current = await academic.ClassMembers.Where(x => x.ClassId == id).ToListAsync(ct);
-        academic.ClassMembers.RemoveRange(current);
-        if (validIds.Count > 0)
-            academic.ClassMembers.AddRange(validIds.Select(studentId =>
-                new CanonicalClassMember { ClassId = id, StudentUserId = studentId, AddedAt = DateTime.UtcNow }));
+        var desiredIds = validIds.ToHashSet();
+        var currentIds = current.Select(x => x.StudentUserId).ToHashSet();
+
+        academic.ClassMembers.RemoveRange(current.Where(x => !desiredIds.Contains(x.StudentUserId)));
+        var addedAt = DateTime.UtcNow;
+        academic.ClassMembers.AddRange(desiredIds.Except(currentIds).Select(studentId =>
+            new CanonicalClassMember { ClassId = id, StudentUserId = studentId, AddedAt = addedAt }));
+
         await academic.SaveChangesAsync(ct);
         await transaction.CommitAsync(ct);
 
