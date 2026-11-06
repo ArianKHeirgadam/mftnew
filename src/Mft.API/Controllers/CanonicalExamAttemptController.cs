@@ -163,27 +163,33 @@ public sealed class CanonicalExamAttemptController(
             var auto = false;
             if (string.Equals(q.TypeCode, "MultipleChoice", StringComparison.OrdinalIgnoreCase))
             {
-                if (!answer.Value.TryGetProperty("selectedOptionId", out var optionNode) || !optionNode.TryGetInt64(out var optionId))
-                    return BadRequest(new { message = "پاسخ سؤال چهارگزینه‌ای معتبر نیست." });
-                var option = await academic.MultipleChoiceOptions.AsNoTracking()
-                    .FirstOrDefaultAsync(x => x.Id == optionId && x.QuestionId == q.QuestionId, ct);
-                if (option is null) return BadRequest(new { message = "گزینه انتخاب‌شده متعلق به این سؤال نیست." });
-                var correct = await academic.MultipleChoiceOptions.AsNoTracking()
-                    .AnyAsync(x => x.QuestionId == q.QuestionId && x.IsCorrect && x.Id == optionId, ct);
-                score = correct ? q.Points : 0m; auto = true;
+                var hasSelection = answer.Value.TryGetProperty("selectedOptionId", out var optionNode) &&
+                    optionNode.ValueKind == JsonValueKind.Number && optionNode.TryGetInt64(out var optionId);
+                if (hasSelection)
+                {
+                    var option = await academic.MultipleChoiceOptions.AsNoTracking()
+                        .FirstOrDefaultAsync(x => x.Id == optionId && x.QuestionId == q.QuestionId, ct);
+                    if (option is null) return BadRequest(new { message = "گزینه انتخاب‌شده متعلق به این سؤال نیست." });
+                    var correct = await academic.MultipleChoiceOptions.AsNoTracking()
+                        .AnyAsync(x => x.QuestionId == q.QuestionId && x.IsCorrect && x.Id == optionId, ct);
+                    score = correct ? q.Points : 0m;
+                }
+                else score = 0m;
+                auto = true;
             }
             else if (string.Equals(q.TypeCode, "Matching", StringComparison.OrdinalIgnoreCase))
             {
-                if (!answer.Value.TryGetProperty("pairs", out var pairs) || pairs.ValueKind != JsonValueKind.Array)
-                    return BadRequest(new { message = "پاسخ سؤال وصل‌کردنی معتبر نیست." });
                 var expected = await academic.MatchingPairs.AsNoTracking().Where(x => x.QuestionId == q.QuestionId)
                     .Select(x => new { x.LeftItem, x.RightItem }).ToListAsync(ct);
-                var submitted = pairs.EnumerateArray().Select(x => new {
-                    LeftItem = x.GetProperty("leftItem").GetString() ?? "",
-                    RightItem = x.GetProperty("rightItem").GetString() ?? ""
-                }).ToList();
-                if (submitted.Count != expected.Count || submitted.Select(x => x.LeftItem).Distinct().Count() != submitted.Count)
-                    return BadRequest(new { message = "تعداد یا ساختار جفت‌های ارسالی صحیح نیست." });
+                var submitted = new List<(string LeftItem, string RightItem)>();
+                if (answer.Value.TryGetProperty("pairs", out var pairs) && pairs.ValueKind == JsonValueKind.Array)
+                    submitted = pairs.EnumerateArray().Select(x => (
+                        x.TryGetProperty("leftItem", out var left) ? left.GetString() ?? "" : "",
+                        x.TryGetProperty("rightItem", out var right) ? right.GetString() ?? "" : ""
+                    )).ToList();
+                if (submitted.Select(x => x.LeftItem).Distinct().Count() != submitted.Count ||
+                    submitted.Any(x => !expected.Any(e => e.LeftItem == x.LeftItem)))
+                    return BadRequest(new { message = "ساختار جفت‌های ارسالی صحیح نیست." });
                 var correctCount = expected.Count(e => submitted.Any(s => s.LeftItem == e.LeftItem && s.RightItem == e.RightItem));
                 score = expected.Count == 0 ? 0m : Math.Round(q.Points * correctCount / expected.Count, 2);
                 auto = true;
