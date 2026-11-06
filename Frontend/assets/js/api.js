@@ -429,8 +429,9 @@
       element.hidden = count === 0;
     });
     const recentBox = $('#topbarRecentNotifications');
-    if (recentBox) recentBox.innerHTML = recent.length
-      ? recent.slice(0, 4).map(item => `<a href="notifications.html" style="display:block;padding:8px 10px;border-bottom:1px solid var(--border);white-space:normal"><b>${escapeHtml(item.title)}</b><div class="text-soft text-sm">${escapeHtml(item.message)}</div></a>`).join('')
+    const recentRows = Array.isArray(recent) ? recent : [];
+    if (recentBox) recentBox.innerHTML = recentRows.length
+      ? recentRows.slice(0, 4).map(item => `<a href="notifications.html" style="display:block;padding:8px 10px;border-bottom:1px solid var(--border);white-space:normal"><b>${escapeHtml(item.title)}</b><div class="text-soft text-sm">${escapeHtml(item.message)}</div></a>`).join('')
       : '<div class="text-soft">اعلانی وجود ندارد.</div>';
   }
 
