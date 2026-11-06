@@ -24,7 +24,10 @@ public sealed class CanonicalExamAttemptController(
         var now = DateTime.UtcNow;
         var exam = await academic.Exams.AsNoTracking().FirstOrDefaultAsync(x => x.Id == examId, ct);
         if (exam is null) return NotFound();
-        if (!exam.IsPublished || exam.DepartmentId != DepartmentId)
+        if (!exam.IsPublished || exam.DepartmentId != DepartmentId || !exam.ClassId.HasValue)
+            return Forbid();
+        if (!await academic.ClassMembers.AnyAsync(x =>
+            x.ClassId == exam.ClassId.Value && x.StudentUserId == StudentId.Value, ct))
             return Forbid();
         if (now < exam.StartAt || now > exam.EndAt)
             return Conflict(new { message = "آزمون در حال حاضر در بازه مجاز برگزاری نیست." });
