@@ -35,13 +35,9 @@
         apply(current === "dark" ? "light" : "dark");
       });
     });
-    // Topbar is rendered by app.js during DOMContentLoaded; keep newly
-    // inserted theme buttons wired and their icons synchronized.
-    const syncThemeControls = () => {
-      document.querySelectorAll("[data-theme-icon]").forEach((btn) => {
-        const icon = document.documentElement.getAttribute("data-theme") === "dark" ? ICONS.sun : ICONS.moon;
-        if (btn.innerHTML !== icon) btn.innerHTML = icon;
-      });
+    // app.js renders the topbar after this DOMContentLoaded handler.
+    // Bind the dynamically-created control only when app.js signals readiness.
+    function bindTopbarThemeControl() {
       document.querySelectorAll("[data-theme-toggle]").forEach((btn) => {
         if (btn.dataset.themeWired === "true") return;
         btn.dataset.themeWired = "true";
@@ -50,9 +46,12 @@
           apply(current === "dark" ? "light" : "dark");
         });
       });
-    };
-    syncThemeControls();
-    new MutationObserver(syncThemeControls).observe(document.body, { childList: true, subtree: true });
+      document.querySelectorAll("[data-theme-icon]").forEach((btn) => {
+        const icon = document.documentElement.getAttribute("data-theme") === "dark" ? ICONS.sun : ICONS.moon;
+        if (btn.innerHTML !== icon) btn.innerHTML = icon;
+      });
+    }
+    document.addEventListener("mft:topbar-ready", bindTopbarThemeControl);
     apply(document.documentElement.getAttribute("data-theme") || getPreferred());
   });
 })();
