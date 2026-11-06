@@ -97,7 +97,7 @@ public sealed class CanonicalAcademicDbContext(
         });
         modelBuilder.Entity<CanonicalClass>(e =>
         {
-            e.ToTable("Classes"); e.HasKey(x => x.Id);
+            e.ToTable("CanonicalClasses"); e.HasKey(x => x.Id);
             e.Property(x => x.Id).HasColumnType("bigint").UseIdentityColumn();
             e.Property(x => x.Name).HasMaxLength(200).IsRequired();
             e.Property(x => x.CreatedAt).HasColumnType("datetime2").HasDefaultValueSql("sysutcdatetime()");
@@ -106,7 +106,7 @@ public sealed class CanonicalAcademicDbContext(
         });
         modelBuilder.Entity<CanonicalClassMember>(e =>
         {
-            e.ToTable("ClassMembers"); e.HasKey(x => x.Id);
+            e.ToTable("CanonicalClassMembers"); e.HasKey(x => x.Id);
             e.Property(x => x.Id).HasColumnType("bigint").UseIdentityColumn();
             e.Property(x => x.AddedAt).HasColumnType("datetime2").HasDefaultValueSql("sysutcdatetime()");
             e.HasIndex(x => new { x.ClassId, x.StudentUserId }).IsUnique();
