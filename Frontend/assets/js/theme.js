@@ -39,7 +39,8 @@
     // inserted theme buttons wired and their icons synchronized.
     const syncThemeControls = () => {
       document.querySelectorAll("[data-theme-icon]").forEach((btn) => {
-        btn.innerHTML = document.documentElement.getAttribute("data-theme") === "dark" ? ICONS.sun : ICONS.moon;
+        const icon = document.documentElement.getAttribute("data-theme") === "dark" ? ICONS.sun : ICONS.moon;
+        if (btn.innerHTML !== icon) btn.innerHTML = icon;
       });
       document.querySelectorAll("[data-theme-toggle]").forEach((btn) => {
         if (btn.dataset.themeWired === "true") return;
