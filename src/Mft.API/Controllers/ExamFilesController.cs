@@ -143,6 +143,13 @@ public sealed class ExamFilesController(AppDbContext db, IWebHostEnvironment env
         if (attempt is null) return NotFound();
         if (attempt.Status != "InProgress" || DateTime.UtcNow > attempt.StartedAt.AddMinutes(attempt.Exam.DurationMinutes))
             return BadRequest(new { message = "مهلت بارگذاری پاسخ این آزمون به پایان رسیده است." });
+        var hasEssayQuestions = await db.ExamQuestions
+            .Where(item => item.ExamId == attempt.ExamId)
+            .Join(db.Questions, item => item.QuestionId, question => question.Id,
+                (item, question) => question.Type)
+            .AnyAsync(type => type == "Essay" || type == "Text", ct);
+        if (!hasEssayQuestions)
+            return BadRequest(new { message = "این آزمون سؤال تشریحی ندارد و بارگذاری پاسخ‌نامه جداگانه لازم نیست." });
 
         var saved = await SaveSubmissionFile(file, ct);
         if (saved is null) return BadRequest(new { message = "فایل پاسخ باید PDF، JPG، JPEG یا PNG معتبر و حداکثر ۲۰ مگابایت باشد." });
