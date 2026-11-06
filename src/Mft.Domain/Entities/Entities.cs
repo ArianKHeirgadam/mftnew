@@ -17,7 +17,6 @@ public class User
     public string FullName { get; set; } = "";
     public string? Email { get; set; }
     public string? Mobile { get; set; }
-    public bool MustChangePassword { get; set; }
     public Guid? DepartmentId { get; set; }
     public bool IsActive { get; set; } = true;
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
