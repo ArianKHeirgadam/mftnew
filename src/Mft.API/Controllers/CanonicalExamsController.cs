@@ -55,7 +55,7 @@ public sealed class CanonicalExamsController(
         var isEnrolledStudent = User.IsInRole("Student") && exam.IsPublished &&
             exam.DepartmentId == CurrentDepartmentId && exam.ClassId.HasValue &&
             await academic.ClassMembers.AnyAsync(m => m.ClassId == exam.ClassId.Value && m.StudentUserId == CurrentUserId, ct);
-        if (!await CanManage(exam, ct) && !isEnrolledStudent)
+        if (!CanManage(exam) && !isEnrolledStudent)
             return Forbid();
         var sections = await academic.ExamSections.AsNoTracking().Where(x => x.ExamId == id)
             .OrderBy(x => x.DisplayOrder).Select(x => new {
@@ -213,7 +213,7 @@ public sealed class CanonicalExamsController(
         await academic.SaveChangesAsync(ct);
     }
 
-    private async Task<bool> CanManage(CanonicalExam exam, CancellationToken ct)
+    private bool CanManage(CanonicalExam exam)
     {
         if (User.IsInRole("SuperAdmin")) return true;
         if (User.IsInRole("Teacher")) return exam.CreatedByUserId == CurrentUserId;
