@@ -28,11 +28,28 @@ public sealed class CanonicalQuestionsController(
         if (!string.IsNullOrWhiteSpace(search)) q = q.Where(x => x.Text.Contains(search));
         var rows = await q.OrderByDescending(x => x.Id).Select(x => new {
             x.Id, x.SkillId, x.QuestionTypeId, x.Text, x.Points, x.DifficultyLevel,
+            SkillName = academic.Skills.Where(s => s.Id == x.SkillId).Select(s => s.Name).FirstOrDefault(),
+            CategoryName = academic.ExamCategories.Where(cat => cat.Id == academic.Skills.Where(s => s.Id == x.SkillId).Select(s => s.ExamCategoryId).FirstOrDefault()).Select(cat => cat.Name).FirstOrDefault(),
+            QuestionTypeCode = academic.QuestionTypes.Where(t => t.Id == x.QuestionTypeId).Select(t => t.Code).FirstOrDefault(),
+            QuestionTypeName = academic.QuestionTypes.Where(t => t.Id == x.QuestionTypeId).Select(t => t.Name).FirstOrDefault(),
             Options = academic.MultipleChoiceOptions.Where(o => o.QuestionId == x.Id).OrderBy(o => o.DisplayOrder).Select(o => new { o.Id, o.OptionText, o.IsCorrect, o.DisplayOrder }).ToList(),
             MatchingPairs = academic.MatchingPairs.Where(p => p.QuestionId == x.Id).OrderBy(p => p.DisplayOrder).Select(p => new { p.Id, p.LeftItem, p.RightItem, p.DisplayOrder }).ToList(),
             Criteria = academic.EssayGradingCriteria.Where(c => c.QuestionId == x.Id).Select(c => new { c.Id, c.CriteriaText, c.MaxPoints }).ToList()
         }).ToListAsync(ct);
         return Ok(rows);
+    }
+
+    [HttpGet("lookups")]
+    public async Task<IActionResult> Lookups(CancellationToken ct)
+    {
+        var categories = await academic.ExamCategories.AsNoTracking()
+            .OrderBy(x => x.Name).Select(x => new { x.Id, x.Name }).ToListAsync(ct);
+        var skills = await academic.Skills.AsNoTracking()
+            .OrderBy(x => x.ExamCategoryId).ThenBy(x => x.Name)
+            .Select(x => new { x.Id, x.Name, x.ExamCategoryId }).ToListAsync(ct);
+        var types = await academic.QuestionTypes.AsNoTracking()
+            .OrderBy(x => x.Id).Select(x => new { x.Id, x.Code, x.Name }).ToListAsync(ct);
+        return Ok(new { Categories = categories, Skills = skills, QuestionTypes = types });
     }
 
     [HttpGet("{id:long}")]
