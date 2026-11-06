@@ -133,3 +133,18 @@ The teacher-facing question bank and exam wizard now use the canonical bigint ac
 - The student canonical workflow enforces one attempt per student per exam. An in-progress attempt may be resumed using its existing attempt ID; a submitted attempt cannot be started again.
 
 These routes and UI changes have been checked for JavaScript syntax, but have not been built against .NET or exercised against SQL Server in this environment.
+
+## Canonical classes, membership, and exam audience
+
+Canonical exams are assigned to one canonical class. Student access is checked against the class membership table; belonging to the same department alone is not sufficient.
+
+- `GET /api/canonical/classes` — lists classes available to the current academic role. SuperAdmin can see all classes; DepartmentAdmin and Teacher are limited to their own department.
+- `POST /api/canonical/classes` — creates a class with `name` and `departmentId`. For non-SuperAdmin roles, the authenticated department is authoritative.
+- `GET /api/canonical/classes/{id}/members` — returns the selected class and its enrolled students.
+- `PUT /api/canonical/classes/{id}/members` — replaces the class roster using `studentIds` (canonical bigint user IDs). Every member must be an active Student in the same department.
+- `POST /api/canonical/exams` now requires `classId` in addition to the exam fields. The class must belong to the exam department.
+- Student `GET /api/canonical/exams` returns only published exams whose assigned class contains that student.
+- Student `GET /api/canonical/exams/{id}` and `POST /api/canonical/exams/{id}/attempt/start` also enforce class membership on the server. Hiding an exam in the UI is not the security boundary.
+- Existing canonical exams with a null `ClassId` are preserved by the additive database patch, but are not exposed to students through the new class-scoped workflow.
+- Run `database/patch-canonical-exam-class-targeting.sql` after the canonical bigint feature-table patch. It adds nullable `Exams.ClassId`, its foreign key, and an index without deleting or rewriting existing exam records.
+- `Frontend/classes.html` provides class creation and roster management; the class-management link is available to SuperAdmin, DepartmentAdmin, and Teacher roles.
