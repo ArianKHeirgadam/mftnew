@@ -48,7 +48,7 @@ const NAV_BY_ROLE = {
     {
       section: "سامانه", items: [
         { key: "reports", label: "گزارش‌ها", href: "reports.html", icon: ICON.report },
-        { key: "notifications", label: "اعلان‌ها", href: "notifications.html", icon: ICON.bell, badge: 5 },
+        { key: "notifications", label: "اعلان‌ها", href: "notifications.html", icon: ICON.bell },
         { key: "settings", label: "تنظیمات", href: "settings.html", icon: ICON.settings },
       ]
     },
@@ -150,7 +150,7 @@ function renderSidebar() {
         <a class="nav-link ${it.key === active ? "active" : ""}" href="${it.href}">
           ${it.icon}
           <span class="nav-label">${it.label}</span>
-          ${it.badge ? `<span class="badge-count">${it.badge}</span>` : ""}
+          ${it.key === "notifications" ? '<span class="badge-count" data-notification-count hidden>0</span>' : ""}
         </a>
       `).join("")}
     </div>
@@ -216,13 +216,11 @@ function renderTopbar() {
         <button class="icon-btn" data-theme-toggle data-theme-icon aria-label="تغییر پوسته"></button>
         <div class="dropdown">
           <button class="icon-btn" data-dropdown-toggle="notifDrop" aria-label="اعلان‌ها">
-            ${ICON.bell}<span class="dot-ping"></span>
+            ${ICON.bell}<span class="badge-count topbar-notification-count" data-notification-count hidden>0</span>
           </button>
-          <div class="dropdown-menu" id="notifDrop" style="width:300px">
+          <div class="dropdown-menu" id="notifDrop" style="width:min(320px, calc(100vw - 32px))">
             <div style="padding:10px 12px;font-weight:700;font-size:13px">اعلان‌های اخیر</div>
-            <a href="notifications.html">📝 نمره‌ی آزمون میان‌ترم اعلام شد</a>
-            <a href="notifications.html">📅 آزمون ساختمان داده فردا برگزار می‌شود</a>
-            <a href="notifications.html">✅ ثبت‌نام شما تایید شد</a>
+            <div id="topbarRecentNotifications" class="text-soft" style="padding:12px">در حال دریافت...</div>
             <hr>
             <a href="notifications.html" style="justify-content:center;color:var(--primary)">مشاهده همه</a>
           </div>
