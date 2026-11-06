@@ -168,7 +168,7 @@ public sealed class CanonicalUsersController(CanonicalIdentityDbContext db) : Co
             ? User.CanonicalDepartmentId()
             : request.DepartmentId;
 
-        if (databaseRole is CanonicalRoleNames.Student or CanonicalRoleNames.Teacher && !departmentId.HasValue)
+        if ((databaseRole == CanonicalRoleNames.Student || databaseRole == CanonicalRoleNames.Teacher) && !departmentId.HasValue)
             return BadRequest(new { message = "برای ساخت دانشجو یا استاد، انتخاب دپارتمان الزامی است." });
 
         if (departmentId.HasValue && !await db.Departments.AnyAsync(item => item.Id == departmentId.Value, ct))
