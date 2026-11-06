@@ -910,7 +910,10 @@ public class ResultsController(AppDbContext db) : ControllerBase
             id = a.Id, examId = a.ExamId, exam = a.Exam.Title,
             score = a.Exam.ResultsPublished ? a.Score : null,
             autoScore = isStudent && a.Exam.ResultsPublished ? null : a.Score,
-            pendingManualCount = a.Answers.Count(x => x.IsCorrect == null),
+            pendingManualCount = a.Answers.Count(x =>
+                x.IsCorrect == null &&
+                questionDetails.TryGetValue(x.QuestionId, out var pendingQuestion) &&
+                (pendingQuestion.Type == "Essay" || pendingQuestion.Type == "Text")),
             maxScore = 100m, passingScore = a.Exam.PassingScore,
             status = a.Exam.ResultsPublished ? a.Status : "AwaitingPublication",
             resultsPublished = a.Exam.ResultsPublished,
