@@ -55,7 +55,9 @@ to persist MCQ options/correct answers, attempt status, answer correctness and
 department manager IDs. Do not skip this step: the previous schema-compatibility
 mapping intentionally ignored those fields.
 
-Also execute `database/create-attendance-records.sql` on the same development database to enable daily attendance records. Back up the database first.\n\nAfter applying the patches, build the API and run the test sequence in
+Also execute `database/create-attendance-records.sql` on the same development database to enable daily attendance records. Back up the database first.
+
+For class-based notification recipients and class rosters, also execute `database/create-classes-and-members.sql` on the same database. This creates the `Classes` and `ClassMembers` tables if they do not already exist; back up the database first.\n\nAfter applying the patches, build the API and run the test sequence in
 `docs/EXAM-SCORING-VERIFICATION.md`. A 20-question test with 15 correct
 answers should produce 75/100. Live SQL Server verification is still required.
 
