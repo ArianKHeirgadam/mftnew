@@ -54,6 +54,24 @@ Base URL: `https://localhost:7081/api` (ASP.NET launch profile). All routes requ
 | GET | `/reports/departments` | SuperAdmin or Department; scoped department-level exam, score, pass-rate, participation, student and teacher aggregates |
 | GET | `/health` | API health check (outside `/api`) |
 
+## Canonical single-attempt exam workflow
+
+These routes use bigint IDs and the supplied canonical tables; they are separate from the legacy GUID-based `/exams` routes above.
+
+| Method | Route | Access / purpose |
+|---|---|---|
+| GET | `/canonical/exams` | Student list includes whether a single attempt already exists and its active attempt ID/status; other roles see their scoped canonical exams |
+| GET | `/canonical/exams/{examId}` | Canonical exam structure and question references |
+| POST / PUT | `/canonical/exams` and `/canonical/exams/{id}` | Create/update canonical exam sections and questions; structure becomes immutable once any student attempt exists |
+| POST | `/canonical/exams/{examId}/attempt/start` | Create the student's only attempt; unique (ExamId, StudentUserId) constraint rejects any second attempt |
+| GET | `/canonical/exams/{examId}/attempt/{attemptId}` | Load the active attempt, deadline, questions, and previously saved answers; only the owner can access it |
+| PUT | `/canonical/exams/{examId}/attempt/{attemptId}/answers` | Autosave the active attempt before its server-side deadline |
+| POST | `/canonical/exams/{examId}/attempt/{attemptId}/submit` | Finalize once; unanswered MCQ/matching items receive zero, objective answers are auto-graded, essays await manual grading |
+
+The student dashboard and `online-exam.html` now use this canonical attempt workflow. An in-progress attempt can be resumed by opening the same attempt ID; that is a continuation, not a second attempt. A submitted attempt is shown as completed and cannot be restarted.
+
+**Remaining integration:** the teacher question-bank and exam-creation pages still call legacy GUID-based endpoints. They must be migrated to canonical bigint question/skill/category/exam APIs before the full teacher-to-student workflow is end-to-end. Do not mix legacy GUID IDs with canonical bigint IDs.
+
 ## Schema requirements for exam grading
 
 Run `database/patch-exam-grading-and-department-manager.sql` on a backed-up
