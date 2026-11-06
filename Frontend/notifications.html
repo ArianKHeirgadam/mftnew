@@ -52,7 +52,7 @@
           <div class="field"><label for="newClassName">نام کلاس جدید</label><input class="input" id="newClassName" data-class-name maxlength="200" placeholder="مثلاً کلاس برنامه‌نویسی وب"></div>
           <div class="field"><label for="newClassDepartment">دپارتمان کلاس</label><select class="input" id="newClassDepartment" data-class-department><option value="">انتخاب دپارتمان</option></select></div>
           <div class="field"><label for="newClassMembers">اعضای کلاس (دانشجویان همان دپارتمان)</label><select class="input" id="newClassMembers" data-class-members multiple size="5"></select><small class="text-soft">برای انتخاب چند نفر، Ctrl را نگه دارید.</small></div>
-          <div class="field" style="align-self:end"><button class="btn btn-outline" type="button" data-class-create>ایجاد کلاس و ثبت اعضا</button></div>
+          <div class="field" style="align-self:end;display:flex;gap:8px;flex-wrap:wrap"><button class="btn btn-outline" type="button" data-class-create>ایجاد کلاس و ثبت اعضا</button><button class="btn btn-primary" type="button" data-class-save-members>ذخیره اعضای کلاس انتخاب‌شده</button></div>
         </div>
         <div class="field"><label for="notificationTitle">عنوان اعلان</label><input class="input" id="notificationTitle" maxlength="250" data-notification-title placeholder="عنوان اعلان"></div>
         <div class="field"><label for="notificationMessage">متن اعلان</label><textarea class="input" id="notificationMessage" rows="4" data-notification-message placeholder="متن اعلان را بنویسید..."></textarea></div>
@@ -68,8 +68,8 @@
 
       <div class="card card-pad">
         <div id="tAll" class="tab-panel active" data-notification-list><div class="empty-state">در حال دریافت اعلان‌ها...</div></div>
-        <div id="tUnread" class="tab-panel"><p class="text-soft text-sm" style="padding:20px 0">اعلان‌های خوانده‌نشده در این بخش نمایش داده می‌شوند.</p></div>
-        <div id="tRead" class="tab-panel"><p class="text-soft text-sm" style="padding:20px 0">اعلان‌های خوانده‌شده در این بخش نمایش داده می‌شوند.</p></div>
+        <div id="tUnread" class="tab-panel"></div>
+        <div id="tRead" class="tab-panel"></div>
       </div>
     </main>
   </div>
