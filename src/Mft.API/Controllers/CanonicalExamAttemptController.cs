@@ -82,7 +82,7 @@ public sealed class CanonicalExamAttemptController(
                         QuestionType = academic.QuestionTypes.Where(t => t.Id == academic.Questions.Where(q => q.Id == eq.QuestionId).Select(q => q.QuestionTypeId).FirstOrDefault()).Select(t => t.Code).FirstOrDefault(),
                         Options = academic.MultipleChoiceOptions.Where(o => o.QuestionId == eq.QuestionId).OrderBy(o => o.DisplayOrder).Select(o => new { o.Id, o.OptionText, o.DisplayOrder }).ToList(),
                         MatchingLeftItems = academic.MatchingPairs.Where(p => p.QuestionId == eq.QuestionId).OrderBy(p => p.DisplayOrder).Select(p => p.LeftItem).ToList(),
-                        MatchingRightItems = academic.MatchingPairs.Where(p => p.QuestionId == eq.QuestionId).Select(p => p.RightItem).ToList()
+                        MatchingRightItems = academic.MatchingPairs.Where(p => p.QuestionId == eq.QuestionId).OrderBy(p => p.DisplayOrder).Select(p => p.RightItem).ToList()
                     }).ToList()
             }).ToList();
         var saved = await academic.StudentAnswers.AsNoTracking().Where(x => x.ExamAttemptId == attemptId)
