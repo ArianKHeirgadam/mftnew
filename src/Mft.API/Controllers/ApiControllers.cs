@@ -383,7 +383,7 @@ public class ExamsController(AppDbContext db) : ControllerBase
         );
     }
     [HttpPut("attempts/{attemptId:guid}/answers"), Authorize(Roles ="Student")]
-    public async Task<IActionResult> SaveAnswers(Guid attemptId, SubmitAttemptRequest r, CancellationToken ct){
+    public async Task<IActionResult> SaveAnswers(Guid attemptId, Mft.Application.Contracts.SubmitAttemptRequest r, CancellationToken ct){
         var a = await db.ExamAttempts.Include(x => x.Exam).ThenInclude(x => x.Questions).FirstOrDefaultAsync(x => x.Id == attemptId && x.StudentId == User.UserId() && x.Status =="InProgress",  ct);
         if (a is null) return NotFound();
         if (DateTime.UtcNow>a.StartedAt.AddMinutes(a.Exam.DurationMinutes)) return Conflict(new {
@@ -406,7 +406,7 @@ public class ExamsController(AppDbContext db) : ControllerBase
         return NoContent();
     }
     [HttpPost("attempts/{attemptId:guid}/submit"), Authorize(Roles ="Student")]
-    public async Task<IActionResult> Submit(Guid attemptId, SubmitAttemptRequest r, CancellationToken ct)
+    public async Task<IActionResult> Submit(Guid attemptId, Mft.Application.Contracts.SubmitAttemptRequest r, CancellationToken ct)
     {
         var attempt = await db.ExamAttempts
             .Include(x => x.Exam)
@@ -829,7 +829,7 @@ public class ClassesController(AppDbContext db) : ControllerBase
         db.Classes.Add(entity);
         db.ClassMembers.AddRange(validIds.Select(id => new StudentClassMember { ClassId = entity.Id, StudentUserId = id }));
         await db.SaveChangesAsync(ct);
-        return Ok(new { id = entity.Id, name = entity.Name, memberCount = validIds.Length });
+        return Ok(new { id = entity.Id, name = entity.Name, memberCount = validIds.Count });
     }
 
 }
