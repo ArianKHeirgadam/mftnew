@@ -204,7 +204,11 @@
       }
       const heading = $('body[data-active="results"] h1');
       if (heading) {
-        const scoreLabel = result.score == null ? (result.resultsPublished ? 'در انتظار تکمیل تصحیح' : 'منتشر نشده') : `${faNumber(result.score)} از ${faNumber(result.maxScore)}`;
+        const scoreLabel = result.score != null
+          ? `${faNumber(result.score)} از ${faNumber(result.maxScore)}`
+          : result.autoScore != null
+            ? `نمره موقت ${faNumber(result.autoScore)} از ${faNumber(result.maxScore)} — در انتظار تصحیح ${faNumber(result.pendingManualCount)} سؤال تشریحی`
+            : (result.resultsPublished ? 'در انتظار تکمیل تصحیح' : 'منتشر نشده');
         const outcome = result.score == null ? '' : (Number(result.score) >= Number(result.passingScore) ? ' — قبول' : ' — نیازمند تلاش بیشتر');
         heading.textContent = `نتیجه آزمون: ${result.exam} — ${scoreLabel}${outcome}`;
       }
@@ -212,10 +216,11 @@
       const canGrade = ['teacher', 'department', 'superadmin'].includes(role);
       if (body) {
         body.innerHTML = result.answers.length ? result.answers.map((answer, index) => {
-          const canEditGrade = canGrade && !result.resultsPublished && (answer.isCorrect == null || answer.isManuallyGraded);
+          const isEssay = ['Essay', 'Text'].includes(String(answer.questionType || '').trim());
+          const canEditGrade = canGrade && isEssay && !result.resultsPublished;
           const gradeControl = canEditGrade
             ? `<div class="flex gap-8 mt-8"><input class="input" type="number" min="0" max="${Number(answer.maxRawScore || 0)}" step="0.01" value="${Number(answer.rawAwardedScore || 0)}" data-grade-score style="max-width:100px" aria-label="نمره خام سؤال"><input class="input" type="text" maxlength="2000" data-grade-comment value="${escapeHtml(answer.gradingComment || '')}" placeholder="توضیح تصحیح" style="max-width:180px"><button class="btn btn-primary btn-sm" data-grade-answer="${answer.questionId}">ثبت نمره</button></div><small class="text-soft">حداکثر نمره خام: ${faNumber(answer.maxRawScore || 0)}</small>`
-            : (answer.isCorrect == null ? 'در انتظار تصحیح' : answer.isCorrect ? 'صحیح' : 'نادرست');
+            : (isEssay && answer.isCorrect == null ? 'در انتظار تصحیح تشریحی' : answer.isCorrect == null ? 'کلید پاسخ تعریف نشده' : answer.isCorrect ? 'صحیح' : 'نادرست');
           return `<tr>
             <td>${faNumber(index + 1)}</td><td>${escapeHtml(answer.question || `سؤال ${answer.questionId}`)}</td>
             <td>${escapeHtml(answer.answer || 'بدون پاسخ')}</td><td>${escapeHtml(answer.correctAnswer || '—')}</td>
@@ -241,7 +246,8 @@
         try {
           const info = await request(`/exam-files/attempts/${encodeURIComponent(attemptId)}/info`);
           pdfBox.hidden = false;
-          pdfBox.innerHTML = `<div class="section-title"><h3>فایل PDF پاسخ دانشجو</h3></div><p class="text-soft text-sm">${escapeHtml(info.fileName)} — ${faNumber(Math.ceil(info.size / 1024))} کیلوبایت</p><button type="button" class="btn btn-outline" id="downloadSubmissionPdf">دریافت فایل پاسخ</button>`;
+          pdfBox.innerHTML = `<div class="section-title"><h3>پاسخ‌نامه تشریحی دانشجو</h3></div><p class="text-soft text-sm">${escapeHtml(info.fileName)} — ${faNumber(Math.ceil(info.size / 1024))} کیلوبایت</p><button type="button" class="btn btn-outline" id="previewSubmissionPdf">مشاهده پاسخ‌نامه</button> <button type="button" class="btn btn-outline" id="downloadSubmissionPdf">دریافت فایل</button>`;
+          $('#previewSubmissionPdf')?.addEventListener('click', () => window.MftApi.preview(`/exam-files/attempts/${encodeURIComponent(attemptId)}`).catch(error => notify(error.message, 'danger')));
           $('#downloadSubmissionPdf')?.addEventListener('click', () => window.MftApi.download(`/exam-files/attempts/${encodeURIComponent(attemptId)}`).catch(error => notify(error.message, 'danger')));
         } catch { pdfBox.hidden = true; pdfBox.innerHTML = ''; }
       } else if (pdfBox) { pdfBox.hidden = true; pdfBox.innerHTML = ''; }
