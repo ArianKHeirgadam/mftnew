@@ -11,12 +11,12 @@ This is a code/schema compatibility audit based on the canonical SQL Server sche
 
 | Area | Current application model | Canonical database | Required treatment |
 |---|---|---|---|
-| User identity | `Guid` | `Users.Id bigint identity` | Use `long` in persistence/API identifiers; preserve external API compatibility only through deliberate DTO/route changes |
+| User identity | Legacy feature controllers still use `Guid`; canonical identity endpoints use `long` | `Users.Id bigint identity` | Login/JWT, user management, and department management now use canonical `long` IDs; remaining feature controllers still require coordinated migration |
 | Department identity | `Guid` | `Departments.Id bigint identity` | Same |
-| User role | `User.Role` enum column | `Roles` + `UserRoles` | Resolve role through normalized join; map DB `DepartmentAdmin` to API/policy alias `Department` |
-| Phone | `Mobile` | `PhoneNumber nvarchar(20)` | Map/rename explicitly; enforce unique phone semantics |
+| User role | Legacy feature controllers still use `User.Role`; canonical identity uses normalized roles | `Roles` + `UserRoles` | Login and identity endpoints resolve normalized role memberships; map DB `DepartmentAdmin` to policy alias `Department` |
+| Phone | Legacy `Mobile`; canonical identity uses `PhoneNumber` | `PhoneNumber nvarchar(20)` unique, not null | Identity API maps Mobile to PhoneNumber and requires a unique phone number for account creation/profile updates |
 | Password lifecycle | Admin-defined initial password only | `Users.PasswordHash` | Hash the admin-defined password with BCrypt; no forced first-login change, no `MustChangePassword` field or endpoint |
-| Department | ManagerUserId, ManagerName, DegreeLevel | No such columns | Remove from persistence model; derive manager display only if a valid relationship exists elsewhere |
+| Department | Legacy manager columns; canonical identity has no manager column | No manager columns | Manager is derived from a DepartmentAdmin account whose Users.DepartmentId points to the department; no manager FK/column is invented |
 | Question | DepartmentId, Category, Type, Difficulty, OptionsJson, CorrectAnswer, IsActive | SkillId, QuestionTypeId, DifficultyLevel, MetadataJson | Rework question domain/persistence mapping; category is reached through Skill -> ExamCategory; options/correct answer use related tables/metadata |
 | MCQ options | `QuestionOptions`, Guid key | `MultipleChoiceOptions`, bigint key | Rename and map real columns |
 | Exam composition | Exam -> Questions via composite (ExamId, QuestionId) | Exam -> ExamSections -> ExamQuestions (identity Id) -> Questions | Rebuild composition around sections and identity ExamQuestions |
@@ -35,9 +35,9 @@ The supplied schema export does not include Classes, ClassMembers, Notifications
 1. Introduce canonical persistence records for Users, Departments, Roles, and UserRoles using SQL Server key types and exact column names.
 2. Implement role resolution as a query over UserRoles -> Roles. Keep the stored role code `DepartmentAdmin`; translate to policy name `Department` only at the authorization boundary.
 3. Map `PhoneNumber` to the API's mobile/phone concept. Confirm whether Email is optional and whether phone uniqueness is enforced by existing data.
-4. Rework login and JWT claims to use bigint user and department IDs and resolved role claims.
-5. Rework user and department endpoints/DTOs and route constraints as one coordinated change.
-6. Add integration tests against a restored copy of the canonical SQL Server database before moving to Questions.
+4. Rework login and JWT claims to use bigint user and department IDs and resolved role claims. (Implemented in canonical identity service.)
+5. Rework user and department endpoints/DTOs and route constraints as one coordinated change. (Implemented for these identity endpoints.)
+6. Add integration tests against a restored copy of the canonical SQL Server database before deploying or moving to Questions.
 
 ## Explicit blockers before coding
 
@@ -52,7 +52,7 @@ The supplied schema export does not include Classes, ClassMembers, Notifications
 - Removed `MustChangePassword` from the domain user, login and create-user contracts, bootstrap account creation, and API responses.
 - Removed the `/api/auth/change-password` endpoint and the profile-page password-change panel and JavaScript handler.
 - Added `CanonicalIdentityDbContext` with explicit mappings for `Users`, `Departments`, `Roles`, and `UserRoles`, using the canonical bigint/int key types and foreign-key delete behaviors. It is registered against the existing connection string but is not yet used by the live authentication flow; this avoids mixing bigint identity claims with the remaining GUID-based controllers.
-- The existing legacy `AppDbContext` and GUID-based user endpoints are not yet cut over. Do not deploy against the canonical database until the coordinated identity/controller migration is complete.
+- Canonical login/JWT, `/api/auth/me`, `/api/users`, and `/api/departments` now use the canonical context and bigint identifiers. The legacy `AppDbContext` remains registered for other modules; many feature controllers still use GUID IDs and old table/column mappings. Do not deploy the application against the canonical database until those modules are migrated and integration-tested.
 
 ## Current conclusion
 
