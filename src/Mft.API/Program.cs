@@ -29,6 +29,13 @@ builder.Services.AddDbContext<CanonicalIdentityDbContext>(options =>
     options.UseSqlServer(
         builder.Configuration.GetConnectionString("DefaultConnection")));
 
+// Canonical question-bank and exam tables use bigint identity keys and the
+// normalized relational schema. Legacy feature endpoints are not switched
+// until their controllers and dependent workflows are migrated together.
+builder.Services.AddDbContext<CanonicalAcademicDbContext>(options =>
+    options.UseSqlServer(
+        builder.Configuration.GetConnectionString("DefaultConnection")));
+
 builder.Services.AddScoped<IAuthService, AuthService>();
 builder.Services.AddScoped<ITokenService, TokenService>();
 
