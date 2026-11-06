@@ -535,10 +535,12 @@
     const table = $('body[data-active="reports"] table tbody');
     if (table) renderRows('body[data-active="reports"] table tbody', rows, row => `<tr><td>${escapeHtml(row.department)}</td><td>${faNumber(row.students)}</td><td>${faNumber(row.teachers)}</td><td>${faNumber(row.exams)}</td><td>${Number(row.averageScore || 0).toLocaleString('fa-IR')}</td><td>${Number(row.passRate || 0).toLocaleString('fa-IR', { maximumFractionDigits: 1 })}%</td><td>${faNumber(row.participation)}</td></tr>`, 7);
     const totalExams = rows.reduce((sum, row) => sum + Number(row.exams || 0), 0);
-    const averagePassRate = rows.length ? rows.reduce((sum, row) => sum + Number(row.passRate || 0), 0) / rows.length : 0;
+    const gradedAttempts = rows.reduce((sum, row) => sum + Number(row.gradedAttempts || 0), 0);
+    const passedAttempts = rows.reduce((sum, row) => sum + Number(row.passedAttempts || 0), 0);
+    const weightedPassRate = gradedAttempts ? passedAttempts * 100 / gradedAttempts : 0;
     const totalStudents = rows.reduce((sum, row) => sum + Number(row.students || 0), 0);
     const totalAttempts = rows.reduce((sum, row) => sum + Number(row.participation || 0), 0);
-    const metrics = { exams: totalExams, passRate: averagePassRate, participation: totalAttempts, students: totalStudents };
+    const metrics = { exams: totalExams, passRate: weightedPassRate, participation: totalAttempts, students: totalStudents };
     $$('body[data-active="reports"] [data-metric]').forEach(element => {
       const key = element.dataset.metric;
       if (key in metrics) element.textContent = faNumber(Math.round(metrics[key] * 10) / 10);
