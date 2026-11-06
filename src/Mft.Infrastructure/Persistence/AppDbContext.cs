@@ -150,7 +150,7 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
             entity.Property(x => x.Id).HasColumnType("uniqueidentifier").ValueGeneratedNever();
             entity.Property(x => x.ExamAttemptId).HasColumnName("AttemptId");
             entity.Property(x => x.Answer).HasColumnName("EssayText").HasColumnType("nvarchar(max)");
-            entity.Property(x => x.AwardedScore).HasColumnName("Score").HasPrecision(5, 2);
+            entity.Property(x => x.AwardedScore).HasColumnName("Score").HasPrecision(18, 2);
             entity.Property(x => x.IsCorrect);
             entity.Property(x => x.IsManuallyGraded).HasDefaultValue(false);
             entity.Property(x => x.GradingComment).HasMaxLength(2000);
