@@ -61,7 +61,7 @@ public sealed class CanonicalExamsController(
                 Questions = academic.ExamQuestions.Where(q => q.ExamSectionId == x.Id)
                     .OrderBy(q => q.DisplayOrder).Select(q => new { q.Id, q.QuestionId, q.DisplayOrder, q.PointsOverride }).ToList()
             }).ToListAsync(ct);
-        return Ok(new { exam.Id, exam.Title, exam.ExamCategoryId, exam.DepartmentId, exam.CreatedByUserId,
+        return Ok(new { exam.Id, exam.Title, exam.ExamCategoryId, exam.DepartmentId, exam.ClassId, exam.CreatedByUserId,
             exam.StartAt, exam.EndAt, exam.DurationMinutes, exam.IsPublished, Sections = sections });
     }
 
