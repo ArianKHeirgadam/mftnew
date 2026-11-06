@@ -608,6 +608,9 @@ public class ExamsController(AppDbContext db) : ControllerBase
             message = "مهلت شرکت در آزمون پایان یافته است."
         }
         );
+        var examPdfAvailable = await db.ExamDocuments.AnyAsync(x => x.ExamId == id, ct);
+        if (e.Questions.Count == 0 && !examPdfAvailable)
+            return BadRequest(new { message = "برای شروع این آزمون هنوز فایل PDF سؤال بارگذاری نشده است." });
         var student = User.UserId();
         var active = await db.ExamAttempts.FirstOrDefaultAsync(x => x.ExamId == id && x.StudentId == student && x.Status =="InProgress",  ct);
         if (active is null){
@@ -618,9 +621,6 @@ public class ExamsController(AppDbContext db) : ControllerBase
             db.ExamAttempts.Add(active);
             await db.SaveChangesAsync(ct);
         }
-        var examPdfAvailable = await db.ExamDocuments.AnyAsync(x => x.ExamId == id, ct);
-        if (e.Questions.Count == 0 && !examPdfAvailable)
-            return BadRequest(new { message = "برای شروع این آزمون هنوز فایل PDF سؤال بارگذاری نشده است." });
         var questionIds = e.Questions.OrderBy(x => x.Order).Select(x => x.QuestionId).ToArray();
         var questionRows = await db.Questions.Where(q => questionIds.Contains(q.Id)).Select(q => new{
             id = q.Id, text = q.Text, type = q.Type, optionsJson = q.OptionsJson, correctAnswer = q.CorrectAnswer
