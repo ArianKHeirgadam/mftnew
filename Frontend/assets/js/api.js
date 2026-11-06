@@ -742,6 +742,7 @@
     const mobile = fields.find(field => field.type === 'tel')?.value.trim() || null;
     const id = modal.dataset.editId;
     if (!fullName) return notify('نام و نام خانوادگی الزامی است.', 'warn');
+    if (!mobile) return notify('شماره تماس الزامی است.', 'warn');
     if (!id && !username) return notify('نام کاربری الزامی است.', 'warn');
     if (!id && (!password || password.length < 8)) return notify('رمز عبور باید حداقل ۸ کاراکتر باشد.', 'warn');
     await safe(async () => {
@@ -1005,12 +1006,13 @@
     const values = await showQuickCreateModal('ایجاد مدیر دپارتمان', [
       { name: 'fullName', label: 'نام و نام خانوادگی مدیر' },
       { name: 'username', label: 'نام کاربری' },
-      { name: 'password', label: 'رمز عبور (حداقل ۸ کاراکتر)', type: 'password' }
+      { name: 'password', label: 'رمز عبور (حداقل ۸ کاراکتر)', type: 'password' },
+      { name: 'mobile', label: 'شماره تماس (الزامی)' }
     ]);
     if (!values) return;
     const created = await request('/users', {
       method: 'POST',
-      body: JSON.stringify({ username: values.username, password: values.password, fullName: values.fullName, role: 'Department', email: null, mobile: null, departmentId: null })
+      body: JSON.stringify({ username: values.username, password: values.password, fullName: values.fullName, role: 'Department', email: null, mobile: values.mobile, departmentId: null })
     });
     const select = $('#departmentManagerId');
     if (select) {
@@ -1030,7 +1032,8 @@
     const values = await showQuickCreateModal('ایجاد حساب استاد', [
       { name: 'fullName', label: 'نام و نام خانوادگی استاد' },
       { name: 'username', label: 'نام کاربری استاد' },
-      { name: 'password', label: 'رمز عبور (حداقل ۸ کاراکتر)', type: 'password' }
+      { name: 'password', label: 'رمز عبور (حداقل ۸ کاراکتر)', type: 'password' },
+      { name: 'mobile', label: 'شماره تماس (الزامی)' }
     ]);
     if (!values) return;
     const { fullName, username } = values;
@@ -1039,7 +1042,7 @@
     if (role === 'superadmin' && !departmentId) return notify('ابتدا دپارتمان مقصد را انتخاب یا ایجاد کنید.', 'warn');
     const created = await request('/users', {
       method: 'POST',
-      body: JSON.stringify({ username, password: values.password, fullName, role: 'Teacher', email: null, mobile: null, departmentId })
+      body: JSON.stringify({ username, password: values.password, fullName, role: 'Teacher', email: null, mobile: values.mobile, departmentId })
     });
     await loadExamWizard();
     const newTeacherCard = $$('#teacherChoices .choice-card').find(card => card.dataset.id === created.id);
