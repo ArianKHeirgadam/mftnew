@@ -487,10 +487,6 @@ public class ExamsController(AppDbContext db) : ControllerBase
         }
         ;
         var ids = (r.QuestionIds??Array.Empty<Guid>()).Distinct().ToArray();
-        if (ids.Length == 0) return BadRequest(new {
-            message = "برای ساخت آزمون حداقل یک سؤال لازم است."
-        }
-        );
         if (ids.Length>0){
             var validQuery = db.Questions.Where(q => ids.Contains(q.Id));
             if (User.IsInRole("Teacher"))validQuery = validQuery.Where(q => q.CreatedByUserId == User.UserId());
@@ -556,10 +552,6 @@ public class ExamsController(AppDbContext db) : ControllerBase
         e.IsPublished = r.IsPublished;
         e.DepartmentId = User.IsInRole("Department") || User.IsInRole("Teacher")?User.DepartmentId():r.DepartmentId;
         var ids = (r.QuestionIds??Array.Empty<Guid>()).Distinct().ToArray();
-        if (ids.Length == 0) return BadRequest(new {
-            message = "برای آزمون حداقل یک سؤال لازم است."
-        }
-        );
         var validQuery = db.Questions.Where(q => ids.Contains(q.Id));
         if (User.IsInRole("Teacher"))validQuery = validQuery.Where(q => q.CreatedByUserId == User.UserId());
         if (User.IsInRole("Department"))validQuery = validQuery.Where(question => db.Users.Any(user => user.Id == question.CreatedByUserId && user.DepartmentId == User.DepartmentId()));
@@ -626,6 +618,9 @@ public class ExamsController(AppDbContext db) : ControllerBase
             db.ExamAttempts.Add(active);
             await db.SaveChangesAsync(ct);
         }
+        var examPdfAvailable = await db.ExamDocuments.AnyAsync(x => x.ExamId == id, ct);
+        if (e.Questions.Count == 0 && !examPdfAvailable)
+            return BadRequest(new { message = "برای شروع این آزمون هنوز فایل PDF سؤال بارگذاری نشده است." });
         var questionIds = e.Questions.OrderBy(x => x.Order).Select(x => x.QuestionId).ToArray();
         var questionRows = await db.Questions.Where(q => questionIds.Contains(q.Id)).Select(q => new{
             id = q.Id, text = q.Text, type = q.Type, optionsJson = q.OptionsJson, correctAnswer = q.CorrectAnswer
@@ -648,7 +643,8 @@ public class ExamsController(AppDbContext db) : ControllerBase
         ).ToListAsync(ct);
         return Ok(new {
             attemptId = active.Id, startedAt = active.StartedAt, exam = new{
-                id = e.Id, title = e.Title, durationMinutes = e.DurationMinutes, allowQuestionNavigation = e.AllowQuestionNavigation
+                id = e.Id, title = e.Title, durationMinutes = e.DurationMinutes, allowQuestionNavigation = e.AllowQuestionNavigation,
+                examPdfAvailable
             }
             ,  questions = qs, answers = savedAnswers
         }
@@ -689,6 +685,18 @@ public class ExamsController(AppDbContext db) : ControllerBase
                      x.Status == "InProgress", ct);
 
         if (attempt is null) return NotFound();
+
+        if (attempt.Exam.Questions.Count == 0)
+        {
+            var answerDocumentExists = await db.ExamSubmissionDocuments.AnyAsync(x => x.AttemptId == attemptId, ct);
+            if (!answerDocumentExists)
+                return BadRequest(new { message = "ابتدا تصویر یا PDF پاسخ‌نامه را بارگذاری کنید." });
+            attempt.Status = "Submitted";
+            attempt.Score = null;
+            attempt.SubmittedAt = DateTime.UtcNow;
+            await db.SaveChangesAsync(ct);
+            return Ok(new { id = attempt.Id, score = (decimal?)null, pendingManualCount = 1, status = attempt.Status, submittedAt = attempt.SubmittedAt });
+        }
 
         var withinTime = DateTime.UtcNow <=
             attempt.StartedAt.AddMinutes(attempt.Exam.DurationMinutes);
@@ -955,7 +963,8 @@ public class ResultsController(AppDbContext db) : ControllerBase
         var inProgress = await db.ExamAttempts.AnyAsync(x => x.ExamId == examId && x.Status == "InProgress", ct);
         if (inProgress) return BadRequest(new { message = "هنوز دانشجویی در حال برگزاری آزمون است." });
         var pending = await db.ExamAttempts.Where(x => x.ExamId == examId)
-            .AnyAsync(x => x.Answers.Any(a => a.IsCorrect == null), ct);
+            .AnyAsync(x => x.Answers.Any(a => a.IsCorrect == null) ||
+                (!x.Exam.Questions.Any() && x.Status != "Graded"), ct);
         if (pending) return BadRequest(new { message = "هنوز پاسخ تشریحی تصحیح‌نشده وجود دارد." });
         var completedAttempts = await db.ExamAttempts.Include(x => x.Answers)
             .Where(x => x.ExamId == examId && x.Status != "InProgress").ToListAsync(ct);
