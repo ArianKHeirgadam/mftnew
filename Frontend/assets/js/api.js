@@ -510,16 +510,7 @@
       safe(() => request('/users/me/profile', { method: 'PUT', body: JSON.stringify({ fullName: name?.value.trim(), email: email?.value.trim() || null, mobile: mobile?.value.trim() || null }) }), 'اطلاعات پروفایل ذخیره شد.');
     }, { once: true });
 
-    const passPanel = $('#tPass');
-    const passButton = $('button', passPanel);
-    passButton?.addEventListener('click', event => {
-      event.preventDefault();
-      const fields = $$('input[type="password"]', passPanel);
-      const [currentPassword, newPassword, repeatPassword] = fields.map(field => field.value);
-      if (!currentPassword || !newPassword || newPassword.length < 8) return notify('رمز فعلی و رمز جدید معتبر الزامی است.', 'warn');
-      if (newPassword !== repeatPassword) return notify('تکرار رمز جدید مطابقت ندارد.', 'warn');
-      safe(() => request('/auth/change-password', { method: 'POST', body: JSON.stringify({ currentPassword, newPassword }) }), 'رمز عبور تغییر کرد.');
-    });
+
   }
 
   async function loadSettings() {
@@ -760,7 +751,7 @@
       if (id) await request(`/users/${id}`, { method: 'PUT', body: JSON.stringify({ fullName, email, mobile, departmentId, isActive }) });
       else {
         if (!password || password.length < 8) return notify('رمز عبور باید حداقل ۸ کاراکتر باشد.', 'warn');
-        await request('/users', { method: 'POST', body: JSON.stringify({ username, password, fullName, role, email, mobile, departmentId, mustChangePassword: false }) });
+        await request('/users', { method: 'POST', body: JSON.stringify({ username, password, fullName, role, email, mobile, departmentId }) });
       }
       modal.classList.remove('show');
       await loadUsers();
@@ -1019,7 +1010,7 @@
     if (!values) return;
     const created = await request('/users', {
       method: 'POST',
-      body: JSON.stringify({ username: values.username, password: values.password, fullName: values.fullName, role: 'Department', email: null, mobile: null, departmentId: null, mustChangePassword: false })
+      body: JSON.stringify({ username: values.username, password: values.password, fullName: values.fullName, role: 'Department', email: null, mobile: null, departmentId: null })
     });
     const select = $('#departmentManagerId');
     if (select) {
@@ -1048,7 +1039,7 @@
     if (role === 'superadmin' && !departmentId) return notify('ابتدا دپارتمان مقصد را انتخاب یا ایجاد کنید.', 'warn');
     const created = await request('/users', {
       method: 'POST',
-      body: JSON.stringify({ username, password: values.password, fullName, role: 'Teacher', email: null, mobile: null, departmentId, mustChangePassword: false })
+      body: JSON.stringify({ username, password: values.password, fullName, role: 'Teacher', email: null, mobile: null, departmentId })
     });
     await loadExamWizard();
     const newTeacherCard = $$('#teacherChoices .choice-card').find(card => card.dataset.id === created.id);
