@@ -233,8 +233,8 @@
       const weight = index === groups.length - 1 ? remainingWeight : weightUnits;
       remainingWeight -= weight;
       const sectionMinutes = index === groups.length - 1
-        ? Math.max(1, remainingMinutes)
-        : Math.max(1, Math.floor(durationMinutes * questionIds.length / totalQuestions));
+        ? remainingMinutes
+        : Math.floor(durationMinutes / groups.length);
       remainingMinutes -= sectionMinutes;
       return { skillId, durationMinutes: sectionMinutes, weightPercent: weight / 100, questionIds };
     });
