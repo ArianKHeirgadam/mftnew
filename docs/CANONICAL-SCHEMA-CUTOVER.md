@@ -34,13 +34,15 @@ Do not execute that script until the application code has completed the bigint c
 
 ## Implementation sequence
 
-1. Replace GUID-based core entities with confirmed key types and explicit lookup entities/navigation mappings.
-2. Move authorization from User.Role to UserRoles/Roles. Preserve the policy alias Department only at the API boundary.
+1. Canonical identity persistence records and mappings for Users, Departments, Roles, and UserRoles are implemented in CanonicalIdentityDbContext.
+2. Authentication/JWT and identity endpoints now resolve roles from UserRoles/Roles. Preserve the policy alias Department only at the API boundary.
 3. Rebuild exam and answer persistence around ExamSections, ExamQuestions.Id, ExamAttempts.StatusId, and StudentAnswers.ExamQuestionId.
 4. Align PDF, attendance, class, notification, and settings models with the additive bigint support schema.
-5. Update controller route constraints, DTOs, JWT claims, and frontend identifiers together.
-6. Generate a migration/SQL diff and test against a restored copy. Never run a destructive migration against the primary database.
+5. Canonical identity controller route constraints and DTOs now use bigint IDs; account creation requires a unique PhoneNumber, and department manager display is derived from DepartmentAdmin + Users.DepartmentId (no noncanonical manager column).
+6. Remaining feature controllers, DTOs, and frontend identifiers still require coordinated bigint migration. Generate a schema diff and test against a restored copy. Never run a destructive migration against the primary database.
 
 ## Verification status
 
-This is a schema contract and additive support-table script, not a completed application cutover. The existing API still contains GUID route parameters and direct User.Role access. Do not deploy or run the new SQL script until those code paths have been migrated and a .NET build plus SQL Server integration tests pass.
+Implemented in this phase: canonical identity DbContext, login/password verification against Users, JWT role claims from UserRoles/Roles, bigint identity DTOs/routes for auth/users/departments, and DepartmentAdmin-to-Department policy mapping. Admin-defined passwords are BCrypt-hashed; there is no forced password-change flow.
+
+Not yet a completed application cutover: other feature controllers still use the legacy GUID-based AppDbContext and old table/column names. The legacy context remains registered to avoid deleting dependencies prematurely, but it is not compatible with the supplied canonical schema. Automatic EF migrations are explicitly blocked at startup. No .NET build or SQL Server integration test is claimed; test on a restored canonical database before deployment. Do not run legacy GUID SQL scripts or deploy this partial cutover against production.
