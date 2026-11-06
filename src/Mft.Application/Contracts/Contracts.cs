@@ -9,7 +9,6 @@ public record LoginResponse(
     string Username,
     string FullName,
     string Role,
-    bool MustChangePassword,
     Guid? DepartmentId);
 
 public record CreateUserRequest(
@@ -19,8 +18,7 @@ public record CreateUserRequest(
     string Role,
     string? Email,
     string? Mobile,
-    Guid? DepartmentId,
-    bool MustChangePassword = false);
+    Guid? DepartmentId);
 
 public record UpdateUserRequest(
     string FullName,
