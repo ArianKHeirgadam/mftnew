@@ -32,6 +32,12 @@ public sealed class CanonicalExamsController(
             SectionCount = academic.ExamSections.Count(s => s.ExamId == x.Id),
             QuestionCount = academic.ExamSections.Where(s => s.ExamId == x.Id)
                 .SelectMany(s => academic.ExamQuestions.Where(eq => eq.ExamSectionId == s.Id)).Count(),
+            ExistingAttemptId = User.IsInRole("Student")
+                ? academic.ExamAttempts.Where(a => a.ExamId == x.Id && a.StudentUserId == CurrentUserId).Select(a => (long?)a.Id).FirstOrDefault()
+                : null,
+            ExistingAttemptStatusId = User.IsInRole("Student")
+                ? academic.ExamAttempts.Where(a => a.ExamId == x.Id && a.StudentUserId == CurrentUserId).Select(a => (byte?)a.StatusId).FirstOrDefault()
+                : null,
             HasAttempt = User.IsInRole("Student") && academic.ExamAttempts.Any(a => a.ExamId == x.Id && a.StudentUserId == CurrentUserId)
         }).ToListAsync(ct);
         return Ok(rows);
