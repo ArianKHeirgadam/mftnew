@@ -695,6 +695,17 @@ public class ExamsController(AppDbContext db) : ControllerBase
 
         if (attempt is null) return NotFound();
 
+        var essayQuestionIds = await db.ExamQuestions
+            .Where(item => item.ExamId == attempt.ExamId)
+            .Join(db.Questions, item => item.QuestionId, question => question.Id,
+                (item, question) => new { item.QuestionId, question.Type })
+            .Where(item => item.Type == "Essay" || item.Type == "Text")
+            .Select(item => item.QuestionId)
+            .ToListAsync(ct);
+        var hasEssayQuestions = essayQuestionIds.Count > 0;
+        if (hasEssayQuestions && !await db.ExamSubmissionDocuments.AnyAsync(x => x.AttemptId == attemptId, ct))
+            return BadRequest(new { message = "این آزمون سؤال تشریحی دارد؛ ابتدا پاسخ‌نامه PDF یا تصویر آن را بارگذاری کنید." });
+
         if (attempt.Exam.Questions.Count == 0)
         {
             var answerDocumentExists = await db.ExamSubmissionDocuments.AnyAsync(x => x.AttemptId == attemptId, ct);
@@ -884,12 +895,12 @@ public class ResultsController(AppDbContext db) : ControllerBase
             .FirstOrDefaultAsync(x => x.Id == id, ct);
         if (a is null) return NotFound();
         var isStudent = User.IsInRole("Student");
-        if (isStudent && (a.StudentId != User.UserId() || !a.Exam.ResultsPublished || a.Status != "Graded")) return NotFound();
+        if (isStudent && (a.StudentId != User.UserId() || a.Status == "InProgress")) return NotFound();
         if (!isStudent && !CanManage(a.Exam)) return Forbid();
 
         var questionIds = a.Answers.Select(x => x.QuestionId).Distinct().ToArray();
         var questionDetails = await db.Questions.Where(x => questionIds.Contains(x.Id))
-            .Select(x => new { x.Id, x.Text, x.CorrectAnswer }).ToDictionaryAsync(x => x.Id, ct);
+            .Select(x => new { x.Id, x.Text, x.Type, x.CorrectAnswer }).ToDictionaryAsync(x => x.Id, ct);
         var questionScores = await db.ExamQuestions.Where(x => x.ExamId == a.ExamId && questionIds.Contains(x.QuestionId))
             .ToDictionaryAsync(x => x.QuestionId, x => x.Score, ct);
         var totalRawPoints = await db.ExamQuestions.Where(x => x.ExamId == a.ExamId)
@@ -898,7 +909,7 @@ public class ResultsController(AppDbContext db) : ControllerBase
         {
             id = a.Id, examId = a.ExamId, exam = a.Exam.Title,
             score = a.Exam.ResultsPublished ? a.Score : null,
-            autoScore = isStudent ? null : a.Score,
+            autoScore = isStudent && a.Exam.ResultsPublished ? null : a.Score,
             pendingManualCount = a.Answers.Count(x => x.IsCorrect == null),
             maxScore = 100m, passingScore = a.Exam.PassingScore,
             status = a.Exam.ResultsPublished ? a.Status : "AwaitingPublication",
@@ -907,6 +918,7 @@ public class ResultsController(AppDbContext db) : ControllerBase
             {
                 questionId = answer.QuestionId,
                 question = questionDetails.TryGetValue(answer.QuestionId, out var detail) ? detail.Text : null,
+                questionType = questionDetails.TryGetValue(answer.QuestionId, out var typeDetail) ? typeDetail.Type : null,
                 correctAnswer = (!isStudent || a.Exam.ResultsPublished) && questionDetails.TryGetValue(answer.QuestionId, out var correct) ? correct.CorrectAnswer : null,
                 answer = answer.Answer,
                 isCorrect = (!isStudent || a.Exam.ResultsPublished) ? answer.IsCorrect : null,
@@ -947,7 +959,10 @@ public class ResultsController(AppDbContext db) : ControllerBase
         if (attempt.Status == "InProgress") return BadRequest(new { message = "آزمون هنوز ارسال نشده است." });
         var answer = await db.ExamAnswers.FirstOrDefaultAsync(x => x.ExamAttemptId == attemptId && x.QuestionId == questionId, ct);
         var examQuestion = await db.ExamQuestions.FirstOrDefaultAsync(x => x.ExamId == attempt.ExamId && x.QuestionId == questionId, ct);
+        var questionType = await db.Questions.Where(x => x.Id == questionId).Select(x => x.Type).FirstOrDefaultAsync(ct);
         if (answer is null || examQuestion is null) return NotFound();
+        if (questionType is not ("Essay" or "Text"))
+            return BadRequest(new { message = "فقط سؤال تشریحی از این مسیر قابل تصحیح دستی است." });
         if (request.Score > examQuestion.Score) return BadRequest(new { message = $"حداکثر نمره خام این سؤال {examQuestion.Score} است." });
         var totalExamPoints = await db.ExamQuestions.Where(x => x.ExamId == attempt.ExamId).SumAsync(x => (decimal?)x.Score, ct) ?? 0m;
         answer.AwardedScore = totalExamPoints <= 0 ? 0m : request.Score * 100m / totalExamPoints;
