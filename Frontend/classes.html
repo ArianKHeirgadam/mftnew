@@ -118,7 +118,7 @@
     ]);
     const memberIds = new Set((members.members || []).map(item => Number(item.id)));
     students = allStudents.filter(item => Number(item.departmentId) === Number(currentClass.departmentId) && item.isActive !== false);
-    selectedIds = memberIds;
+    selectedIds = new Set([...memberIds].filter(id => students.some(student => Number(student.id) === id)));
     $('#classSummary').textContent = currentClass.name + ' — ' + (currentClass.department || me?.department || 'دپارتمان') +
       ' — ' + selectedIds.size + ' عضو';
     $('#saveMembers').disabled = false;
