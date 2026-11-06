@@ -149,9 +149,10 @@
     const input = document.getElementById('studentAnswerPdf');
     const status = document.getElementById('studentPdfStatus');
     const file = input?.files?.[0];
-    if (!file) { toast('ابتدا فایل PDF پاسخ را انتخاب کنید.', 'warn'); return; }
-    if (file.size > 20 * 1024 * 1024 || (!file.type.includes('pdf') && !file.name.toLowerCase().endsWith('.pdf'))) {
-      toast('فایل باید PDF و حداکثر ۲۰ مگابایت باشد.', 'warn'); return;
+    if (!file) { toast('ابتدا فایل پاسخ را انتخاب کنید.', 'warn'); return; }
+    const extension = file.name.toLowerCase().split('.').pop();
+    if (file.size > 20 * 1024 * 1024 || !['pdf','jpg','jpeg','png'].includes(extension)) {
+      toast('فایل باید PDF، JPG، JPEG یا PNG و حداکثر ۲۰ مگابایت باشد.', 'warn'); return;
     }
     const form = new FormData(); form.append('file', file);
     const button = document.getElementById('uploadStudentPdf');
@@ -176,7 +177,48 @@
     if (!attempt?.attemptId || !Array.isArray(attempt.questions)) throw new Error('اطلاعات آزمون معتبر نیست؛ آزمون را دوباره شروع کنید.');
     questions = attempt.questions;
     allowQuestionNavigation = attempt.exam?.allowQuestionNavigation !== false;
-    if (!questions.length) throw new Error('برای این آزمون سؤالی ثبت نشده است.');
+    if (!questions.length) {
+      if (!attempt.exam?.examPdfAvailable) throw new Error('برای این آزمون نه سؤال ثبت شده و نه فایل PDF بارگذاری شده است.');
+      const panel = document.querySelector('.exam-nav-panel');
+      if (panel) panel.hidden = true;
+      if (card) card.innerHTML = `
+        <div class="alert alert-info" style="margin-bottom:16px">این آزمون به‌صورت برگه PDF برگزار می‌شود. فایل سؤال را دانلود کنید، پاسخ‌ها را روی کاغذ بنویسید، سپس تصویر یا PDF پاسخ‌نامه را بارگذاری و ارسال نهایی کنید.</div>
+        <h3 style="font-size:17px;margin-bottom:12px">${esc(attempt.exam?.title || 'آزمون PDF')}</h3>
+        <button type="button" class="btn btn-outline" id="pdfOnlyDownload">دانلود برگه سؤال (PDF)</button>
+        <div class="field" style="margin-top:22px">
+          <label for="pdfOnlyAnswerFile">بارگذاری پاسخ‌نامه (PDF، JPG، JPEG یا PNG — حداکثر ۲۰ مگابایت)</label>
+          <input class="input" id="pdfOnlyAnswerFile" type="file" accept=".pdf,.jpg,.jpeg,.png,application/pdf,image/jpeg,image/png">
+          <small class="text-soft">می‌توانید فایل PDF چندصفحه‌ای یا تصویر واضح پاسخ‌نامه را ارسال کنید.</small>
+        </div>
+        <div id="pdfOnlyUploadStatus" class="text-soft text-sm" aria-live="polite"></div>
+        <div class="flex gap-8" style="margin-top:18px;flex-wrap:wrap">
+          <button type="button" class="btn btn-primary" id="pdfOnlyUpload">بارگذاری پاسخ‌نامه</button>
+          <button type="button" class="btn btn-danger" id="pdfOnlySubmit">تأیید و ارسال نهایی آزمون</button>
+        </div>`;
+      document.getElementById('pdfOnlyDownload')?.addEventListener('click', async () => {
+        try { await api.download(`/exam-files/exams/${encodeURIComponent(attempt.exam.id)}`); }
+        catch (error) { toast(error.message || 'دانلود PDF ناموفق بود.', 'danger'); }
+      });
+      document.getElementById('pdfOnlyUpload')?.addEventListener('click', async () => {
+        const input = document.getElementById('pdfOnlyAnswerFile');
+        const file = input?.files?.[0];
+        if (!file) return toast('ابتدا فایل پاسخ‌نامه را انتخاب کنید.', 'warn');
+        const ext = file.name.toLowerCase().split('.').pop();
+        if (file.size > 20 * 1024 * 1024 || !['pdf','jpg','jpeg','png'].includes(ext))
+          return toast('فقط PDF، JPG، JPEG یا PNG تا سقف ۲۰ مگابایت مجاز است.', 'warn');
+        const form = new FormData(); form.append('file', file);
+        const button = document.getElementById('pdfOnlyUpload');
+        const status = document.getElementById('pdfOnlyUploadStatus');
+        button.disabled = true; status.textContent = 'در حال بارگذاری...';
+        try {
+          const result = await api.request(`/exam-files/attempts/${encodeURIComponent(attempt.attemptId)}`, { method:'POST', body:form });
+          status.textContent = `فایل «${result.fileName}» بارگذاری شد. اکنون ارسال نهایی را تأیید کنید.`;
+          toast('پاسخ‌نامه بارگذاری شد.', 'ok');
+        } catch (error) { status.textContent = error.message; toast(error.message, 'danger'); }
+        finally { button.disabled = false; }
+      });
+      document.getElementById('pdfOnlySubmit')?.addEventListener('click', submitExam);
+    }
     (attempt.answers || []).forEach(a => { if (a.answer != null) answers.set(a.questionId, a.answer); });
     const duration = Math.max(1, Number(attempt.exam?.durationMinutes || 45) * 60);
     const startedAt = attempt.startedAt ? new Date(attempt.startedAt).getTime() : Date.now();
