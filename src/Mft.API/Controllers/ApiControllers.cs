@@ -1132,10 +1132,14 @@ public class SettingsController(AppDbContext db) : ControllerBase
 public class ReportsController(AppDbContext db) : ControllerBase
 {
     [HttpGet("departments")]
-    public async Task<IActionResult> Departments(CancellationToken ct){
+    public async Task<IActionResult> Departments(CancellationToken ct)
+    {
         var q = db.Departments.AsQueryable();
-        if (User.IsInRole("Department"))q = q.Where(d => d.Id == User.DepartmentId());
-        return Ok(await q.Select(d => new{
+        if (User.IsInRole("Department"))
+            q = q.Where(d => d.Id == User.DepartmentId());
+
+        var rows = await q.Select(d => new
+        {
             department = d.Name,
             students = db.Users.Count(u => u.DepartmentId == d.Id && u.Role == UserRole.Student),
             teachers = db.Users.Count(u => u.DepartmentId == d.Id && u.Role == UserRole.Teacher),
@@ -1145,8 +1149,30 @@ public class ReportsController(AppDbContext db) : ControllerBase
             passedAttempts = db.ExamAttempts.Count(a => a.Exam.DepartmentId == d.Id && a.Score != null && a.Score >= a.Exam.PassingScore),
             passRate = db.ExamAttempts.Where(a => a.Exam.DepartmentId == d.Id && a.Score != null).Count(a => a.Score >= a.Exam.PassingScore) * 100.0 / Math.Max(1, db.ExamAttempts.Count(a => a.Exam.DepartmentId == d.Id && a.Score != null)),
             participation = db.ExamAttempts.Count(a => a.Exam.DepartmentId == d.Id)
+        }).ToListAsync(ct);
+
+        if (User.IsInRole("SuperAdmin"))
+        {
+            var unassignedStudents = await db.Users.CountAsync(u => u.DepartmentId == null && u.Role == UserRole.Student, ct);
+            var unassignedTeachers = await db.Users.CountAsync(u => u.DepartmentId == null && u.Role == UserRole.Teacher, ct);
+            if (unassignedStudents > 0 || unassignedTeachers > 0)
+            {
+                rows.Add(new
+                {
+                    department = "بدون دپارتمان",
+                    students = unassignedStudents,
+                    teachers = unassignedTeachers,
+                    exams = 0,
+                    averageScore = 0d,
+                    gradedAttempts = 0,
+                    passedAttempts = 0,
+                    passRate = 0d,
+                    participation = 0
+                });
+            }
         }
-        ).ToListAsync(ct));
+
+        return Ok(rows);
     }
 }
 static class ClaimsExtensions{
