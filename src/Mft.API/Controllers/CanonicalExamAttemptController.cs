@@ -90,6 +90,41 @@ public sealed class CanonicalExamAttemptController(
         return Ok(new { attempt.Id, attempt.StartedAt, Deadline = deadline, Sections = sections, SavedAnswers = saved });
     }
 
+    [HttpPut("{attemptId:long}/answers")]
+    public async Task<IActionResult> SaveAnswers(long examId, long attemptId, SaveAttemptAnswersRequest request, CancellationToken ct)
+    {
+        var attempt = await academic.ExamAttempts.FirstOrDefaultAsync(x =>
+            x.Id == attemptId && x.ExamId == examId && x.StudentUserId == StudentId, ct);
+        if (attempt is null) return NotFound();
+        if (attempt.StatusId != 1)
+            return Conflict(new { message = "این تلاش ثبت نهایی شده و پاسخ‌های آن قابل تغییر نیست." });
+        var exam = await academic.Exams.AsNoTracking().FirstAsync(x => x.Id == examId, ct);
+        var deadline = attempt.StartedAt.AddMinutes(exam.DurationMinutes);
+        if (DateTime.UtcNow >= deadline)
+            return Conflict(new { message = "مهلت آزمون به پایان رسیده است." });
+        var validIds = await academic.ExamQuestions.AsNoTracking()
+            .Where(x => academic.ExamSections.Any(s => s.Id == x.ExamSectionId && s.ExamId == examId))
+            .Select(x => x.Id).ToListAsync(ct);
+        if (request.Answers.Select(x => x.ExamQuestionId).Distinct().Count() != request.Answers.Count ||
+            request.Answers.Any(x => !validIds.Contains(x.ExamQuestionId)))
+            return BadRequest(new { message = "پاسخ تکراری یا متعلق به سؤال دیگری ارسال شده است." });
+
+        var existing = await academic.StudentAnswers
+            .Where(x => x.ExamAttemptId == attemptId).ToDictionaryAsync(x => x.ExamQuestionId, ct);
+        foreach (var answer in request.Answers)
+        {
+            var json = answer.Value.GetRawText();
+            if (existing.TryGetValue(answer.ExamQuestionId, out var saved))
+                saved.AnswerJson = json;
+            else
+                academic.StudentAnswers.Add(new CanonicalStudentAnswer {
+                    ExamAttemptId = attemptId, ExamQuestionId = answer.ExamQuestionId, AnswerJson = json
+                });
+        }
+        await academic.SaveChangesAsync(ct);
+        return Ok(new { savedCount = request.Answers.Count, savedAt = DateTime.UtcNow });
+    }
+
     [HttpPost("{attemptId:long}/submit")]
     public async Task<IActionResult> Submit(long examId, long attemptId, SubmitAttemptRequest request, CancellationToken ct)
     {
@@ -162,10 +197,19 @@ public sealed class CanonicalExamAttemptController(
             else return BadRequest(new { message = "نوع سؤال پشتیبانی نمی‌شود." });
 
             if (auto) autoScore += score ?? 0;
-            academic.StudentAnswers.Add(new CanonicalStudentAnswer {
-                ExamAttemptId = attempt.Id, ExamQuestionId = q.Id, AnswerJson = json,
-                IsAutoGraded = auto, Score = score
-            });
+            if (await academic.StudentAnswers.FirstOrDefaultAsync(x => x.ExamAttemptId == attempt.Id && x.ExamQuestionId == q.Id, ct) is { } existingAnswer)
+            {
+                existingAnswer.AnswerJson = json;
+                existingAnswer.IsAutoGraded = auto;
+                existingAnswer.Score = score;
+            }
+            else
+            {
+                academic.StudentAnswers.Add(new CanonicalStudentAnswer {
+                    ExamAttemptId = attempt.Id, ExamQuestionId = q.Id, AnswerJson = json,
+                    IsAutoGraded = auto, Score = score
+                });
+            }
         }
         attempt.AutoGradedScore = autoScore;
         attempt.SubmittedAt = DateTime.UtcNow;
@@ -184,4 +228,9 @@ public sealed class SubmittedAnswer
 {
     public long ExamQuestionId { get; set; }
     public JsonElement Value { get; set; }
+}
+
+public sealed class SaveAttemptAnswersRequest
+{
+    public List<SubmittedAnswer> Answers { get; set; } = new();
 }
