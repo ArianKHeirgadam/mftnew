@@ -1499,3 +1499,21 @@ body[data-active="notifications"] .notification-item { background: var(--surface
 body[data-active="notifications"] .notification-item p { color: var(--text-soft, #667085); }
 body[data-active="notifications"] .empty-state { background: var(--surface, #fff); color: var(--text, #202938); border-radius: var(--r-md, 12px); padding: 24px; text-align: center; }
 body[data-active="notifications"] [data-class-create-wrap] { margin-top: 12px; }
+
+
+/* Notification tabs use theme tokens in both light and dark mode. */
+body[data-active="notifications"] [data-tabs] .tab-btn {
+  background: var(--surface);
+  color: var(--text-soft);
+  border: 1px solid var(--border);
+  border-bottom: 2px solid transparent;
+  border-radius: var(--r-sm) var(--r-sm) 0 0;
+}
+body[data-active="notifications"] [data-tabs] .tab-btn.active {
+  background: var(--surface);
+  color: var(--primary);
+  border-color: var(--border);
+  border-bottom-color: var(--primary);
+}
+body[data-active="notifications"] .tab-panel { color: var(--text); }
+body[data-active="notifications"] .empty-state { background: var(--surface); color: var(--text); border: 1px solid var(--border); }
