@@ -185,7 +185,7 @@ public sealed class ExamFilesController(AppDbContext db, IWebHostEnvironment env
         if (attempt is null) return NotFound();
         if (User.IsInRole("Student"))
         {
-            if (attempt.StudentId != User.UserId() || !attempt.Exam.ResultsPublished || attempt.Status != "Graded") return NotFound();
+            if (attempt.StudentId != User.UserId()) return NotFound();
         }
         else if (!CanManage(attempt.Exam)) return Forbid();
 
