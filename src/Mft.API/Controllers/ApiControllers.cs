@@ -862,8 +862,8 @@ public class ResultsController(AppDbContext db) : ControllerBase
             studentId = x.StudentId,
             studentName = db.Users.Where(u => u.Id == x.StudentId).Select(u => u.FullName).FirstOrDefault(),
             startedAt = x.StartedAt, submittedAt = x.SubmittedAt,
-            score = x.Exam.ResultsPublished ? x.Score : null,
-            status = x.Exam.ResultsPublished ? x.Status : "AwaitingPublication",
+            score = (!User.IsInRole("Student") || x.Exam.ResultsPublished) ? x.Score : null,
+            status = User.IsInRole("Student") && !x.Exam.ResultsPublished ? "AwaitingPublication" : x.Status,
             resultsPublished = x.Exam.ResultsPublished
         }).ToListAsync(ct));
     }
