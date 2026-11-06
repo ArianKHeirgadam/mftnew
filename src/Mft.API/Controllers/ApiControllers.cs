@@ -302,6 +302,7 @@ public class QuestionsController(AppDbContext db) : ControllerBase
             .Select(question => new
             {
                 Id = question.Id,
+                DepartmentId = question.DepartmentId,
                 Text = question.Text,
                 Category = question.Category,
                 Type = question.Type,
@@ -315,6 +316,7 @@ public class QuestionsController(AppDbContext db) : ControllerBase
         var response = rows.Select(question => new
         {
             id = question.Id,
+            departmentId = question.DepartmentId,
             text = question.Text,
             category = question.Category,
             type = question.Type,
@@ -338,7 +340,7 @@ public class QuestionsController(AppDbContext db) : ControllerBase
         if (User.IsInRole("Teacher") && q.CreatedByUserId != User.UserId()) return Forbid();
         if (User.IsInRole("Department") && !await db.Users.AnyAsync(user => user.Id == q.CreatedByUserId && user.DepartmentId == User.DepartmentId(), ct)) return Forbid();
         return Ok(new {
-            id = q.Id, text = q.Text, category = q.Category, type = q.Type, difficulty = q.Difficulty, options = q.OptionsJson == null?Array.Empty<string>():JsonSerializer.Deserialize<string[]>(q.OptionsJson)!, correctAnswer = q.CorrectAnswer, score = q.Score
+            id = q.Id, departmentId = q.DepartmentId, text = q.Text, category = q.Category, type = q.Type, difficulty = q.Difficulty, options = q.OptionsJson == null?Array.Empty<string>():JsonSerializer.Deserialize<string[]>(q.OptionsJson)!, correctAnswer = q.CorrectAnswer, score = q.Score
         }
         );
     }
