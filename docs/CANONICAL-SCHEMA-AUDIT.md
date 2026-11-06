@@ -15,7 +15,7 @@ This is a code/schema compatibility audit based on the canonical SQL Server sche
 | Department identity | `Guid` | `Departments.Id bigint identity` | Same |
 | User role | `User.Role` enum column | `Roles` + `UserRoles` | Resolve role through normalized join; map DB `DepartmentAdmin` to API/policy alias `Department` |
 | Phone | `Mobile` | `PhoneNumber nvarchar(20)` | Map/rename explicitly; enforce unique phone semantics |
-| User security flags | `MustChangePassword` | Not in supplied Users schema | Keep outside Users row (e.g. dedicated auth/profile extension) only if product requires it; do not silently map to nonexistent column |
+| Password lifecycle | Admin-defined initial password only | `Users.PasswordHash` | Hash the admin-defined password with BCrypt; no forced first-login change, no `MustChangePassword` field or endpoint |
 | Department | ManagerUserId, ManagerName, DegreeLevel | No such columns | Remove from persistence model; derive manager display only if a valid relationship exists elsewhere |
 | Question | DepartmentId, Category, Type, Difficulty, OptionsJson, CorrectAnswer, IsActive | SkillId, QuestionTypeId, DifficultyLevel, MetadataJson | Rework question domain/persistence mapping; category is reached through Skill -> ExamCategory; options/correct answer use related tables/metadata |
 | MCQ options | `QuestionOptions`, Guid key | `MultipleChoiceOptions`, bigint key | Rename and map real columns |
@@ -43,9 +43,16 @@ The supplied schema export does not include Classes, ClassMembers, Notifications
 
 - The current application exposes Guid identifiers in route constraints and request/response contracts across several controllers; changing only EF entities would break the API.
 - The current `User` aggregate has a single enum role, while the canonical schema permits multiple rows in UserRoles. Confirm whether multiple roles per user are intended. The persistence implementation should still query normalized roles.
-- The canonical Users schema has no `MustChangePassword` column. Decide whether to add a separate extension table through an approved additive script or remove this behavior.
+- Password-change flow and `MustChangePassword` have been removed by product decision; the admin-defined initial password remains the account password.
 - The canonical Departments schema has no manager column. Department manager ownership must not be persisted by inventing columns; decide whether department administration is determined only by role + Users.DepartmentId or requires a separate extension.
 - No live SQL Server connection or restored database was available during this audit; no build or integration test is claimed.
+
+## Implementation progress
+
+- Removed `MustChangePassword` from the domain user, login and create-user contracts, bootstrap account creation, and API responses.
+- Removed the `/api/auth/change-password` endpoint and the profile-page password-change panel and JavaScript handler.
+- Added `CanonicalIdentityDbContext` with explicit mappings for `Users`, `Departments`, `Roles`, and `UserRoles`, using the canonical bigint/int key types and foreign-key delete behaviors. It is registered against the existing connection string but is not yet used by the live authentication flow; this avoids mixing bigint identity claims with the remaining GUID-based controllers.
+- The existing legacy `AppDbContext` and GUID-based user endpoints are not yet cut over. Do not deploy against the canonical database until the coordinated identity/controller migration is complete.
 
 ## Current conclusion
 
