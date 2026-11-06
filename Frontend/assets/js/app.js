@@ -283,7 +283,8 @@ function initTabs() {
     btns.forEach((btn) => {
       btn.addEventListener("click", () => {
         btns.forEach((b) => b.classList.remove("active"));
-        wrap.querySelectorAll(".tab-panel").forEach((p) => p.classList.remove("active"));
+        const panelRoot = wrap.parentElement;
+        panelRoot?.querySelectorAll(".tab-panel").forEach((p) => p.classList.remove("active"));
         btn.classList.add("active");
         document.getElementById(btn.dataset.tab)?.classList.add("active");
       });
