@@ -161,20 +161,31 @@
   async function loadExams() {
     const role = (document.body.dataset.role || currentUser()?.role || '').toLowerCase();
     if (role !== 'student' || document.body.dataset.active !== 'dashboard') return;
-    const rows = await request('/exams');
-    renderRows('body[data-active="dashboard"] tbody', rows, row => `<tr>
-      <td>${escapeHtml(row.title)}</td><td>${escapeHtml(row.subject || '—')}</td>
-      <td>${row.startsAt ? new Date(row.startsAt).toLocaleDateString('fa-IR') : '—'}</td>
-      <td>${faNumber(row.durationMinutes)} دقیقه</td><td>${row.isPublished ? 'آماده برگزاری' : 'منتشر نشده'}</td>
-      <td>${row.isPublished ? `<button class="btn btn-primary" data-exam-start="${row.id}">شروع آزمون</button>` : '—'}</td></tr>`, 6);
-    const nextExam = rows.filter(row => row.isPublished && (!row.startsAt || new Date(row.startsAt).getTime() >= Date.now())).sort((a, b) => (a.startsAt ? new Date(a.startsAt).getTime() : Infinity) - (b.startsAt ? new Date(b.startsAt).getTime() : Infinity))[0];
+    const rows = await request('/canonical/exams');
+    renderRows('body[data-active="dashboard"] tbody', rows, row => {
+      const alreadyAttempted = row.hasAttempt === true;
+      const starts = row.startAt ? new Date(row.startAt) : null;
+      const ends = row.endAt ? new Date(row.endAt) : null;
+      const now = Date.now();
+      const available = row.isPublished && (!starts || starts.getTime() <= now) && (!ends || ends.getTime() >= now);
+      const action = alreadyAttempted
+        ? '<span class="badge badge-muted">تلاش ثبت شده — شرکت مجدد ممنوع</span>'
+        : available ? `<button class="btn btn-primary" data-exam-start="${row.id}">شروع آزمون</button>`
+        : '<span class="badge badge-muted">خارج از بازه برگزاری</span>';
+      return `<tr>
+        <td>${escapeHtml(row.title)}</td><td>—</td>
+        <td>${starts ? starts.toLocaleDateString('fa-IR') : '—'}</td>
+        <td>${faNumber(row.durationMinutes)} دقیقه</td><td>${row.isPublished ? 'منتشر شده' : 'منتشر نشده'}</td>
+        <td>${action}</td></tr>`;
+    }, 6);
+    const nextExam = rows.filter(row => row.isPublished && row.hasAttempt !== true && (!row.startAt || new Date(row.startAt).getTime() <= Date.now()) && (!row.endAt || new Date(row.endAt).getTime() >= Date.now())).sort((a, b) => (a.startAt ? new Date(a.startAt).getTime() : Infinity) - (b.startAt ? new Date(b.startAt).getTime() : Infinity))[0];
     const nextCard = $('body[data-active="dashboard"] .eyebrow');
     if (nextCard?.textContent.includes('آزمون پیش رو')) {
       const card = nextCard.closest('.card');
       const title = $('h2', card); const details = $('p', card); const link = $('a', card);
       if (nextExam) {
         if (title) title.textContent = nextExam.title;
-        if (details) details.textContent = `${nextExam.startsAt ? new Date(nextExam.startsAt).toLocaleString('fa-IR') : 'زمان شروع اعلام نشده'} — مدت زمان: ${faNumber(nextExam.durationMinutes)} دقیقه`;
+        if (details) details.textContent = `${nextExam.startAt ? new Date(nextExam.startAt).toLocaleString('fa-IR') : 'آزمون در حال برگزاری است'} — مدت زمان: ${faNumber(nextExam.durationMinutes)} دقیقه`;
         if (link) { link.dataset.examStart = String(nextExam.id); link.href = '#'; link.textContent = 'شروع آزمون'; }
       } else {
         if (title) title.textContent = 'آزمون زمان‌بندی‌شده‌ای وجود ندارد';
@@ -860,9 +871,20 @@
           await request(`/notifications/${target.dataset.notificationRead}/read`, { method: 'PUT' });
           await loadNotifications();
         } else if (target.dataset.examStart) {
-          const attempt = await request(`/exams/${target.dataset.examStart}/start`, { method: 'POST' });
-          sessionStorage.setItem('mft.activeAttempt', JSON.stringify(attempt));
-          location.href = 'online-exam.html';
+          target.disabled = true;
+          try {
+            const examId = target.dataset.examStart;
+            const attempt = await request(`/canonical/exams/${encodeURIComponent(examId)}/attempt/start`, { method: 'POST' });
+            location.href = `online-exam.html?examId=${encodeURIComponent(examId)}&attemptId=${encodeURIComponent(attempt.attemptId)}`;
+          } catch (error) {
+            target.disabled = false;
+            if (/قبلاً تلاش|شرکت مجدد|تلاش ثبت شده/i.test(error.message)) {
+              notify('برای این آزمون قبلاً تلاش ثبت شده است؛ امکان شرکت مجدد وجود ندارد.', 'warn');
+              await loadExams();
+              return;
+            }
+            throw error;
+          }
         } else if (target.dataset.resultView) {
           const result = await request(`/results/${target.dataset.resultView}`);
           const answers = result.answers.map(answer => `سؤال ${answer.questionId}: ${escapeHtml(answer.answer || 'بدون پاسخ')} — نمره ${faNumber(answer.awardedScore)}`).join('\n');
