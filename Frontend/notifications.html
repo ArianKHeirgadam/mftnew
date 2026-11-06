@@ -47,6 +47,11 @@
           <label for="notificationClass">کلاس مقصد</label>
           <select class="input" id="notificationClass" data-notification-class><option value="">در حال دریافت...</option></select>
           <p class="text-soft text-sm" data-class-summary></p>
+          <div class="field" data-class-roster-wrap hidden>
+            <label for="classRosterMembers">اعضای کلاس (برای ویرایش، اعضای موردنظر را انتخاب کنید)</label>
+            <select class="input" id="classRosterMembers" data-class-roster-members multiple size="6"></select>
+            <button class="btn btn-outline mt-8" type="button" data-class-roster-save>ذخیره اعضای کلاس</button>
+          </div>
         </div>
         <div class="grid-2" data-class-create-wrap hidden>
           <div class="field"><label for="newClassName">نام کلاس جدید</label><input class="input" id="newClassName" data-class-name maxlength="200" placeholder="مثلاً کلاس برنامه‌نویسی وب"></div>
