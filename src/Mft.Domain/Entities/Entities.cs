@@ -34,6 +34,7 @@ public class Department
     public bool IsActive { get; set; } = true;
     [System.ComponentModel.DataAnnotations.Schema.NotMapped]
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+    public User? Manager { get; set; }
     public ICollection<User> Users { get; set; } = new List<User>();
 }
 
@@ -52,6 +53,13 @@ public class Question
     public Guid CreatedByUserId { get; set; }
     [System.ComponentModel.DataAnnotations.Schema.NotMapped]
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+}
+
+public class QuestionOption
+{
+    public Guid Id { get; set; } = Guid.NewGuid();
+    public Guid QuestionId { get; set; }
+    public bool IsCorrect { get; set; }
 }
 
 public class Exam
@@ -106,7 +114,9 @@ public class ExamAnswer
     public Guid Id { get; set; } = Guid.NewGuid();
     public Guid ExamAttemptId { get; set; }
     public Guid QuestionId { get; set; }
+    public Guid? SelectedOptionId { get; set; }
     public string? Answer { get; set; }
+    public QuestionOption? SelectedOption { get; set; }
     public bool? IsCorrect { get; set; }
     public decimal AwardedScore { get; set; }
     public bool IsManuallyGraded { get; set; }
