@@ -779,11 +779,12 @@
 
   async function loadExamWizard() {
     if (!document.body.matches('[data-active="exams"]') || !$('#wizardSteps')) return;
-    const [departments, lookups, questions, me] = await Promise.all([
+    const [departments, lookups, questions, me, classes] = await Promise.all([
       request('/departments').catch(() => []),
       request('/canonical/questions/lookups'),
       request('/canonical/questions'),
-      request('/auth/me').catch(() => null)
+      request('/auth/me').catch(() => null),
+      request('/canonical/classes').catch(() => [])
     ]);
     const departmentWrap = $('#deptChoices');
     if (departmentWrap) {
@@ -792,6 +793,45 @@
       departmentWrap.innerHTML = visibleDepartments.length
         ? visibleDepartments.map((dept, index) => `<div class="choice-card ${index === 0 ? 'selected' : ''}" data-id="${dept.id}" data-value="${escapeHtml(dept.name)}"><div class="mohr sm"><div class="mohr-inner"><b>${escapeHtml(dept.name.slice(0, 2))}</b></div></div><b>${escapeHtml(dept.name)}</b></div>`).join('')
         : '<p class="text-soft">دپارتمان متصل به حساب شما پیدا نشد؛ ابتدا اتصال حساب به دپارتمان را بررسی کنید.</p>';
+    }
+    const classSelect = $('#examClass');
+    if (classSelect) {
+      classSelect.innerHTML = '<option value="">انتخاب کلاس آزمون</option>' +
+        classes.map(item => `<option value="${item.id}" data-department-id="${item.departmentId}">${escapeHtml(item.name)} — ${escapeHtml(item.department || '')} (${Number(item.memberCount || 0)} نفر)</option>`).join('');
+      if (!classes.length) classSelect.innerHTML = '<option value="">کلاسی ثبت نشده است؛ ابتدا کلاس ایجاد کنید</option>';
+      classSelect.onchange = () => {
+        const selected = classSelect.selectedOptions[0];
+        const deptId = Number(selected?.dataset.departmentId || 0);
+        const departmentCard = $('#deptChoices .choice-card').find(card => Number(card.dataset.id) === deptId);
+        if (departmentCard) {
+          $('#deptChoices .choice-card').forEach(card => card.classList.toggle('selected', card === departmentCard));
+          const preview = $('#prevDept');
+          if (preview) preview.textContent = departmentCard.dataset.value || departmentCard.textContent.trim();
+        }
+      };
+    }
+    const createClassButton = $('[data-create-class]');
+    if (createClassButton && !createClassButton.dataset.bound) {
+      createClassButton.dataset.bound = 'true';
+      createClassButton.addEventListener('click', async () => {
+        const departmentCard = $('#deptChoices .choice-card.selected');
+        if (!departmentCard?.dataset.id) return notify('ابتدا دپارتمان مقصد را انتخاب کنید.', 'warn');
+        const name = prompt('نام کلاس جدید را وارد کنید:');
+        if (!name?.trim()) return;
+        await safe(async () => {
+          await request('/canonical/classes', {
+            method: 'POST',
+            body: JSON.stringify({ name: name.trim(), departmentId: Number(departmentCard.dataset.id) })
+          });
+          await window.MftApi.refresh();
+          const select = $('#examClass');
+          const created = [...(select?.options || [])].find(option =>
+            option.textContent.startsWith(name.trim() + ' — ') &&
+            Number(option.dataset.departmentId) === Number(departmentCard.dataset.id));
+          if (created) select.value = created.value;
+          notify('کلاس ایجاد شد. اکنون اعضای آن را در بخش مدیریت کلاس‌ها تعیین کنید.', 'ok');
+        });
+      });
     }
     const categorySelect = $('#examCategory');
     if (categorySelect) categorySelect.innerHTML = '<option value="">انتخاب دسته‌بندی آزمون</option>' +
