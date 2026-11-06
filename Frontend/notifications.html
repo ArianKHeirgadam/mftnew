@@ -37,15 +37,26 @@
               <option value="Department">تمام اعضای یک دپارتمان</option>
               <option value="Managers">تمام مدیران دپارتمان</option>
               <option value="User">یک کاربر مشخص</option>
-              <option value="Class" disabled>اعضای یک کلاس (نیازمند تعریف کلاس در سامانه)</option>
+              <option value="Class">اعضای یک کلاس</option>
             </select>
           </div>
           <div class="field" data-notification-department-wrap><label for="notificationDepartment">دپارتمان مقصد</label><select class="input" id="notificationDepartment" data-notification-department><option value="">در حال دریافت...</option></select></div>
           <div class="field" data-notification-user-wrap hidden><label for="notificationUser">کاربر مقصد</label><select class="input" id="notificationUser" data-notification-user><option value="">در حال دریافت...</option></select></div>
         </div>
+        <div class="field" data-notification-class-wrap hidden>
+          <label for="notificationClass">کلاس مقصد</label>
+          <select class="input" id="notificationClass" data-notification-class><option value="">در حال دریافت...</option></select>
+          <p class="text-soft text-sm" data-class-summary></p>
+        </div>
+        <div class="grid-2" data-class-create-wrap hidden>
+          <div class="field"><label for="newClassName">نام کلاس جدید</label><input class="input" id="newClassName" data-class-name maxlength="200" placeholder="مثلاً کلاس برنامه‌نویسی وب"></div>
+          <div class="field"><label for="newClassDepartment">دپارتمان کلاس</label><select class="input" id="newClassDepartment" data-class-department><option value="">انتخاب دپارتمان</option></select></div>
+          <div class="field"><label for="newClassMembers">اعضای کلاس (دانشجویان همان دپارتمان)</label><select class="input" id="newClassMembers" data-class-members multiple size="5"></select><small class="text-soft">برای انتخاب چند نفر، Ctrl را نگه دارید.</small></div>
+          <div class="field" style="align-self:end"><button class="btn btn-outline" type="button" data-class-create>ایجاد کلاس و ثبت اعضا</button></div>
+        </div>
         <div class="field"><label for="notificationTitle">عنوان اعلان</label><input class="input" id="notificationTitle" maxlength="250" data-notification-title placeholder="عنوان اعلان"></div>
         <div class="field"><label for="notificationMessage">متن اعلان</label><textarea class="input" id="notificationMessage" rows="4" data-notification-message placeholder="متن اعلان را بنویسید..."></textarea></div>
-        <p class="text-soft text-sm" data-notification-class-note hidden>ساختار کلاس و عضویت دانشجویان در کلاس هنوز در دیتابیس پروژه تعریف نشده است؛ برای جلوگیری از ارسال اشتباه، این گزینه فعلاً غیرفعال است.</p>
+        
         <button class="btn btn-primary" type="button" data-notification-send>ارسال اعلان</button>
       </section>
 
