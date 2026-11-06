@@ -71,6 +71,11 @@
 
         <!-- Step 3: Questions -->
         <div class="wpanel" id="step3">
+          <div class="alert alert-info" style="margin-bottom:14px">
+            <label class="checkbox-row"><input type="checkbox" id="pdfOnlyExam"> برگزاری آزمون فقط با PDF (بدون بانک سؤال و بدون اسکن یا استخراج محتوا)</label>
+            <small class="text-soft">در این حالت دانشجو PDF را دانلود می‌کند و پاسخ‌نامه دست‌نویس را به‌صورت عکس یا PDF ارسال می‌کند.</small>
+          </div>
+          <div id="questionSelectionArea">
           <div class="flex justify-between items-center" style="margin-bottom:16px">
             <h3>انتخاب سوالات</h3>
             <label class="checkbox-row"><input type="checkbox" id="randomToggle"> انتخاب تصادفی سوالات از بانک سوال</label>
@@ -85,13 +90,14 @@
             <div class="field"><label>تعداد سوالات تشریحی</label><input class="input" id="randomEssayCount" type="number" min="0" value="2"></div>
             <div class="field"><label>تعداد سؤال‌های وصل‌کردنی</label><input class="input" id="randomMatchingCount" type="number" min="0" value="0"></div>
           </div>
+          </div>
         </div>
 
         <!-- Step 4: Duration & Passing score -->
         <div class="wpanel" id="step4">
           <h3 style="margin-bottom:16px">اطلاعات آزمون، مدت زمان و نمره قبولی</h3>
           <div class="field"><label>عنوان آزمون</label><input class="input" id="examTitle" required placeholder="مثلاً آزمون میان‌ترم"></div>
-          <div class="field"><label>فایل PDF برگه آزمون (اختیاری، حداکثر ۲۰ مگابایت)</label><input class="input" id="examPdfFile" type="file" accept="application/pdf,.pdf"><small class="text-soft">فایل پس از ایجاد آزمون به‌صورت خصوصی ذخیره می‌شود و فقط کاربران مجاز به آن دسترسی دارند.</small></div>
+          <div class="field"><label>فایل PDF برگه آزمون (برای حالت فقط PDF الزامی، حداکثر ۲۰ مگابایت)</label><input class="input" id="examPdfFile" type="file" accept="application/pdf,.pdf"><small class="text-soft">فایل پس از ایجاد آزمون به‌صورت خصوصی ذخیره می‌شود و فقط کاربران مجاز به آن دسترسی دارند.</small></div>
           <div class="field"><label>درس / موضوع</label><input class="input" id="examSubject" placeholder="نام درس"></div>
           <div class="field"><label>توضیحات</label><textarea class="textarea" id="examDescription" rows="2" placeholder="توضیحات اختیاری"></textarea></div>
           <div class="grid-2" style="grid-template-columns:1fr 1fr">
@@ -152,11 +158,12 @@
     document.getElementById("wizNext").textContent = number === STEPS.length ? "انتشار آزمون" : "مرحله بعد";
     renderSteps();
     if (number === 6) {
+      const pdfOnly = document.getElementById("pdfOnlyExam").checked;
       const randomMode = document.getElementById("randomToggle").checked;
-      const selectedCount = randomMode
+      const selectedCount = pdfOnly ? 0 : randomMode
         ? Number(document.getElementById("randomMcqCount").value || 0) + Number(document.getElementById("randomEssayCount").value || 0) + Number(document.getElementById("randomMatchingCount").value || 0)
         : document.querySelectorAll('#manualPick input[type=checkbox]:checked').length;
-      document.getElementById("prevQuestionCount").textContent = `${selectedCount} سوال${randomMode ? ' (تصادفی)' : ''}`;
+      document.getElementById("prevQuestionCount").textContent = pdfOnly ? "فقط PDF (بدون سؤال ساختاریافته)" : `${selectedCount} سوال${randomMode ? ' (تصادفی)' : ''}`;
       document.getElementById("prevDuration").textContent = `${document.getElementById("examDuration").value || 0} دقیقه`;
       document.getElementById("prevPassingScore").textContent = `${document.getElementById("examPassingScore").value || 0} از ۲۰`;
     }
@@ -173,6 +180,9 @@
     document.getElementById("manualPick").style.display = event.target.checked ? "none" : "block";
     document.getElementById("randomPick").style.display = event.target.checked ? "block" : "none";
   });
+  document.getElementById("pdfOnlyExam").addEventListener("change", event => {
+    document.getElementById("questionSelectionArea").hidden = event.target.checked;
+  });
   document.getElementById("wizPrev").addEventListener("click", () => { if (current > 1) showStep(current - 1); });
   document.getElementById("wizNext").addEventListener("click", async () => {
     if (current < STEPS.length) {
@@ -183,8 +193,9 @@
     const api = window.MftApi;
     if (!api) return showToast("اتصال API آماده نیست.", "danger");
     const department = document.querySelector("#deptChoices .choice-card.selected");
-    let questionIds = [...document.querySelectorAll('#manualPick input[type="checkbox"]:checked')].map(input => input.value).filter(Boolean);
-    if (document.getElementById("randomToggle").checked) {
+    const pdfOnly = document.getElementById("pdfOnlyExam").checked;
+    let questionIds = pdfOnly ? [] : [...document.querySelectorAll('#manualPick input[type="checkbox"]:checked')].map(input => input.value).filter(Boolean);
+    if (!pdfOnly && document.getElementById("randomToggle").checked) {
       const pool = [...document.querySelectorAll('#manualPick input[type="checkbox"]')];
       const mcqCount = Math.max(0, Number(document.getElementById("randomMcqCount").value) || 0);
       const essayCount = Math.max(0, Number(document.getElementById("randomEssayCount").value) || 0);
@@ -199,7 +210,9 @@
     const durationMinutes = Number(document.getElementById("examDuration").value);
     if (!document.getElementById("examTitle").value.trim()) return showToast("عنوان آزمون را وارد کنید.", "warn");
     if (!Number.isInteger(durationMinutes) || durationMinutes < 1) return showToast("مدت آزمون باید حداقل یک دقیقه باشد.", "warn");
-    if (!questionIds.length) return showToast("حداقل یک سؤال برای آزمون انتخاب کنید؛ تعداد تصادفی را هم بررسی کنید.", "warn");
+    const examPdf = document.getElementById("examPdfFile")?.files?.[0];
+    if (pdfOnly && !examPdf) return showToast("برای آزمون PDF-only، ابتدا فایل PDF برگه سؤال را انتخاب کنید.", "warn");
+    if (!pdfOnly && !questionIds.length) return showToast("حداقل یک سؤال انتخاب کنید یا حالت آزمون فقط با PDF را فعال کنید.", "warn");
     let startsAt = null;
     const date = document.getElementById("examDate").value;
     const time = document.getElementById("examTime").value;
@@ -214,7 +227,6 @@
         createdByUserId: selectedTeacher?.dataset.id || null,
         questionIds
       }) });
-      const examPdf = document.getElementById("examPdfFile")?.files?.[0];
       if (examPdf) {
         const form = new FormData(); form.append("file", examPdf);
         try {
