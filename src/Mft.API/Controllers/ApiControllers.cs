@@ -1034,6 +1034,41 @@ public class NotificationsController(AppDbContext db) : ControllerBase
         if (unread == false)q = q.Where(x => x.IsRead);
         return Ok(await q.OrderByDescending(x => x.CreatedAt).ToListAsync(ct));
     }
+    [HttpPost, Authorize(Policy = "SuperAdmin")]
+    public async Task<IActionResult> Create([FromBody] JsonElement payload, CancellationToken ct)
+    {
+        var title = payload.TryGetProperty("title", out var titleValue) ? titleValue.GetString()?.Trim() : null;
+        var message = payload.TryGetProperty("message", out var messageValue) ? messageValue.GetString()?.Trim() : null;
+        var audience = payload.TryGetProperty("audience", out var audienceValue) ? audienceValue.GetString() : null;
+        if (string.IsNullOrWhiteSpace(title) || title.Length > 250 || string.IsNullOrWhiteSpace(message))
+            return BadRequest(new { message = "عنوان و متن اعلان الزامی است." });
+        IQueryable<User> recipients = db.Users.AsNoTracking().Where(u => u.IsActive);
+        if (string.Equals(audience, "Department", StringComparison.OrdinalIgnoreCase))
+        {
+            if (!payload.TryGetProperty("departmentId", out var departmentValue) || !Guid.TryParse(departmentValue.GetString(), out var departmentId))
+                return BadRequest(new { message = "دپارتمان مقصد را انتخاب کنید." });
+            if (!await db.Departments.AnyAsync(d => d.Id == departmentId, ct))
+                return BadRequest(new { message = "دپارتمان انتخاب‌شده معتبر نیست." });
+            recipients = recipients.Where(u => u.DepartmentId == departmentId && u.Role != UserRole.SuperAdmin);
+        }
+        else if (string.Equals(audience, "Managers", StringComparison.OrdinalIgnoreCase))
+            recipients = recipients.Where(u => u.Role == UserRole.Department);
+        else if (string.Equals(audience, "User", StringComparison.OrdinalIgnoreCase))
+        {
+            if (!payload.TryGetProperty("userId", out var userValue) || !Guid.TryParse(userValue.GetString(), out var userId))
+                return BadRequest(new { message = "کاربر مقصد را انتخاب کنید." });
+            recipients = recipients.Where(u => u.Id == userId);
+        }
+        else
+            return BadRequest(new { message = "گروه گیرندگان نامعتبر است. ارسال به کلاس تا زمان تعریف ساختار کلاس‌ها در سامانه فعال نیست." });
+        var recipientIds = await recipients.Select(u => u.Id).Distinct().ToListAsync(ct);
+        if (recipientIds.Count == 0) return BadRequest(new { message = "برای این گروه گیرنده فعالی پیدا نشد." });
+        var now = DateTime.UtcNow;
+        db.Notifications.AddRange(recipientIds.Select(userId => new Notification { UserId = userId, Title = title, Message = message, IsRead = false, CreatedAt = now }));
+        await db.SaveChangesAsync(ct);
+        return Ok(new { sent = recipientIds.Count, message = "اعلان برای گیرندگان انتخاب‌شده ثبت شد." });
+    }
+
     [HttpPut("{id:guid}/read")]
     public async Task<IActionResult> Read(Guid id, CancellationToken ct){
         var n = await db.Notifications.FirstOrDefaultAsync(x => x.Id == id && x.UserId == User.UserId(), ct);
@@ -1172,6 +1207,38 @@ public class ReportsController(AppDbContext db) : ControllerBase
             }
         }
 
+        return Ok(rows);
+    }
+
+    [HttpGet("recent-attempts")]
+    public async Task<IActionResult> RecentAttempts([FromQuery] Guid? departmentId, [FromQuery] string? search, [FromQuery] int take = 100, CancellationToken ct = default)
+    {
+        var q = db.ExamAttempts.AsNoTracking().Where(a => a.Status != "InProgress" && a.SubmittedAt != null);
+        if (User.IsInRole("Department")) q = q.Where(a => a.Exam.DepartmentId == User.DepartmentId());
+        else if (departmentId.HasValue) q = q.Where(a => a.Exam.DepartmentId == departmentId.Value);
+        if (!string.IsNullOrWhiteSpace(search))
+        {
+            var term = search.Trim();
+            q = q.Where(a => a.Exam.Title.Contains(term) ||
+                db.Users.Any(u => u.Id == a.StudentId && u.FullName.Contains(term)));
+        }
+        var rows = await q
+            .OrderBy(a => db.Departments.Where(d => d.Id == a.Exam.DepartmentId).Select(d => d.Name).FirstOrDefault())
+            .ThenByDescending(a => a.SubmittedAt)
+            .Take(Math.Clamp(take, 1, 250))
+            .Select(a => new
+            {
+                attemptId = a.Id,
+                departmentId = a.Exam.DepartmentId,
+                department = db.Departments.Where(d => d.Id == a.Exam.DepartmentId).Select(d => d.Name).FirstOrDefault() ?? "بدون دپارتمان",
+                studentId = a.StudentId,
+                student = db.Users.Where(u => u.Id == a.StudentId).Select(u => u.FullName).FirstOrDefault() ?? "کاربر حذف‌شده",
+                exam = a.Exam.Title,
+                score = a.Score,
+                status = a.Status,
+                startedAt = a.StartedAt,
+                submittedAt = a.SubmittedAt
+            }).ToListAsync(ct);
         return Ok(rows);
     }
 }
