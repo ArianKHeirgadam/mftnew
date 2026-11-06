@@ -107,7 +107,11 @@ BEGIN TRY
         )
             THROW 51310, 'An existing exam attempt cannot be mapped from Students.Id to Users.Id.', 1;
 
-        EXEC(N'ALTER TABLE dbo.ExamAttempts DROP CONSTRAINT ' + QUOTENAME(@studentFk) + N';');
+        DECLARE @dropStudentFkSql NVARCHAR(MAX);
+        SET @dropStudentFkSql =
+            N'ALTER TABLE dbo.ExamAttempts DROP CONSTRAINT '
+            + QUOTENAME(@studentFk) + N';';
+        EXEC sys.sp_executesql @dropStudentFkSql;
 
         UPDATE a
            SET StudentId=s.UserId
