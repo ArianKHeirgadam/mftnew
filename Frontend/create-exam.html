@@ -230,6 +230,7 @@
       bySkill.get(skillId).push(Number(input.value));
     });
     const groups = [...bySkill.entries()];
+    if (durationMinutes < groups.length) return showToast("مدت آزمون باید حداقل به تعداد مهارت‌های انتخاب‌شده دقیقه باشد.", "warn");
     const weightUnits = Math.floor(10000 / groups.length);
     let remainingWeight = 10000;
     let remainingMinutes = durationMinutes;
