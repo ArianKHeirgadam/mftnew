@@ -560,7 +560,7 @@
     const totalStudents = rows.reduce((sum, row) => sum + Number(row.students || 0), 0);
     const totalAttempts = rows.reduce((sum, row) => sum + Number(row.participation || 0), 0);
     const metrics = { exams: totalExams, passRate: weightedPassRate, participation: totalAttempts, students: totalStudents };
-    $('body[data-active="reports"] [data-metric]').forEach(element => {
+    document.querySelectorAll('body[data-active="reports"] [data-metric]').forEach(element => {
       const key = element.dataset.metric;
       if (key in metrics) element.textContent = faNumber(Math.round(metrics[key] * 10) / 10);
     });
