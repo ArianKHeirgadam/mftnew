@@ -128,6 +128,25 @@ public class ExamAnswer
     public ExamAttempt Attempt { get; set; } = null!;
 }
 
+public class StudentClass
+{
+    public Guid Id { get; set; } = Guid.NewGuid();
+    public string Name { get; set; } = "";
+    public Guid DepartmentId { get; set; }
+    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+    public ICollection<StudentClassMember> Members { get; set; } = new List<StudentClassMember>();
+}
+
+public class StudentClassMember
+{
+    public Guid Id { get; set; } = Guid.NewGuid();
+    public Guid ClassId { get; set; }
+    public Guid StudentUserId { get; set; }
+    public DateTime AddedAt { get; set; } = DateTime.UtcNow;
+    public StudentClass Class { get; set; } = null!;
+    public User Student { get; set; } = null!;
+}
+
 public class Notification
 {
     public Guid Id { get; set; } = Guid.NewGuid();
