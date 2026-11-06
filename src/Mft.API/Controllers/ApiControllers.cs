@@ -8,7 +8,7 @@ using Mft.Application.Contracts;
 using Mft.Domain.Entities;
 using Mft.Infrastructure.Persistence;
 namespace Mft.API.Controllers;
-/// <summary>Handles authentication and the current user password lifecycle.</summary>
+/// <summary>Handles authentication and the current user profile.</summary>
 [ApiController, Route("api/auth"), Authorize]
 public class AuthController(IAuthService auth, AppDbContext db) : ControllerBase
 {
@@ -29,31 +29,11 @@ public class AuthController(IAuthService auth, AppDbContext db) : ControllerBase
         var id = User.UserId();
         var u = await db.Users.Include(x => x.Department).FirstOrDefaultAsync(x => x.Id == id, ct);
         return u is null?NotFound():Ok(new{
-            id = u.Id, username = u.Username, fullName = u.FullName, role = u.Role.ToString(), email = u.Email, mobile = u.Mobile, departmentId = u.DepartmentId, department = u.Department?.Name, mustChangePassword = u.MustChangePassword
+            id = u.Id, username = u.Username, fullName = u.FullName, role = u.Role.ToString(), email = u.Email, mobile = u.Mobile, departmentId = u.DepartmentId, department = u.Department?.Name
         }
         );
     }
-    [HttpPost("change-password")]
-    public async Task<IActionResult> ChangePassword(ChangePasswordRequest r, CancellationToken ct){
-        var u = await db.Users.FindAsync(new object?[]{
-            User.UserId()
-        }
-        ,  ct);
-        if (u is null) return Unauthorized();
-        if (!BCrypt.Net.BCrypt.Verify(r.CurrentPassword, u.PasswordHash)) return BadRequest(new {
-            message = "رمز فعلی صحیح نیست."
-        }
-        );
-        if (string.IsNullOrWhiteSpace(r.NewPassword) || r.NewPassword.Length < 8) return BadRequest(new {
-            message = "رمز جدید باید حداقل ۸ کاراکتر باشد."
-        }
-        );
-        u.PasswordHash = BCrypt.Net.BCrypt.HashPassword(r.NewPassword);
-        u.MustChangePassword = false;
-        await db.SaveChangesAsync(ct);
-        return NoContent();
-    }
-}
+
 [ApiController, Route("api/users"), Authorize]
 public class UsersController(AppDbContext db) : ControllerBase
 {
@@ -114,7 +94,7 @@ public class UsersController(AppDbContext db) : ControllerBase
         }
         );
         var u = new User{
-            Username = normalizedUsername, PasswordHash = BCrypt.Net.BCrypt.HashPassword(password), FullName = r.FullName.Trim(), Role = role, Email = r.Email, Mobile = r.Mobile, DepartmentId = assignedDepartmentId, MustChangePassword = false
+            Username = normalizedUsername, PasswordHash = BCrypt.Net.BCrypt.HashPassword(password), FullName = r.FullName.Trim(), Role = role, Email = r.Email, Mobile = r.Mobile, DepartmentId = assignedDepartmentId
         }
         ;
         db.Users.Add(u);
