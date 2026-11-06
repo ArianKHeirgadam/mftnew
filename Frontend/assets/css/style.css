@@ -1488,3 +1488,11 @@ table.dt tbody tr:last-child td {
   margin-inline-start: -10px;
   border: 2px solid var(--surface);
 }
+
+/* Notification list tab panels and explicit light-theme surfaces */
+body[data-active="notifications"] .tab-panel { display: none; }
+body[data-active="notifications"] .tab-panel.active { display: block; }
+body[data-active="notifications"] .notification-item { background: var(--surface, #fff); color: var(--text, #202938); border: 1px solid var(--border, #e5e7eb); border-radius: var(--r-md, 12px); padding: 16px; margin: 10px 0; }
+body[data-active="notifications"] .notification-item p { color: var(--text-soft, #667085); }
+body[data-active="notifications"] .empty-state { background: var(--surface, #fff); color: var(--text, #202938); border-radius: var(--r-md, 12px); padding: 24px; text-align: center; }
+body[data-active="notifications"] [data-class-create-wrap] { margin-top: 12px; }
