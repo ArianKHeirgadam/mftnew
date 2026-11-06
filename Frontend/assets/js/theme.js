@@ -28,12 +28,30 @@
 
   document.addEventListener("DOMContentLoaded", () => {
     document.querySelectorAll("[data-theme-toggle]").forEach((btn) => {
+      if (btn.dataset.themeWired === "true") return;
+      btn.dataset.themeWired = "true";
       btn.addEventListener("click", () => {
         const current = document.documentElement.getAttribute("data-theme");
         apply(current === "dark" ? "light" : "dark");
       });
     });
-    // set correct icon on load
+    // Topbar is rendered by app.js during DOMContentLoaded; keep newly
+    // inserted theme buttons wired and their icons synchronized.
+    const syncThemeControls = () => {
+      document.querySelectorAll("[data-theme-icon]").forEach((btn) => {
+        btn.innerHTML = document.documentElement.getAttribute("data-theme") === "dark" ? ICONS.sun : ICONS.moon;
+      });
+      document.querySelectorAll("[data-theme-toggle]").forEach((btn) => {
+        if (btn.dataset.themeWired === "true") return;
+        btn.dataset.themeWired = "true";
+        btn.addEventListener("click", () => {
+          const current = document.documentElement.getAttribute("data-theme");
+          apply(current === "dark" ? "light" : "dark");
+        });
+      });
+    };
+    syncThemeControls();
+    new MutationObserver(syncThemeControls).observe(document.body, { childList: true, subtree: true });
     apply(document.documentElement.getAttribute("data-theme") || getPreferred());
   });
 })();
