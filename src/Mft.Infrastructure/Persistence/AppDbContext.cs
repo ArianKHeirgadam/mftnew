@@ -60,7 +60,11 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
             entity.Property(x => x.Id).HasColumnType("uniqueidentifier").ValueGeneratedNever();
             entity.Property(x => x.Score).HasColumnName("Points").HasPrecision(18, 2);
             entity.Property(x => x.DepartmentId).IsRequired();
-            entity.Property(x => x.CreatedByUserId).HasColumnName("CreatedByTeacherId");
+            // Question ownership is a user identity, not a Teachers table identity.
+            // SQL patch database/patch-question-owner-user-fk.sql renames the legacy column.
+            entity.Property(x => x.CreatedByUserId).HasColumnName("CreatedByUserId");
+            entity.HasOne<User>().WithMany().HasForeignKey(x => x.CreatedByUserId)
+                .OnDelete(DeleteBehavior.Restrict);
             entity.Property(x => x.Text).IsRequired();
             entity.Property(x => x.IsActive).IsRequired();
             entity.Property(x => x.Type).HasMaxLength(30).IsRequired();
