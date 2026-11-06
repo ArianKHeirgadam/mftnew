@@ -623,7 +623,11 @@
       const settingsSave = event.target.closest('[data-settings-save]');
       if (settingsSave) { event.preventDefault(); saveSettings(); return; }
       const questionSave = event.target.closest('[data-question-save]');
-      if (questionSave) { event.preventDefault(); saveQuestionFromModal(questionSave.closest('.modal-overlay')); return; }
+      if (questionSave) {
+        event.preventDefault();
+        if (document.body.dataset.active !== 'bank') saveQuestionFromModal(questionSave.closest('.modal-overlay'));
+        return;
+      }
       if (event.target.closest('[data-create-department]')) { event.preventDefault(); safe(createDepartmentInline); return; }
       if (event.target.closest('[data-create-manager]')) { event.preventDefault(); safe(createManagerInline); return; }
       if (event.target.closest('[data-create-teacher]')) { event.preventDefault(); safe(createTeacherInline); return; }
@@ -682,7 +686,7 @@
     const category = $('[data-question-category]', modal)?.value || 'عمومی';
     const optionFields = $$('[data-question-option]', modal);
     let options = optionFields.map(field => field.value.trim()).filter(Boolean);
-    const correctIndex = $$('input[name="correct"]', modal).findIndex(field => field.checked);
+    const correctIndex = Number($('#correctOption', modal)?.value || 0) - 1;
     let correctAnswer = type === 'MultipleChoice' ? (optionFields[correctIndex]?.value.trim() || null) : null;
     if (type === 'Matching') {
       const left = $$('[data-match-left]', modal).map(field => field.value.trim());
@@ -695,7 +699,9 @@
     }
     if (!text) return notify('متن سؤال الزامی است.', 'warn');
     if (type === 'MultipleChoice' && (options.length < 2 || !correctAnswer)) return notify('حداقل دو گزینه و پاسخ صحیح را مشخص کنید.', 'warn');
-    const payload = { text, type, difficulty, category, options: ['MultipleChoice','Matching'].includes(type) ? options : [], correctAnswer, score: 1 };
+    const departmentId = $('#questionDepartment', modal)?.value || null;
+    if (!departmentId) return notify('برای ثبت سؤال، یک دپارتمان معتبر انتخاب کنید. اگر فهرست خالی است، مدیر سامانه باید حساب شما را به دپارتمان متصل کند.', 'warn');
+    const payload = { text, departmentId, type, difficulty, category, options: ['MultipleChoice','Matching'].includes(type) ? options : [], correctAnswer, score: 1 };
     await safe(async () => {
       const id = modal.dataset.editId;
       await request(id ? `/questions/${id}` : '/questions', { method: id ? 'PUT' : 'POST', body: JSON.stringify(payload) });
@@ -875,7 +881,8 @@
       $('#matchingOptions', modal).hidden = true;
     }
     const correctIndex = question.options?.indexOf(question.correctAnswer) ?? -1;
-    $$('input[name="correct"]', modal).forEach((field, index) => field.checked = index === correctIndex);
+    if ($('#correctOption', modal)) $('#correctOption', modal).value = correctIndex >= 0 ? String(correctIndex + 1) : '';
+    if ($('#questionDepartment', modal) && question.departmentId) $('#questionDepartment', modal).value = question.departmentId;
     modal.classList.add('show');
   }
 
