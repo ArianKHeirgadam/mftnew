@@ -33,7 +33,7 @@ public sealed class CanonicalIdentityDbContext(
             entity.Property(x => x.CreatedAt).HasColumnType("datetime2")
                 .HasDefaultValueSql("sysutcdatetime()");
             entity.HasIndex(x => x.Username).IsUnique();
-            entity.HasIndex(x => x.PhoneNumber).IsUnique();
+            entity.HasIndex(x => x.PhoneNumber).IsUnique().HasFilter("[PhoneNumber] IS NOT NULL");
             entity.HasOne(x => x.Department).WithMany(x => x.Users)
                 .HasForeignKey(x => x.DepartmentId)
                 .OnDelete(DeleteBehavior.NoAction);
