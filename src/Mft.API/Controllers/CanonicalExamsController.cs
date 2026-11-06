@@ -112,6 +112,43 @@ public sealed class CanonicalExamsController(
         return NoContent();
     }
 
+    [HttpPost("{id:long}/assign-class")]
+    [Authorize(Policy = "TeacherOrAbove")]
+    public async Task<IActionResult> AssignClass(long id, CanonicalExamClassAssignmentRequest request, CancellationToken ct)
+    {
+        if (request.ClassId <= 0)
+            return BadRequest(new { message = "شناسه کلاس معتبر نیست." });
+
+        // Serializable isolation prevents a new attempt from appearing between
+        // the no-attempt check and the class assignment.
+        await using var transaction = await academic.Database.BeginTransactionAsync(
+            System.Data.IsolationLevel.Serializable, ct);
+
+        var exam = await academic.Exams.FirstOrDefaultAsync(x => x.Id == id, ct);
+        if (exam is null) return NotFound();
+        if (!await CanManage(exam, ct)) return Forbid();
+
+        if (exam.ClassId.HasValue)
+            return Conflict(new { message = "این آزمون قبلاً به کلاس متصل شده است؛ تخصیص مجدد از این مسیر مجاز نیست." });
+
+        if (await academic.ExamAttempts.AnyAsync(x => x.ExamId == id, ct))
+            return Conflict(new {
+                code = "EXAM_HAS_ATTEMPTS",
+                message = "این آزمون سابقه تلاش دانشجو دارد. برای حفظ سوابق و دسترسی، تخصیص آن باید پس از بررسی گزارش عضویت انجام شود."
+            });
+
+        var classExists = await academic.Classes.AnyAsync(
+            x => x.Id == request.ClassId && x.DepartmentId == exam.DepartmentId, ct);
+        if (!classExists)
+            return BadRequest(new { message = "کلاس انتخاب‌شده وجود ندارد یا متعلق به دپارتمان آزمون نیست." });
+
+        exam.ClassId = request.ClassId;
+        await academic.SaveChangesAsync(ct);
+        await transaction.CommitAsync(ct);
+
+        return Ok(new { examId = exam.Id, classId = exam.ClassId });
+    }
+
     [HttpDelete("{id:long}")]
     [Authorize(Policy = "TeacherOrAbove")]
     public async Task<IActionResult> Delete(long id, CancellationToken ct)
@@ -202,4 +239,9 @@ public sealed class ExamSectionInput
     public int DurationMinutes { get; set; }
     public decimal WeightPercent { get; set; }
     public List<long> QuestionIds { get; set; } = new();
+}
+
+public sealed class CanonicalExamClassAssignmentRequest
+{
+    public long ClassId { get; set; }
 }
