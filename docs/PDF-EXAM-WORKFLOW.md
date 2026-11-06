@@ -1,34 +1,45 @@
-# PDF exam workflow — deployment and verification
+# PDF-based exam workflow
+
+## Intended flow
+
+1. A teacher creates an exam and chooses either:
+   - a structured exam using questions from the question bank; or
+   - PDF-only mode, with no structured questions.
+2. In PDF-only mode, the teacher must upload the original exam paper as a PDF (maximum 20 MB).
+3. The student starts the published exam and downloads the same original PDF. The application does not OCR, scan, parse, or import questions from that file.
+4. The student writes answers on paper, photographs/scans the answer sheet, and uploads one PDF, JPG, JPEG, or PNG file (maximum 20 MB).
+5. The student previews the selected local file and confirms final submission.
+6. The teacher opens the submitted attempt, previews or downloads the student's answer sheet, and enters a score from 0 to 100.
+7. Results remain hidden from students until the teacher publishes the exam results.
 
 ## Deployment order
 
-1. Back up the target SQL Server database and test the patch against a restored copy.
-2. Execute `database/patch-exam-pdf-workflow.sql`. The script is additive and re-runnable; it does not drop existing data.
+1. Back up the target SQL Server database and test the additive patch against a restored copy.
+2. Execute `database/patch-exam-pdf-workflow.sql`.
 3. Deploy the API and frontend together.
-4. Ensure the API process identity can create, read, and delete files under `src/Mft.API/App_Data/exam-files` (or the equivalent API content-root path in the deployment).
-5. Include that private directory in the deployment's protected backup strategy. Do not expose it through static-file middleware or move it under `wwwroot`.
-6. Verify the API build, SQL Server connectivity, and role-based tests before production use.
+4. Ensure the API process identity can create/read/delete files under `App_Data/exam-files` under the API content root.
+5. Keep that directory private and include it in protected backups. Do not expose it through static-file middleware or place it under `wwwroot`.
+6. For multiple API instances, configure shared private storage before scaling out.
 
-## End-to-end acceptance test
+## Acceptance checks
 
-Use a development database and test accounts for one teacher, one student in the same department, and one student in a different department.
+- Create a PDF-only exam with no question-bank entries and upload its PDF.
+- Verify a student in the exam's department can start it and download the exact uploaded PDF.
+- Verify students outside the department cannot access the exam PDF or attempt.
+- Verify the student can upload a valid PDF, JPG, JPEG, or PNG answer sheet, preview it, and submit.
+- Verify an unsupported extension, invalid file signature, empty file, or file over 20 MB is rejected.
+- Verify a student cannot submit a PDF-only attempt without an uploaded answer sheet.
+- Verify the teacher sees the attempt in the pending-grading queue and can preview/download the student's answer sheet.
+- Verify the teacher can assign a score from 0 to 100 and cannot edit a result after publication.
+- Verify publication is blocked while any submitted PDF-only attempt remains ungraded.
+- Verify students cannot see their score or another student's answer sheet before publication, and cannot access another student's attempt at any time.
+- Verify structured-question exams continue to start, save answers, submit, and use their existing grading workflow.
+- Verify the old PDF question-import/OCR route is no longer present.
 
-1. Teacher creates an exam with two multiple-choice questions and one essay question, and optionally uploads the exam PDF.
-2. Verify the exam PDF can be downloaded by the owning teacher and the in-department student after the exam is published. Verify another department's student receives no access.
-3. Student starts the exam, answers the questions, uploads a PDF response, and submits before the deadline.
-4. Verify the student cannot read the result or download their submission PDF before result publication.
-5. Teacher opens the attempt result detail, downloads the student's PDF, and grades the essay answer question-by-question.
-6. Verify the teacher cannot enter a score greater than the question's configured raw points.
-7. Verify publication is rejected while any saved answer still needs manual grading.
-8. Teacher publishes results. Verify the student can now read the result, correct answers, awarded scores, and download their own submitted PDF. Verify the exam is closed to new attempts after publication.
-9. Verify the student cannot read another student's attempt or download another student's PDF.
-10. Verify a teacher cannot grade an exam owned by another teacher, and a department manager cannot grade outside their department.
-11. Unpublish results before making any correction; grading endpoints reject changes while results remain published.
+## Security and operational notes
 
-## Important limits
-
-- PDF question extraction uses selectable text. Scanned PDFs need OCR before import; OCR is not implemented here.
-- The upload endpoint checks file extension, size, and the PDF signature. It is not an antivirus scanner or a complete PDF sanitization service.
-- Files are stored on the API host's local filesystem. Multi-instance deployments need shared private storage or an equivalent storage service before scaling out.
-- A failed database write after file creation may leave an orphaned file; periodic private-storage cleanup should be part of operational maintenance.
-- This implementation has not been compiled or integration-tested in this environment because the .NET SDK and a SQL Server instance are unavailable. Do not consider the workflow production-ready until the acceptance test above passes on the target environment.
+- Upload validation checks extension, size, and a basic file signature; it is not antivirus scanning or complete document sanitization.
+- Files use server-generated names and are stored outside `wwwroot`.
+- Local filesystem storage is suitable only when the API host's storage is persistent and backed up.
+- A database failure after a file is written can leave an orphaned file; schedule private-storage cleanup.
+- This change has not been compiled or browser-tested in the target environment. Run `dotnet restore`, `dotnet build Mft.sln`, and the acceptance checks above before production use.
