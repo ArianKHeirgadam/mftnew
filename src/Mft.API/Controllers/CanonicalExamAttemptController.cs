@@ -87,7 +87,7 @@ public sealed class CanonicalExamAttemptController(
                         MatchingLeftItems = academic.MatchingPairs.Where(p => p.QuestionId == eq.QuestionId).OrderBy(p => p.DisplayOrder).Select(p => p.LeftItem).ToList(),
                         MatchingRightItems = academic.MatchingPairs.Where(p => p.QuestionId == eq.QuestionId).OrderBy(p => p.DisplayOrder).Select(p => p.RightItem).ToList()
                     }).ToList()
-            }).ToList();
+            }).ToListAsync(ct);
         var saved = await academic.StudentAnswers.AsNoTracking().Where(x => x.ExamAttemptId == attemptId)
             .ToDictionaryAsync(x => x.ExamQuestionId, x => x.AnswerJson, ct);
         return Ok(new { attempt.Id, attempt.StartedAt, Deadline = deadline, Sections = sections, SavedAnswers = saved });
@@ -129,7 +129,7 @@ public sealed class CanonicalExamAttemptController(
     }
 
     [HttpPost("{attemptId:long}/submit")]
-    public async Task<IActionResult> Submit(long examId, long attemptId, SubmitAttemptRequest request, CancellationToken ct)
+    public async Task<IActionResult> Submit(long examId, long attemptId, CanonicalSubmitAttemptRequest request, CancellationToken ct)
     {
         var attempt = await academic.ExamAttempts.FirstOrDefaultAsync(x => x.Id == attemptId && x.ExamId == examId && x.StudentUserId == StudentId, ct);
         if (attempt is null) return NotFound();
@@ -230,11 +230,11 @@ public sealed class CanonicalExamAttemptController(
     }
 }
 
-public sealed class SubmitAttemptRequest
+public sealed class CanonicalSubmitAttemptRequest
 {
-    public List<SubmittedAnswer> Answers { get; set; } = new();
+    public List<CanonicalSubmittedAnswer> Answers { get; set; } = new();
 }
-public sealed class SubmittedAnswer
+public sealed class CanonicalSubmittedAnswer
 {
     public long ExamQuestionId { get; set; }
     public JsonElement Value { get; set; }
