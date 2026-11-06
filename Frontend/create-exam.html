@@ -52,6 +52,14 @@
         <div class="wpanel active" id="step1">
           <h3 style="margin-bottom:16px">دپارتمان را انتخاب کنید</h3>
           <div class="flex items-center justify-between gap-8" style="margin-bottom:12px"><span class="text-soft text-sm">اگر دپارتمان موردنظر وجود ندارد، همین‌جا بسازید.</span><button type="button" class="btn btn-outline btn-sm" data-create-department>+ ایجاد دپارتمان</button></div>
+          <div class="field" style="margin-top:16px">
+            <label for="examClass">کلاس دریافت‌کنندگان آزمون</label>
+            <div class="flex items-center gap-8">
+              <select class="select" id="examClass" required style="flex:1"><option value="">در حال دریافت کلاس‌ها...</option></select>
+              <button type="button" class="btn btn-outline btn-sm" data-create-class>+ ایجاد کلاس</button>
+            </div>
+            <small class="text-soft">فقط دانشجویانی که عضو این کلاس هستند، آزمون را در داشبورد خود می‌بینند و می‌توانند شروع کنند.</small>
+          </div>
           <div class="choice-grid" id="deptChoices">
             <div class="choice-card selected" data-value="کامپیوتر"><div class="mohr sm"><div class="mohr-inner"><b>ک</b></div></div><b>مهندسی کامپیوتر</b></div>
             <div class="choice-card" data-value="برق"><div class="mohr sm gold"><div class="mohr-inner"><b>ب</b></div></div><b>مهندسی برق</b></div>
@@ -177,6 +185,7 @@
 
   document.getElementById("wizNext").addEventListener("click", async () => {
     if (current < STEPS.length) {
+      if (current === 1 && !document.getElementById("examClass").value) return showToast("کلاس دریافت‌کنندگان آزمون را انتخاب کنید.", "warn");
       if (current === 3 && !document.getElementById("examCategory").value) return showToast("دسته‌بندی آزمون را انتخاب کنید.", "warn");
       if (current === 4 && !document.getElementById("examTitle").value.trim()) return showToast("عنوان آزمون را وارد کنید.", "warn");
       showStep(current + 1);
@@ -185,12 +194,15 @@
     const api = window.MftApi;
     if (!api) return showToast("اتصال API آماده نیست.", "danger");
     const categoryId = Number(document.getElementById("examCategory").value || 0);
-    const department = document.querySelector("#deptChoices .choice-card.selected");
+    const classSelect = document.getElementById("examClass");
+    const selectedClass = classSelect?.selectedOptions?.[0];
+    const classId = Number(classSelect?.value || 0);
+    const departmentId = Number(selectedClass?.dataset.departmentId || 0);
     const durationMinutes = Number(document.getElementById("examDuration").value);
     if (!categoryId) return showToast("دسته‌بندی آزمون را انتخاب کنید.", "warn");
     if (!document.getElementById("examTitle").value.trim()) return showToast("عنوان آزمون را وارد کنید.", "warn");
     if (!Number.isInteger(durationMinutes) || durationMinutes < 1 || durationMinutes > 600) return showToast("مدت آزمون باید بین ۱ تا ۶۰۰ دقیقه باشد.", "warn");
-    if (!department?.dataset.id) return showToast("دپارتمان معتبر برای حساب شما پیدا نشد.", "warn");
+    if (!classId || !departmentId) return showToast("کلاس معتبر برای آزمون انتخاب نشده است.", "warn");
 
     let selected = [...document.querySelectorAll('#manualPick input[type="checkbox"]:checked')];
     if (document.getElementById("randomToggle").checked) {
@@ -244,7 +256,8 @@
         body: JSON.stringify({
           title: document.getElementById("examTitle").value.trim(),
           examCategoryId: categoryId,
-          departmentId: Number(department.dataset.id),
+          departmentId,
+          classId,
           startAt: startAt.toISOString(),
           endAt: endAt.toISOString(),
           durationMinutes,
