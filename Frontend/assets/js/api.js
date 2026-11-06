@@ -507,7 +507,8 @@
     const save = $('button', form);
     save?.addEventListener('click', event => {
       event.preventDefault();
-      safe(() => request('/users/me/profile', { method: 'PUT', body: JSON.stringify({ fullName: name?.value.trim(), email: email?.value.trim() || null, mobile: mobile?.value.trim() || null }) }), 'اطلاعات پروفایل ذخیره شد.');
+      if (!mobile?.value.trim()) return notify('شماره تماس الزامی است.', 'warn');
+      safe(() => request('/users/me/profile', { method: 'PUT', body: JSON.stringify({ fullName: name?.value.trim(), email: email?.value.trim() || null, mobile: mobile.value.trim() }) }), 'اطلاعات پروفایل ذخیره شد.');
     }, { once: true });
 
 
