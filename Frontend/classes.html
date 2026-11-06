@@ -131,7 +131,7 @@
     const departments = await api().request('/departments');
     const departmentSelect = $('#classDepartment');
     const departmentField = $('#classDepartmentField');
-    if (me.role !== 'superadmin') {
+    if (String(me.role || '').toLowerCase() !== 'superadmin') {
       departmentField.hidden = true;
     } else {
       departmentSelect.innerHTML = '<option value="">انتخاب دپارتمان</option>' + departments.filter(d => d.isActive !== false)
