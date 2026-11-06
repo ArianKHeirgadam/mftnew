@@ -201,6 +201,45 @@ using (var scope = app.Services.CreateScope())
             await db.SaveChangesAsync();
         }
     }
+
+    if (builder.Configuration.GetValue<bool>("Bootstrap:SecondSuperAdmin:Enabled"))
+    {
+        var username = (builder.Configuration["Bootstrap:SecondSuperAdmin:Username"] ?? "admin2").Trim();
+        if (!await db.Users.AnyAsync(user => user.Username == username))
+        {
+            var password = builder.Configuration["Bootstrap:SecondSuperAdmin:Password"];
+            var phoneNumber = builder.Configuration["Bootstrap:SecondSuperAdmin:Mobile"]?.Trim();
+
+            if (string.IsNullOrWhiteSpace(password) || password.Length < 12)
+                throw new InvalidOperationException(
+                    "Bootstrap:SecondSuperAdmin:Password must contain at least 12 characters.");
+            if (string.IsNullOrWhiteSpace(phoneNumber))
+                throw new InvalidOperationException(
+                    "Bootstrap:SecondSuperAdmin:Mobile is required and must be unique.");
+            if (await db.Users.AnyAsync(user => user.PhoneNumber == phoneNumber))
+                throw new InvalidOperationException(
+                    "Bootstrap:SecondSuperAdmin:Mobile is already assigned to another user.");
+
+            var role = await db.Roles.SingleOrDefaultAsync(item => item.Id == 1);
+            if (role is null || role.Name != CanonicalRoleNames.SuperAdmin)
+                throw new InvalidOperationException(
+                    "Canonical Roles must contain Id=1, Name=SuperAdmin before bootstrap.");
+
+            var user = new CanonicalUser
+            {
+                Username = username,
+                PasswordHash = BCrypt.Net.BCrypt.HashPassword(password),
+                FullName = "Second System Administrator",
+                Email = "admin2@local",
+                PhoneNumber = phoneNumber,
+                IsActive = true,
+                CreatedAt = DateTime.UtcNow
+            };
+            user.UserRoles.Add(new CanonicalUserRole { RoleId = role.Id, Role = role });
+            db.Users.Add(user);
+            await db.SaveChangesAsync();
+        }
+    }
 }
 
 app.Run();
