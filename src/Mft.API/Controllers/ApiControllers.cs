@@ -832,24 +832,6 @@ public class ClassesController(AppDbContext db) : ControllerBase
         return Ok(new { id = entity.Id, name = entity.Name, memberCount = validIds.Length });
     }
 
-    [HttpPut("{id:guid}/members"), Authorize(Policy = "SuperAdmin")]
-    public async Task<IActionResult> UpdateMembers(Guid id, [FromBody] JsonElement payload, CancellationToken ct)
-    {
-        var entity = await db.Classes.FirstOrDefaultAsync(x => x.Id == id, ct);
-        if (entity is null) return NotFound(new { message = "کلاس پیدا نشد." });
-        var studentIds = payload.TryGetProperty("studentIds", out var ids) && ids.ValueKind == JsonValueKind.Array
-            ? ids.EnumerateArray().Where(x => x.ValueKind == JsonValueKind.String && Guid.TryParse(x.GetString(), out _)).Select(x => Guid.Parse(x.GetString()!)).Distinct().ToArray()
-            : Array.Empty<Guid>();
-        var validIds = await db.Users.Where(x => studentIds.Contains(x.Id) && x.Role == UserRole.Student &&
-            x.DepartmentId == entity.DepartmentId && x.IsActive).Select(x => x.Id).ToListAsync(ct);
-        if (validIds.Count != studentIds.Length)
-            return BadRequest(new { message = "همه اعضا باید دانشجوی فعال همان دپارتمان باشند." });
-        var current = await db.ClassMembers.Where(x => x.ClassId == id).ToListAsync(ct);
-        db.ClassMembers.RemoveRange(current);
-        db.ClassMembers.AddRange(validIds.Select(userId => new StudentClassMember { ClassId = id, StudentUserId = userId }));
-        await db.SaveChangesAsync(ct);
-        return Ok(new { id, memberCount = validIds.Count, memberIds = validIds });
-    }
 }
 
 [ApiController, Route("api/notifications"), Authorize]
