@@ -71,10 +71,8 @@
 
         <!-- Step 3: Questions -->
         <div class="wpanel" id="step3">
-          <div class="alert alert-info" style="margin-bottom:14px">
-            <label class="checkbox-row"><input type="checkbox" id="pdfOnlyExam"> برگزاری آزمون فقط با PDF (بدون بانک سؤال و بدون اسکن یا استخراج محتوا)</label>
-            <small class="text-soft">در این حالت دانشجو PDF را دانلود می‌کند و پاسخ‌نامه دست‌نویس را به‌صورت عکس یا PDF ارسال می‌کند.</small>
-          </div>
+          <div class="alert alert-info" style="margin-bottom:14px">آزمون‌های این مسیر بر اساس بانک سؤالات canonical ساخته می‌شوند. ساخت آزمون صرفاً PDF در این گردش‌کار هنوز پشتیبانی نمی‌شود.</div>
+          <div class="field"><label for="examCategory">دسته‌بندی آزمون</label><select class="select" id="examCategory" required><option value="">در حال دریافت دسته‌بندی‌ها...</option></select></div>
           <div id="questionSelectionArea">
           <div class="flex justify-between items-center" style="margin-bottom:16px">
             <h3>انتخاب سوالات</h3>
@@ -97,7 +95,7 @@
         <div class="wpanel" id="step4">
           <h3 style="margin-bottom:16px">اطلاعات آزمون، مدت زمان و نمره قبولی</h3>
           <div class="field"><label>عنوان آزمون</label><input class="input" id="examTitle" required placeholder="مثلاً آزمون میان‌ترم"></div>
-          <div class="field"><label>فایل PDF برگه آزمون (برای حالت فقط PDF الزامی، حداکثر ۲۰ مگابایت)</label><input class="input" id="examPdfFile" type="file" accept="application/pdf,.pdf"><small class="text-soft">فایل پس از ایجاد آزمون به‌صورت خصوصی ذخیره می‌شود و فقط کاربران مجاز به آن دسترسی دارند.</small></div>
+          
           <div class="field"><label>درس / موضوع</label><input class="input" id="examSubject" placeholder="نام درس"></div>
           <div class="field"><label>توضیحات</label><textarea class="textarea" id="examDescription" rows="2" placeholder="توضیحات اختیاری"></textarea></div>
           <div class="grid-2" style="grid-template-columns:1fr 1fr">
@@ -112,7 +110,9 @@
           <h3 style="margin-bottom:16px">زمان‌بندی آزمون</h3>
           <div class="grid-2" style="grid-template-columns:1fr 1fr">
             <div class="field"><label>تاریخ برگزاری</label><input class="input" id="examDate" type="date"></div>
-            <div class="field"><label>ساعت شروع</label><input class="input" id="examTime" type="time" value="10:00"></div>
+            <div class="field"><label>ساعت شروع</label><input class="input" id="examTime" type="time" value="10:00" required></div>
+            <div class="field"><label>تاریخ پایان مهلت شرکت</label><input class="input" id="examEndDate" type="date" required></div>
+            <div class="field"><label>ساعت پایان مهلت شرکت</label><input class="input" id="examEndTime" type="time" value="23:59" required></div>
           </div>
         </div>
 
@@ -158,12 +158,11 @@
     document.getElementById("wizNext").textContent = number === STEPS.length ? "انتشار آزمون" : "مرحله بعد";
     renderSteps();
     if (number === 6) {
-      const pdfOnly = document.getElementById("pdfOnlyExam").checked;
       const randomMode = document.getElementById("randomToggle").checked;
-      const selectedCount = pdfOnly ? 0 : randomMode
+      const selectedCount = randomMode
         ? Number(document.getElementById("randomMcqCount").value || 0) + Number(document.getElementById("randomEssayCount").value || 0) + Number(document.getElementById("randomMatchingCount").value || 0)
         : document.querySelectorAll('#manualPick input[type=checkbox]:checked').length;
-      document.getElementById("prevQuestionCount").textContent = pdfOnly ? "فقط PDF (بدون سؤال ساختاریافته)" : `${selectedCount} سوال${randomMode ? ' (تصادفی)' : ''}`;
+      document.getElementById("prevQuestionCount").textContent = selectedCount + " سوال" + (randomMode ? " (تصادفی)" : "");
       document.getElementById("prevDuration").textContent = `${document.getElementById("examDuration").value || 0} دقیقه`;
       document.getElementById("prevPassingScore").textContent = `${document.getElementById("examPassingScore").value || 0} از ۱۰۰`;
     }
@@ -180,67 +179,90 @@
     document.getElementById("manualPick").style.display = event.target.checked ? "none" : "block";
     document.getElementById("randomPick").style.display = event.target.checked ? "block" : "none";
   });
-  document.getElementById("pdfOnlyExam").addEventListener("change", event => {
-    document.getElementById("questionSelectionArea").hidden = event.target.checked;
-  });
   document.getElementById("wizPrev").addEventListener("click", () => { if (current > 1) showStep(current - 1); });
+
   document.getElementById("wizNext").addEventListener("click", async () => {
     if (current < STEPS.length) {
+      if (current === 3 && !document.getElementById("examCategory").value) return showToast("دسته‌بندی آزمون را انتخاب کنید.", "warn");
       if (current === 4 && !document.getElementById("examTitle").value.trim()) return showToast("عنوان آزمون را وارد کنید.", "warn");
       showStep(current + 1);
       return;
     }
     const api = window.MftApi;
     if (!api) return showToast("اتصال API آماده نیست.", "danger");
+    const categoryId = Number(document.getElementById("examCategory").value || 0);
     const department = document.querySelector("#deptChoices .choice-card.selected");
-    const pdfOnly = document.getElementById("pdfOnlyExam").checked;
-    let questionIds = pdfOnly ? [] : [...document.querySelectorAll('#manualPick input[type="checkbox"]:checked')].map(input => input.value).filter(Boolean);
-    if (!pdfOnly && document.getElementById("randomToggle").checked) {
+    const durationMinutes = Number(document.getElementById("examDuration").value);
+    if (!categoryId) return showToast("دسته‌بندی آزمون را انتخاب کنید.", "warn");
+    if (!document.getElementById("examTitle").value.trim()) return showToast("عنوان آزمون را وارد کنید.", "warn");
+    if (!Number.isInteger(durationMinutes) || durationMinutes < 1 || durationMinutes > 600) return showToast("مدت آزمون باید بین ۱ تا ۶۰۰ دقیقه باشد.", "warn");
+    if (!department?.dataset.id) return showToast("دپارتمان معتبر برای حساب شما پیدا نشد.", "warn");
+
+    let selected = [...document.querySelectorAll('#manualPick input[type="checkbox"]:checked')];
+    if (document.getElementById("randomToggle").checked) {
       const pool = [...document.querySelectorAll('#manualPick input[type="checkbox"]')];
       const mcqCount = Math.max(0, Number(document.getElementById("randomMcqCount").value) || 0);
       const essayCount = Math.max(0, Number(document.getElementById("randomEssayCount").value) || 0);
       const matchingCount = Math.max(0, Number(document.getElementById("randomMatchingCount").value) || 0);
-      const pickRandom = items => items.sort(() => Math.random() - 0.5);
-      const mcq = pickRandom(pool.filter(input => /multiplechoice|mcq/i.test(input.dataset.questionType || ''))).slice(0, mcqCount);
-      const essay = pickRandom(pool.filter(input => /essay|text|descriptive/i.test(input.dataset.questionType || ''))).slice(0, essayCount);
-      const matching = pickRandom(pool.filter(input => /matching/i.test(input.dataset.questionType || ''))).slice(0, matchingCount);
-      questionIds = [...mcq, ...essay, ...matching].map(input => input.value).filter(Boolean);
+      const pickRandom = items => [...items].sort(() => Math.random() - 0.5);
+      selected = [
+        ...pickRandom(pool.filter(input => input.dataset.questionType === 'MultipleChoice')).slice(0, mcqCount),
+        ...pickRandom(pool.filter(input => input.dataset.questionType === 'Essay')).slice(0, essayCount),
+        ...pickRandom(pool.filter(input => input.dataset.questionType === 'Matching')).slice(0, matchingCount)
+      ];
     }
-    const selectedTeacher = document.querySelector("#teacherChoices .choice-card.selected");
-    const durationMinutes = Number(document.getElementById("examDuration").value);
-    if (!document.getElementById("examTitle").value.trim()) return showToast("عنوان آزمون را وارد کنید.", "warn");
-    if (!Number.isInteger(durationMinutes) || durationMinutes < 1) return showToast("مدت آزمون باید حداقل یک دقیقه باشد.", "warn");
-    const examPdf = document.getElementById("examPdfFile")?.files?.[0];
-    if (pdfOnly && !examPdf) return showToast("برای آزمون PDF-only، ابتدا فایل PDF برگه سؤال را انتخاب کنید.", "warn");
-    if (!pdfOnly && !questionIds.length) return showToast("حداقل یک سؤال انتخاب کنید یا حالت آزمون فقط با PDF را فعال کنید.", "warn");
-    let startsAt = null;
+    if (!selected.length) return showToast("حداقل یک سؤال انتخاب کنید.", "warn");
+
     const date = document.getElementById("examDate").value;
     const time = document.getElementById("examTime").value;
-    if (date) startsAt = new Date(`${date}T${time || "00:00"}`).toISOString();
+    const endDate = document.getElementById("examEndDate").value;
+    const endTime = document.getElementById("examEndTime").value;
+    if (!date || !time || !endDate || !endTime) return showToast("زمان شروع و پایان آزمون را کامل کنید.", "warn");
+    const startAt = new Date(date + "T" + time);
+    const endAt = new Date(endDate + "T" + endTime);
+    if (Number.isNaN(startAt.getTime()) || Number.isNaN(endAt.getTime()) || endAt <= startAt)
+      return showToast("زمان پایان باید بعد از زمان شروع باشد.", "warn");
+
+    const bySkill = new Map();
+    selected.forEach(input => {
+      const skillId = Number(input.dataset.skillId);
+      if (!bySkill.has(skillId)) bySkill.set(skillId, []);
+      bySkill.get(skillId).push(Number(input.value));
+    });
+    const groups = [...bySkill.entries()];
+    const weightUnits = Math.floor(10000 / groups.length);
+    let remainingWeight = 10000;
+    let remainingMinutes = durationMinutes;
+    const totalQuestions = selected.length;
+    const sections = groups.map(([skillId, questionIds], index) => {
+      const weight = index === groups.length - 1 ? remainingWeight : weightUnits;
+      remainingWeight -= weight;
+      const sectionMinutes = index === groups.length - 1
+        ? Math.max(1, remainingMinutes)
+        : Math.max(1, Math.floor(durationMinutes * questionIds.length / totalQuestions));
+      remainingMinutes -= sectionMinutes;
+      return { skillId, durationMinutes: sectionMinutes, weightPercent: weight / 100, questionIds };
+    });
+
     try {
-      const createdExam = await api.request("/exams", { method: "POST", body: JSON.stringify({
-        title: document.getElementById("examTitle").value.trim(),
-        subject: document.getElementById("examSubject").value.trim() || null,
-        description: document.getElementById("examDescription").value.trim() || null,
-        durationMinutes, passingScore: Number(document.getElementById("examPassingScore").value || 0), allowQuestionNavigation: document.getElementById("allowQuestionNavigation").checked, startsAt, endsAt: null, isPublished: true,
-        departmentId: department?.dataset.id || null,
-        createdByUserId: selectedTeacher?.dataset.id || null,
-        questionIds
-      }) });
-      if (examPdf) {
-        const form = new FormData(); form.append("file", examPdf);
-        try {
-          await api.request(`/exam-files/exams/${encodeURIComponent(createdExam.id)}`, { method: "POST", body: form });
-        } catch (uploadError) {
-          showToast(`بارگذاری PDF ناموفق بود؛ آزمون ناقص حذف می‌شود: ${uploadError.message}`, "warn");
-          await api.request(`/exams/${encodeURIComponent(createdExam.id)}`, { method: "DELETE" }).catch(() => null);
-          setTimeout(() => location.href = "dashboard-teacher.html", 1800);
-          return;
-        }
-      }
-      showToast("آزمون با موفقیت ذخیره و منتشر شد.", "ok");
+      await api.request("/canonical/exams", {
+        method: "POST",
+        body: JSON.stringify({
+          title: document.getElementById("examTitle").value.trim(),
+          examCategoryId: categoryId,
+          departmentId: Number(department.dataset.id),
+          startAt: startAt.toISOString(),
+          endAt: endAt.toISOString(),
+          durationMinutes,
+          isPublished: true,
+          sections
+        })
+      });
+      showToast("آزمون canonical با موفقیت ذخیره و منتشر شد.", "ok");
       setTimeout(() => location.href = "dashboard-teacher.html", 700);
-    } catch (error) { showToast(error.message || "ذخیره آزمون ناموفق بود.", "danger"); }
+    } catch (error) {
+      showToast(error.message || "ذخیره آزمون ناموفق بود.", "danger");
+    }
   });
   showStep(1);
 </script>
