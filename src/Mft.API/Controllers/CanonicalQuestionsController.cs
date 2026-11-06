@@ -164,7 +164,7 @@ public sealed class CanonicalQuestionsController(
 public sealed class QuestionUpsert
 {
     public long SkillId { get; set; }
-    public byte QuestionTypeId { get; set; }
+    public long QuestionTypeId { get; set; }
     public string Text { get; set; } = "";
     public decimal Points { get; set; } = 1;
     public byte? DifficultyLevel { get; set; }
