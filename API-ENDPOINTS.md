@@ -32,7 +32,7 @@ Base URL: `https://localhost:7081/api` (ASP.NET launch profile). All routes requ
 | POST / PUT / DELETE | `/questions[/{id}]` | Create/edit/delete questions; teacher ownership enforced; MCQ options/correct answer validated |
 | GET | `/exams` | Student sees published exams; Teacher sees owned exams; Department sees department exams; SuperAdmin sees all |
 | GET | `/exams/{id}` | Exam detail within role scope |
-| POST / PUT / DELETE | `/exams[/{id}]` | Create/update/delete exams; title, duration, pass mark (0–20), navigation setting, teacher ownership and selected question ownership validated; exam question points are normalized to a total of 20 |
+| POST / PUT / DELETE | `/exams[/{id}]` | Create/update/delete exams; title, duration, pass mark (0–100), navigation setting, teacher ownership and selected question ownership validated; exam question points are normalized to a total of 100 |
 | POST | `/exams/{id}/start` | Student starts or resumes a published exam within its schedule; correct answers are not returned |
 | PUT | `/exams/attempts/{attemptId}/answers` | Save answers for the authenticated student's active attempt while its server-side duration remains valid |
 | POST | `/exams/attempts/{attemptId}/submit` | Finalize an active attempt; objective questions are auto-scored, essay answers remain pending manual grading, and expired attempts cannot submit new answers |
@@ -67,7 +67,7 @@ not be converted to JavaScript numbers.
 - Login uses API authentication and role-driven navigation; no role picker.
 - User lists, create/edit/delete actions, department management, question CRUD, exam creation, exam start/autosave/submit, results review, notifications, profile/password update, settings key/value save, dashboard metrics, and department reports use the API.
 - Report charts are populated only when API data is returned; hardcoded sample chart series were removed.
-- Password reset by email/SMS, SMS delivery, actual database backup/restore, PDF/Excel report export, image uploads, and a full audit trail are not implemented because the necessary provider/storage/export workflow is not configured. The UI must not report those operations as successful.
+- Password reset by email/SMS, SMS delivery, actual database backup/restore, PDF/Excel report export, generic profile image uploads, and a full audit trail are not implemented because the necessary provider/storage/export workflow is not configured. The UI must not report those operations as successful.
 
 The API's live Swagger document is the source of truth. These routes describe code, not a claim of successful SQL Server integration testing.
 
@@ -82,9 +82,13 @@ The API's live Swagger document is the source of truth. These routes describe co
 
 ## PDF exam, manual grading and result publication workflow
 
+- PDF-only exams can be created with zero question-bank entries; the teacher must upload the exam paper PDF before a student can start the exam.
+- The exam PDF is delivered as the original file. The exam workflow does not run OCR, parse pages, scan for questions, or import its contents.
 - `POST /api/exam-files/exams/{examId}` — teacher/department/super-admin uploads the exam PDF as multipart field `file` (20 MB maximum).
 - `GET /api/exam-files/exams/{examId}` — authenticated download. Students can download only a published exam in their department; its owner and authorized department/super admins can download it.
 - `POST /api/exam-files/attempts/{attemptId}` — student uploads/replaces a PDF, JPG, JPEG, or PNG answer sheet while the attempt is in progress and before the server-side deadline (20 MB maximum).
+- `POST /api/exams/attempts/{attemptId}/submit` — in PDF-only mode, finalizes the attempt only after an answer-sheet file has been uploaded; the attempt remains pending until a teacher enters a score.
+- `PUT /api/results/{id}/grade` — teacher enters the PDF-only attempt's final score from 0 to 100. Publication is blocked until each PDF-only submission is graded.
 - `GET /api/exam-files/attempts/{attemptId}/info` — returns metadata to the authorized grader or the student who owns the attempt.
 - `GET /api/exam-files/attempts/{attemptId}` — authenticated preview/download of the student's PDF or image answer sheet; students can access only their own file, while authorized graders can access the attempt's file.
 - `PUT /api/results/{attemptId}/answers/{questionId}/grade` — per-question manual grade. JSON body: `{ "score": 2.5, "comment": "..." }`. The score is entered in the question's configured raw points; it is normalized to the exam's 100-point scale. Teacher ownership and department scope are checked.
