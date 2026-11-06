@@ -1136,7 +1136,15 @@ public class ReportsController(AppDbContext db) : ControllerBase
         var q = db.Departments.AsQueryable();
         if (User.IsInRole("Department"))q = q.Where(d => d.Id == User.DepartmentId());
         return Ok(await q.Select(d => new{
-            department = d.Name, students = db.Users.Count(u => u.DepartmentId == d.Id && u.Role == UserRole.Student), teachers = db.Users.Count(u => u.DepartmentId == d.Id && u.Role == UserRole.Teacher), exams = db.Exams.Count(e => e.DepartmentId == d.Id), averageScore = db.ExamAttempts.Where(a => a.Exam.DepartmentId == d.Id && a.Score != null).Select(a => (double?) a.Score).Average()??0, passRate = db.ExamAttempts.Where(a => a.Exam.DepartmentId == d.Id && a.Score != null).Count(a => a.Score >= a.Exam.PassingScore)*100.0/Math.Max(1, db.ExamAttempts.Count(a => a.Exam.DepartmentId == d.Id && a.Score != null)), participation = db.ExamAttempts.Count(a => a.Exam.DepartmentId == d.Id)
+            department = d.Name,
+            students = db.Users.Count(u => u.DepartmentId == d.Id && u.Role == UserRole.Student),
+            teachers = db.Users.Count(u => u.DepartmentId == d.Id && u.Role == UserRole.Teacher),
+            exams = db.Exams.Count(e => e.DepartmentId == d.Id),
+            averageScore = db.ExamAttempts.Where(a => a.Exam.DepartmentId == d.Id && a.Score != null).Select(a => (double?)a.Score).Average() ?? 0,
+            gradedAttempts = db.ExamAttempts.Count(a => a.Exam.DepartmentId == d.Id && a.Score != null),
+            passedAttempts = db.ExamAttempts.Count(a => a.Exam.DepartmentId == d.Id && a.Score != null && a.Score >= a.Exam.PassingScore),
+            passRate = db.ExamAttempts.Where(a => a.Exam.DepartmentId == d.Id && a.Score != null).Count(a => a.Score >= a.Exam.PassingScore) * 100.0 / Math.Max(1, db.ExamAttempts.Count(a => a.Exam.DepartmentId == d.Id && a.Score != null)),
+            participation = db.ExamAttempts.Count(a => a.Exam.DepartmentId == d.Id)
         }
         ).ToListAsync(ct));
     }
