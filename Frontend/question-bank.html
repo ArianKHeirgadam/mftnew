@@ -65,12 +65,12 @@
     <div class="modal-head"><h3 style="font-size:16px">افزودن / ویرایش سوال</h3><button class="icon-btn" data-modal-close>✕</button></div>
     <div class="modal-body">
       <div class="field"><label>متن سوال</label><textarea class="textarea" rows="3" placeholder="متن سوال را وارد کنید..." data-question-text></textarea></div>
-      <div class="field"><label>دپارتمان</label><select class="select" id="questionDepartment" required><option value="">در حال دریافت دپارتمان‌ها...</option></select></div>
+      <div class="field"><label>مهارت / سرفصل</label><select class="select" id="questionSkill" required><option value="">در حال دریافت مهارت‌ها...</option></select></div>
       <div class="grid-2" style="grid-template-columns:1fr 1fr">
         <div class="field"><label>نوع سوال</label><select class="select" id="qType"><option value="MultipleChoice">چهارگزینه‌ای</option><option value="Essay">تشریحی</option><option value="Matching">وصل‌کردنی</option></select></div>
         <div class="field"><label>سطح دشواری</label><select class="select" data-question-difficulty><option value="Easy">آسان</option><option value="Medium" selected>متوسط</option><option value="Hard">سخت</option></select></div>
       </div>
-      <div class="field"><label>دسته‌بندی</label><select class="select" data-question-category><option>الگوریتم</option><option>ساختمان داده</option><option>پایگاه داده</option></select></div>
+      <div class="field"><label>بارم سؤال</label><input class="input" id="questionPoints" type="number" min="0.25" max="9999" step="0.25" value="1"></div>
       <div id="mcqOptions">
         <label style="font-size:12.5px;font-weight:700;display:block;margin-bottom:7px">گزینه‌ها</label>
         <div class="field"><input class="input" data-question-option placeholder="گزینه ۱"></div>
@@ -99,20 +99,17 @@
 <script src="assets/js/api.js"></script>
 <script>
 (() => {
- const api=window.MftApi, dept=document.getElementById('questionDepartment'), modal=document.getElementById('questionModal'), correct=document.getElementById('correctOption');
- const inputs=[...document.querySelectorAll('[data-question-option]')];
+ const api=window.MftApi, skill=document.getElementById('questionSkill'), modal=document.getElementById('questionModal');
+ const correct=document.getElementById('correctOption');
  const notify=(m,t='info')=>window.showToast?.(m,t);
  const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
- async function loadDepartments(){
+ let lookups=null;
+ async function loadCanonicalLookups(){
   try{
-   const rows=await api.request('/departments');
-   const me=await api.request('/auth/me').catch(()=>null);
-   const activeRows=rows.filter(x=>x.isActive!==false);
-   dept.innerHTML='<option value="">'+(activeRows.length?'انتخاب دپارتمان':'دپارتمانی برای حساب شما در دسترس نیست')+'</option>'+activeRows.map(x=>'<option value="'+x.id+'">'+esc(x.name)+'</option>').join('');
-   if(me?.departmentId) dept.value=me.departmentId;
-   if(activeRows.length===1) dept.value=activeRows[0].id;
-   if(!activeRows.length) notify(me?.role==='Teacher'?'حساب استاد به دپارتمان متصل نیست؛ مدیر سامانه باید ابتدا دپارتمان حساب را تعیین کند.':'ابتدا یک دپارتمان فعال ایجاد کنید یا دسترسی حساب را بررسی کنید.','warn');
-  }catch(e){dept.innerHTML='<option value="">دریافت دپارتمان ناموفق بود</option>';notify(e.message,'danger');}
+   lookups=await api.request('/canonical/questions/lookups');
+   skill.innerHTML='<option value="">انتخاب مهارت</option>'+lookups.skills.map(x=>'<option value="'+x.id+'">'+esc(x.name)+' — '+esc(lookups.categories.find(c=>Number(c.id)===Number(x.examCategoryId))?.name||'')+'</option>').join('');
+   if(!lookups.skills.length) notify('هیچ مهارتی در بانک اطلاعاتی ثبت نشده است؛ ابتدا دسته‌بندی و مهارت‌ها باید در دیتابیس تعریف شوند.','warn');
+  }catch(e){skill.innerHTML='<option value="">دریافت مهارت‌ها ناموفق بود</option>';notify(e.message,'danger');}
  }
  document.getElementById('qType').addEventListener('change',function(){
   document.getElementById('mcqOptions').style.display=this.value==='MultipleChoice'?'block':'none';
@@ -120,22 +117,33 @@
  });
  document.querySelector('[data-question-save]').addEventListener('click',async()=>{
   const text=document.querySelector('[data-question-text]').value.trim(), type=document.getElementById('qType').value;
-  const options=inputs.map(x=>x.value.trim()).filter(Boolean), idx=Number(correct.value)-1;
+  const options=[...document.querySelectorAll('[data-question-option]')].map(x=>x.value.trim());
+  const idx=Number(correct.value)-1;
+  const left=[...document.querySelectorAll('[data-match-left]')].map(x=>x.value.trim());
+  const right=[...document.querySelectorAll('[data-match-right]')].map(x=>x.value.trim());
+  const pairs=left.map((v,i)=>({leftItem:v,rightItem:right[i],displayOrder:i+1})).filter(x=>x.leftItem&&x.rightItem);
   if(!text)return notify('متن سؤال را وارد کنید.','warn');
-  if(!dept.value)return notify('یک دپارتمان معتبر انتخاب کنید.','warn');
-  if(type==='MultipleChoice'&&(options.length!==4||!correct.value||!options[idx]))return notify('هر چهار گزینه را وارد و گزینه صحیح را انتخاب کنید.','warn');
-  const body={text,departmentId:dept.value,category:document.querySelector('[data-question-category]').value,type,difficulty:document.querySelector('[data-question-difficulty]').value,options:type==='MultipleChoice'?options:[],correctAnswer:type==='MultipleChoice'?options[idx]:null,score:1};
+  if(!skill.value)return notify('یک مهارت معتبر انتخاب کنید.','warn');
+  if(type==='MultipleChoice'&&(options.filter(Boolean).length<2||!options[idx]))return notify('حداقل دو گزینه و گزینه صحیح را مشخص کنید.','warn');
+  if(type==='Matching'&&(pairs.length<2||new Set(pairs.map(x=>x.rightItem.toLocaleLowerCase())).size!==pairs.length))return notify('حداقل دو جفت وصل‌کردنی با پاسخ‌های غیرتکراری وارد کنید.','warn');
+  const typeRow=lookups?.questionTypes.find(x=>x.code===type);
+  if(!typeRow)return notify('نوع سؤال در داده‌های پایه پیدا نشد.','danger');
+  const difficulty={Easy:1,Medium:2,Hard:3}[document.querySelector('[data-question-difficulty]').value]||2;
+  const body={skillId:Number(skill.value),questionTypeId:Number(typeRow.id),text,points:Number(document.getElementById('questionPoints').value||1),difficultyLevel:difficulty,
+   options:type==='MultipleChoice'?options.filter(Boolean).map((optionText,i)=>({optionText,isCorrect:i===idx,displayOrder:i+1})):[],
+   matchingPairs:type==='Matching'?pairs:[],criteria:[]};
   try{
-   const editId=modal.dataset.editId;
-   await api.request(editId?'/questions/'+encodeURIComponent(editId):'/questions',{method:editId?'PUT':'POST',body:JSON.stringify(body)});
-   delete modal.dataset.editId;
-   notify(editId?'سؤال با موفقیت ویرایش شد.':'سؤال با موفقیت ذخیره شد.','ok');modal.classList.remove('show');
-   document.querySelector('[data-question-text]').value='';inputs.forEach(x=>x.value='');correct.value='';
-   const rows=await api.request('/questions'), tbody=document.querySelector('body[data-active="bank"] table tbody');
-   if(tbody)tbody.innerHTML=rows.map(r=>'<tr><td>'+esc(r.text)+'</td><td>'+esc(r.category)+'</td><td>'+esc(r.type)+'</td><td>'+esc(r.difficulty)+'</td><td>—</td></tr>').join('');
+   const id=modal.dataset.editId;
+   await api.request(id?'/canonical/questions/'+encodeURIComponent(id):'/canonical/questions',{method:id?'PUT':'POST',body:JSON.stringify(body)});
+   delete modal.dataset.editId; modal.classList.remove('show');
+   document.querySelector('[data-question-text]').value='';
+   document.querySelectorAll('[data-question-option],[data-match-left],[data-match-right]').forEach(x=>x.value='');
+   correct.value=''; skill.value=''; document.getElementById('questionPoints').value='1';
+   notify(id?'سؤال با موفقیت ویرایش شد.':'سؤال با موفقیت ذخیره شد.','ok');
+   await api.refresh();
   }catch(e){notify(e.message||'ذخیره سؤال ناموفق بود.','danger');}
  });
- loadDepartments();
+ loadCanonicalLookups();
 })();
 </script>
 </body>
