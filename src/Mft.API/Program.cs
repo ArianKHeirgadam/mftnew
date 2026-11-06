@@ -142,112 +142,62 @@ app.MapGet("/health", () => Results.Ok(new
 }));
 
 // --------------------------------------------------
-// Database & SuperAdmin Bootstrap
 // --------------------------------------------------
+// Canonical database bootstrap
+// --------------------------------------------------
+
+if (builder.Configuration.GetValue<bool>("Database:ApplyMigrationsOnStartup"))
+{
+    throw new InvalidOperationException(
+        "Automatic EF migrations are disabled for the canonical database. " +
+        "Apply reviewed SQL changes explicitly to a restored database copy.");
+}
 
 using (var scope = app.Services.CreateScope())
 {
     var db = scope.ServiceProvider
-        .GetRequiredService<AppDbContext>();
+        .GetRequiredService<CanonicalIdentityDbContext>();
 
-    // Apply migrations if enabled
-    if (builder.Configuration.GetValue<bool>(
-        "Database:ApplyMigrationsOnStartup"))
+    if (builder.Configuration.GetValue<bool>("Bootstrap:CreateSuperAdmin"))
     {
-        await db.Database.MigrateAsync();
-    }
-
-    // Create first SuperAdmin
-    if (builder.Configuration.GetValue<bool>(
-        "Bootstrap:CreateSuperAdmin"))
-    {
-        var username =
-            builder.Configuration["Bootstrap:Username"]
-            ?? "admin";
-
-        var existingAdmin = await db.Users
-            .AnyAsync(user => user.Username == username);
+        var username = (builder.Configuration["Bootstrap:Username"] ?? "admin").Trim();
+        var existingAdmin = await db.Users.AnyAsync(user => user.Username == username);
 
         if (!existingAdmin)
         {
-            var password =
-                builder.Configuration["Bootstrap:Password"];
+            var password = builder.Configuration["Bootstrap:Password"];
+            var phoneNumber = builder.Configuration["Bootstrap:Mobile"]?.Trim();
 
-            if (string.IsNullOrWhiteSpace(password) ||
-                password.Length < 12)
-            {
+            if (string.IsNullOrWhiteSpace(password) || password.Length < 12)
                 throw new InvalidOperationException(
-                    "Bootstrap:Password must be at least 12 characters.");
-            }
+                    "Bootstrap:Password must contain at least 12 characters.");
 
-            db.Users.Add(new User
+            if (string.IsNullOrWhiteSpace(phoneNumber))
+                throw new InvalidOperationException(
+                    "Bootstrap:Mobile is required because canonical Users.PhoneNumber is NOT NULL and unique.");
+
+            if (await db.Users.AnyAsync(user => user.PhoneNumber == phoneNumber))
+                throw new InvalidOperationException(
+                    "Bootstrap:Mobile is already assigned to another user.");
+
+            var role = await db.Roles.SingleOrDefaultAsync(item => item.Id == 1);
+            if (role is null || role.Name != CanonicalRoleNames.SuperAdmin)
+                throw new InvalidOperationException(
+                    "Canonical Roles must contain Id=1, Name=SuperAdmin before bootstrap.");
+
+            var user = new CanonicalUser
             {
                 Username = username,
-                PasswordHash =
-                    BCrypt.Net.BCrypt.HashPassword(password),
+                PasswordHash = BCrypt.Net.BCrypt.HashPassword(password),
+                FullName = builder.Configuration["Bootstrap:FullName"] ?? "System Administrator",
+                Email = builder.Configuration["Bootstrap:Email"] ?? "admin@local",
+                PhoneNumber = phoneNumber,
+                IsActive = true,
+                CreatedAt = DateTime.UtcNow
+            };
 
-                FullName =
-                    builder.Configuration["Bootstrap:FullName"]
-                    ?? "System Administrator",
-
-                Email =
-                    builder.Configuration["Bootstrap:Email"]
-                    ?? "admin@local",
-
-                Mobile =
-                    builder.Configuration["Bootstrap:Mobile"]
-                    ?? "",
-
-                Role = UserRole.SuperAdmin,
-                IsActive = true
-            });
-
-            await db.SaveChangesAsync();
-        }
-    }
-
-    // Create second SuperAdmin
-    if (builder.Configuration.GetValue<bool>(
-        "Bootstrap:SecondSuperAdmin:Enabled"))
-    {
-        var secondUsername =
-            builder.Configuration[
-                "Bootstrap:SecondSuperAdmin:Username"]
-            ?? "admin2";
-
-        var existingSecondAdmin = await db.Users
-            .AnyAsync(user =>
-                user.Username == secondUsername);
-
-        if (!existingSecondAdmin)
-        {
-            var secondPassword =
-                builder.Configuration[
-                    "Bootstrap:SecondSuperAdmin:Password"];
-
-            if (string.IsNullOrWhiteSpace(secondPassword) ||
-                secondPassword.Length < 12)
-            {
-                throw new InvalidOperationException(
-                    "Second SuperAdmin password must be at least 12 characters.");
-            }
-
-            db.Users.Add(new User
-            {
-                Username = secondUsername,
-
-                PasswordHash =
-                    BCrypt.Net.BCrypt.HashPassword(
-                        secondPassword),
-
-                FullName = "Second System Administrator",
-                Email = "admin2@local",
-                Mobile = "",
-
-                Role = UserRole.SuperAdmin,
-                IsActive = true
-            });
-
+            user.UserRoles.Add(new CanonicalUserRole { RoleId = role.Id, Role = role });
+            db.Users.Add(user);
             await db.SaveChangesAsync();
         }
     }
