@@ -1,5 +1,5 @@
 using Mft.Application.Contracts;
-using Mft.Domain.Entities;
+using Mft.Infrastructure.Persistence;
 
 namespace Mft.Application.Abstractions;
 
@@ -10,5 +10,5 @@ public interface IAuthService
 
 public interface ITokenService
 {
-    string Create(User user, DateTime expiresAt);
+    string Create(CanonicalUser user, IReadOnlyCollection<string> roles, DateTime expiresAt);
 }
