@@ -47,7 +47,7 @@ public sealed class CanonicalAcademicDbContext(
         modelBuilder.Entity<CanonicalQuestionType>(e =>
         {
             e.ToTable("QuestionTypes"); e.HasKey(x => x.Id);
-            e.Property(x => x.Id).HasColumnType("bigint").UseIdentityColumn();
+            e.Property(x => x.Id).HasColumnType("tinyint").ValueGeneratedNever();
             e.Property(x => x.Code).HasMaxLength(50).IsRequired();
             e.Property(x => x.Name).HasMaxLength(100).IsRequired();
             e.HasIndex(x => x.Code).IsUnique();
@@ -163,8 +163,8 @@ public sealed class CanonicalAcademicDbContext(
 
 public sealed class CanonicalExamCategory { public long Id { get; set; } public string Name { get; set; } = ""; public ICollection<CanonicalSkill> Skills { get; set; } = new List<CanonicalSkill>(); }
 public sealed class CanonicalSkill { public long Id { get; set; } public long ExamCategoryId { get; set; } public string Name { get; set; } = ""; public CanonicalExamCategory ExamCategory { get; set; } = null!; }
-public sealed class CanonicalQuestionType { public long Id { get; set; } public string Code { get; set; } = ""; public string Name { get; set; } = ""; }
-public sealed class CanonicalQuestion { public long Id { get; set; } public long SkillId { get; set; } public long QuestionTypeId { get; set; } public string Text { get; set; } = ""; public decimal Points { get; set; } = 1m; public byte? DifficultyLevel { get; set; } public long CreatedByUserId { get; set; } public string? MetadataJson { get; set; } public DateTime CreatedAt { get; set; } }
+public sealed class CanonicalQuestionType { public byte Id { get; set; } public string Code { get; set; } = ""; public string Name { get; set; } = ""; }
+public sealed class CanonicalQuestion { public long Id { get; set; } public long SkillId { get; set; } public byte QuestionTypeId { get; set; } public string Text { get; set; } = ""; public decimal Points { get; set; } = 1m; public byte? DifficultyLevel { get; set; } public long CreatedByUserId { get; set; } public string? MetadataJson { get; set; } public DateTime CreatedAt { get; set; } }
 public sealed class CanonicalMultipleChoiceOption { public long Id { get; set; } public long QuestionId { get; set; } public string OptionText { get; set; } = ""; public bool IsCorrect { get; set; } public int DisplayOrder { get; set; } }
 public sealed class CanonicalMatchingPair { public long Id { get; set; } public long QuestionId { get; set; } public string LeftItem { get; set; } = ""; public string RightItem { get; set; } = ""; public int DisplayOrder { get; set; } }
 public sealed class CanonicalEssayGradingCriterion { public long Id { get; set; } public long QuestionId { get; set; } public string CriteriaText { get; set; } = ""; public decimal MaxPoints { get; set; } }
