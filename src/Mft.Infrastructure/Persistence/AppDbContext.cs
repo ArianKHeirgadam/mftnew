@@ -15,6 +15,8 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
     public DbSet<ExamAnswer> ExamAnswers => Set<ExamAnswer>();
     public DbSet<ExamDocument> ExamDocuments => Set<ExamDocument>();
     public DbSet<ExamSubmissionDocument> ExamSubmissionDocuments => Set<ExamSubmissionDocument>();
+    public DbSet<StudentClass> Classes => Set<StudentClass>();
+    public DbSet<StudentClassMember> ClassMembers => Set<StudentClassMember>();
     public DbSet<Notification> Notifications => Set<Notification>();
     public DbSet<AppSetting> Settings => Set<AppSetting>();
     public DbSet<AttendanceRecord> AttendanceRecords => Set<AttendanceRecord>();
@@ -196,6 +198,26 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
                 .OnDelete(DeleteBehavior.Cascade);
             entity.HasOne<User>().WithMany().HasForeignKey(x => x.UploadedByUserId)
                 .OnDelete(DeleteBehavior.Restrict);
+        });
+
+        modelBuilder.Entity<StudentClass>(entity =>
+        {
+            entity.ToTable("Classes");
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.Id).HasColumnType("uniqueidentifier").ValueGeneratedNever();
+            entity.Property(x => x.Name).HasMaxLength(200).IsRequired();
+            entity.HasIndex(x => new { x.DepartmentId, x.Name }).IsUnique();
+            entity.HasOne<Department>().WithMany().HasForeignKey(x => x.DepartmentId).OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<StudentClassMember>(entity =>
+        {
+            entity.ToTable("ClassMembers");
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.Id).HasColumnType("uniqueidentifier").ValueGeneratedNever();
+            entity.HasIndex(x => new { x.ClassId, x.StudentUserId }).IsUnique();
+            entity.HasOne(x => x.Class).WithMany(x => x.Members).HasForeignKey(x => x.ClassId).OnDelete(DeleteBehavior.Cascade);
+            entity.HasOne(x => x.Student).WithMany().HasForeignKey(x => x.StudentUserId).OnDelete(DeleteBehavior.Cascade);
         });
 
         modelBuilder.Entity<Notification>(entity =>
