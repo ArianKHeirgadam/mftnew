@@ -80,7 +80,11 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
             entity.ToTable("Exams");
             entity.HasKey(x => x.Id);
             entity.Property(x => x.Id).HasColumnType("uniqueidentifier").ValueGeneratedNever();
-            entity.Property(x => x.CreatedByUserId).HasColumnName("TeacherId");
+            // Exam ownership is the authenticated creator's Users.Id, regardless of role.
+            // database/patch-exam-owner-user-fk.sql migrates the legacy TeacherId column.
+            entity.Property(x => x.CreatedByUserId).HasColumnName("CreatedByUserId");
+            entity.HasOne<User>().WithMany().HasForeignKey(x => x.CreatedByUserId)
+                .OnDelete(DeleteBehavior.Restrict);
             entity.Property(x => x.StartsAt).HasColumnName("ScheduledAt");
             entity.Property(x => x.IsPublished).HasColumnName("Status")
                 .HasConversion(value => value ? "Published" : "Draft", value => value == "Published")
