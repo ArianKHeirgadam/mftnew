@@ -357,6 +357,7 @@ window.clearFieldError = clearFieldError;
 document.addEventListener("DOMContentLoaded", () => {
   renderSidebar();
   renderTopbar();
+  document.dispatchEvent(new Event("mft:topbar-ready"));
   initDropdowns();
   initModals();
   initTabs();
