@@ -748,65 +748,59 @@ public class ResultsController(AppDbContext db) : ControllerBase
 }
 
 [ApiController, Route("api/classes"), Authorize]
-public class ClassesController(AppDbContext db) : ControllerBase
+public sealed class ClassesController(CanonicalAcademicDbContext academic, CanonicalIdentityDbContext identity) : ControllerBase
 {
     [HttpGet, Authorize(Policy = "SuperAdmin")]
     public async Task<IActionResult> List(CancellationToken ct)
     {
-        var rows = await db.Classes.AsNoTracking().OrderBy(x => x.Name)
-            .Select(x => new { id = x.Id, name = x.Name, departmentId = x.DepartmentId,
-                department = db.Departments.Where(d => d.Id == x.DepartmentId).Select(d => d.Name).FirstOrDefault(),
-                memberCount = db.ClassMembers.Count(m => m.ClassId == x.Id),
-                memberIds = db.ClassMembers.Where(m => m.ClassId == x.Id).Select(m => m.StudentUserId).ToList() })
-            .ToListAsync(ct);
-        return Ok(rows);
+        var classes = await academic.Classes.AsNoTracking().OrderBy(x => x.Name).ToListAsync(ct);
+        var departmentIds = classes.Select(x => x.DepartmentId).Distinct().ToArray();
+        var departments = await identity.Departments.AsNoTracking().Where(x => departmentIds.Contains(x.Id))
+            .ToDictionaryAsync(x => x.Id, x => x.Name, ct);
+        var ids = classes.Select(x => x.Id).ToArray();
+        var members = await academic.ClassMembers.AsNoTracking().Where(x => ids.Contains(x.ClassId))
+            .GroupBy(x => x.ClassId).Select(g => new { ClassId = g.Key, Count = g.Count(), Ids = g.Select(x => x.StudentUserId).ToList() }).ToListAsync(ct);
+        var memberMap = members.ToDictionary(x => x.ClassId);
+        return Ok(classes.Select(x => new { id = x.Id, name = x.Name, departmentId = x.DepartmentId,
+            department = departments.GetValueOrDefault(x.DepartmentId),
+            memberCount = memberMap.GetValueOrDefault(x.Id)?.Count ?? 0,
+            memberIds = memberMap.GetValueOrDefault(x.Id)?.Ids ?? new List<long>() }));
     }
 
-    [HttpGet("{id:guid}/members"), Authorize(Policy = "SuperAdmin")]
-    public async Task<IActionResult> Members(Guid id, CancellationToken ct)
+    [HttpGet("{id:long}/members"), Authorize(Policy = "SuperAdmin")]
+    public async Task<IActionResult> Members(long id, CancellationToken ct)
     {
-        var classInfo = await db.Classes.AsNoTracking()
-            .Where(x => x.Id == id)
-            .Select(x => new { x.Id, x.DepartmentId, x.Name })
-            .FirstOrDefaultAsync(ct);
-        if (classInfo is null) return NotFound();
-
-        var members = await db.ClassMembers.AsNoTracking()
-            .Where(x => x.ClassId == id)
-            .Join(db.Users.AsNoTracking(), member => member.StudentUserId, student => student.Id,
-                (member, student) => new { id = student.Id, name = student.FullName, username = student.Username })
-            .OrderBy(x => x.name)
-            .ToListAsync(ct);
-        return Ok(new { classInfo.Id, classInfo.Name, classInfo.DepartmentId, members });
+        var item = await academic.Classes.AsNoTracking().Where(x => x.Id == id)
+            .Select(x => new { x.Id, x.DepartmentId, x.Name }).FirstOrDefaultAsync(ct);
+        if (item is null) return NotFound();
+        var members = await academic.ClassMembers.AsNoTracking().Where(x => x.ClassId == id)
+            .Join(identity.Users.AsNoTracking(), m => m.StudentUserId, u => u.Id,
+                (m, u) => new { id = u.Id, name = u.FullName, username = u.Username })
+            .OrderBy(x => x.name).ToListAsync(ct);
+        return Ok(new { item.Id, item.Name, item.DepartmentId, members });
     }
 
-    [HttpPut("{id:guid}/members"), Authorize(Policy = "SuperAdmin")]
-    public async Task<IActionResult> UpdateMembers(Guid id, [FromBody] JsonElement payload, CancellationToken ct)
+    [HttpPut("{id:long}/members"), Authorize(Policy = "SuperAdmin")]
+    public async Task<IActionResult> UpdateMembers(long id, [FromBody] JsonElement payload, CancellationToken ct)
     {
-        var classInfo = await db.Classes.FirstOrDefaultAsync(x => x.Id == id, ct);
-        if (classInfo is null) return NotFound();
-        if (!payload.TryGetProperty("studentIds", out var ids) || ids.ValueKind != JsonValueKind.Array)
+        var item = await academic.Classes.FirstOrDefaultAsync(x => x.Id == id, ct);
+        if (item is null) return NotFound();
+        if (!payload.TryGetProperty("studentIds", out var values) || values.ValueKind != JsonValueKind.Array)
             return BadRequest(new { message = "فهرست اعضای کلاس معتبر نیست." });
-
-        var studentIds = ids.EnumerateArray()
-            .Where(x => x.ValueKind == JsonValueKind.String && Guid.TryParse(x.GetString(), out _))
-            .Select(x => Guid.Parse(x.GetString()!)).Distinct().ToArray();
-        if (studentIds.Length != ids.GetArrayLength())
+        var studentIds = values.EnumerateArray().Where(x => x.TryGetInt64(out _))
+            .Select(x => x.GetInt64()).Distinct().ToArray();
+        if (studentIds.Length != values.GetArrayLength())
             return BadRequest(new { message = "شناسه اعضا تکراری یا نامعتبر است." });
-
-        var validIds = await db.Users
-            .Where(x => studentIds.Contains(x.Id) && x.Role == UserRole.Student &&
-                        x.DepartmentId == classInfo.DepartmentId && x.IsActive)
+        var valid = await identity.Users.Where(x => studentIds.Contains(x.Id) && x.IsActive &&
+            x.DepartmentId == item.DepartmentId && x.UserRoles.Any(r => r.Role.Name == CanonicalRoleNames.Student))
             .Select(x => x.Id).ToListAsync(ct);
-        if (validIds.Count != studentIds.Length)
+        if (valid.Count != studentIds.Length)
             return BadRequest(new { message = "همه اعضا باید دانشجوی فعال همان دپارتمان باشند." });
-
-        var current = await db.ClassMembers.Where(x => x.ClassId == id).ToListAsync(ct);
-        db.ClassMembers.RemoveRange(current);
-        db.ClassMembers.AddRange(validIds.Select(studentId =>
-            new StudentClassMember { ClassId = id, StudentUserId = studentId }));
-        await db.SaveChangesAsync(ct);
-        return Ok(new { classId = id, memberCount = validIds.Count });
+        var current = await academic.ClassMembers.Where(x => x.ClassId == id).ToListAsync(ct);
+        academic.ClassMembers.RemoveRange(current);
+        academic.ClassMembers.AddRange(valid.Select(studentId => new CanonicalClassMember { ClassId = id, StudentUserId = studentId }));
+        await academic.SaveChangesAsync(ct);
+        return Ok(new { classId = id, memberCount = valid.Count });
     }
 
     [HttpPost, Authorize(Policy = "SuperAdmin")]
@@ -815,23 +809,26 @@ public class ClassesController(AppDbContext db) : ControllerBase
         var name = payload.TryGetProperty("name", out var n) ? n.GetString()?.Trim() : null;
         if (string.IsNullOrWhiteSpace(name) || name.Length > 200)
             return BadRequest(new { message = "نام کلاس الزامی و حداکثر ۲۰۰ کاراکتر است." });
-        if (!payload.TryGetProperty("departmentId", out var d) || !Guid.TryParse(d.GetString(), out var departmentId))
+        if (!payload.TryGetProperty("departmentId", out var raw) || !raw.TryGetInt64(out var departmentId))
             return BadRequest(new { message = "دپارتمان کلاس را انتخاب کنید." });
-        if (!await db.Departments.AnyAsync(x => x.Id == departmentId, ct))
+        if (!await identity.Departments.AnyAsync(x => x.Id == departmentId, ct))
             return BadRequest(new { message = "دپارتمان انتخاب‌شده معتبر نیست." });
-        var studentIds = payload.TryGetProperty("studentIds", out var ids) && ids.ValueKind == JsonValueKind.Array
-            ? ids.EnumerateArray().Where(x => x.ValueKind == JsonValueKind.String && Guid.TryParse(x.GetString(), out _)).Select(x => Guid.Parse(x.GetString()!)).Distinct().ToArray()
-            : Array.Empty<Guid>();
-        var validIds = await db.Users.Where(x => studentIds.Contains(x.Id) && x.Role == UserRole.Student && x.DepartmentId == departmentId && x.IsActive).Select(x => x.Id).ToListAsync(ct);
-        if (validIds.Count != studentIds.Length)
+        var studentIds = payload.TryGetProperty("studentIds", out var values) && values.ValueKind == JsonValueKind.Array
+            ? values.EnumerateArray().Where(x => x.TryGetInt64(out _)).Select(x => x.GetInt64()).Distinct().ToArray()
+            : Array.Empty<long>();
+        if (values.ValueKind == JsonValueKind.Array && studentIds.Length != values.GetArrayLength())
+            return BadRequest(new { message = "شناسه اعضا تکراری یا نامعتبر است." });
+        var valid = await identity.Users.Where(x => studentIds.Contains(x.Id) && x.IsActive && x.DepartmentId == departmentId &&
+            x.UserRoles.Any(r => r.Role.Name == CanonicalRoleNames.Student)).Select(x => x.Id).ToListAsync(ct);
+        if (valid.Count != studentIds.Length)
             return BadRequest(new { message = "همه اعضا باید دانشجوی فعال همان دپارتمان باشند." });
-        var entity = new StudentClass { Name = name, DepartmentId = departmentId };
-        db.Classes.Add(entity);
-        db.ClassMembers.AddRange(validIds.Select(id => new StudentClassMember { ClassId = entity.Id, StudentUserId = id }));
-        await db.SaveChangesAsync(ct);
-        return Ok(new { id = entity.Id, name = entity.Name, memberCount = validIds.Count });
+        var entity = new CanonicalClass { Name = name, DepartmentId = departmentId, CreatedAt = DateTime.UtcNow };
+        academic.Classes.Add(entity);
+        await academic.SaveChangesAsync(ct);
+        academic.ClassMembers.AddRange(valid.Select(id => new CanonicalClassMember { ClassId = entity.Id, StudentUserId = id, AddedAt = DateTime.UtcNow }));
+        await academic.SaveChangesAsync(ct);
+        return Ok(new { id = entity.Id, name = entity.Name, memberCount = valid.Count });
     }
-
 }
 
 [ApiController, Route("api/notifications"), Authorize]
