@@ -63,7 +63,6 @@ public class AuthService(AppDbContext db, ITokenService tokenService) : IAuthSer
             user.Username,
             user.FullName,
             user.Role.ToString(),
-            user.MustChangePassword,
             user.DepartmentId);
     }
 }
