@@ -55,7 +55,6 @@ public record ExamRequest(
 
 public record AnswerRequest(Guid QuestionId, string? Answer);
 public record SubmitAttemptRequest(IReadOnlyList<AnswerRequest> Answers);
-public record ChangePasswordRequest(string CurrentPassword, string NewPassword);
 public record UpdateProfileRequest(string FullName, string? Email, string? Mobile);
 public record SaveSettingRequest(string Key, string Value);
 
