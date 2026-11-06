@@ -37,12 +37,14 @@ Do not execute that script until the application code has completed the bigint c
 1. Canonical identity persistence records and mappings for Users, Departments, Roles, and UserRoles are implemented in CanonicalIdentityDbContext.
 2. Authentication/JWT and identity endpoints now resolve roles from UserRoles/Roles. Preserve the policy alias Department only at the API boundary.
 3. Rebuild exam and answer persistence around ExamSections, ExamQuestions.Id, ExamAttempts.StatusId, and StudentAnswers.ExamQuestionId.
-4. Align PDF, attendance, class, notification, and settings models with the additive bigint support schema.
-5. Canonical identity controller route constraints and DTOs now use bigint IDs; account creation requires a unique PhoneNumber, and department manager display is derived from DepartmentAdmin + Users.DepartmentId (no noncanonical manager column).
-6. Remaining feature controllers, DTOs, and frontend identifiers still require coordinated bigint migration. Generate a schema diff and test against a restored copy. Never run a destructive migration against the primary database.
+4. Enforce exactly one attempt per student per exam using the canonical unique index on ExamAttempts(ExamId, StudentUserId); a second start is rejected even if the first attempt was submitted or remains in progress.
+5. Expose canonical student attempt endpoints for start, load, and final submission. Multiple-choice and matching answers are auto-graded; essay answers remain pending manual grading.
+6. Lock exam structure after the first attempt exists so historical ExamQuestion references and answers cannot be invalidated.
+7. Align PDF, attendance, class, notification, and settings models with the additive bigint support schema.
+8. Migrate remaining feature controllers, DTOs, and frontend identifiers. Generate a schema diff and test against a restored copy. Never run a destructive migration against the primary database.
 
 ## Verification status
 
-Implemented in this phase: canonical identity DbContext, login/password verification against Users, JWT role claims from UserRoles/Roles, bigint identity DTOs/routes for auth/users/departments, and DepartmentAdmin-to-Department policy mapping. Admin-defined passwords are BCrypt-hashed; there is no forced password-change flow.
+Implemented in this phase: canonical identity DbContext and endpoints; canonical academic mappings and question/exam APIs; canonical ExamAttempts and StudentAnswers mappings; student attempt start/load/submit API; one-attempt-per-exam enforcement via the unique (ExamId, StudentUserId) key; MCQ and matching auto-grading; essay pending manual grading; exam structure lock after first attempt. Login/password verification uses Users and JWT roles use UserRoles/Roles. Admin-defined passwords are BCrypt-hashed; there is no forced password-change flow.
 
 Not yet a completed application cutover: other feature controllers still use the legacy GUID-based AppDbContext and old table/column names. The legacy context remains registered to avoid deleting dependencies prematurely, but it is not compatible with the supplied canonical schema. Automatic EF migrations are explicitly blocked at startup. No .NET build or SQL Server integration test is claimed; test on a restored canonical database before deployment. Do not run legacy GUID SQL scripts or deploy this partial cutover against production.
