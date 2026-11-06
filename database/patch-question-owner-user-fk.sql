@@ -84,39 +84,46 @@ BEGIN TRY
     IF COL_LENGTH(N'dbo.Questions', N'CreatedByUserId') IS NULL
         THROW 51006, 'Neither legacy nor migrated question owner column was found.', 1;
 
-    IF EXISTS (
-        SELECT 1
-        FROM dbo.Questions q
-        LEFT JOIN dbo.Users u ON u.Id = q.CreatedByUserId
-        WHERE u.Id IS NULL
-    )
-        THROW 51007, 'A question owner does not exist in dbo.Users; user FK was not created.', 1;
+    /*
+       The column was renamed earlier in this same batch. SQL Server may
+       compile later static statements before executing sp_rename, so all
+       statements that bind CreatedByUserId must be executed dynamically.
+    */
+    EXEC sys.sp_executesql N'
+        IF EXISTS (
+            SELECT 1
+            FROM dbo.Questions q
+            LEFT JOIN dbo.Users u ON u.Id = q.CreatedByUserId
+            WHERE u.Id IS NULL
+        )
+            THROW 51007, ''A question owner does not exist in dbo.Users; user FK was not created.'', 1;
 
-    IF NOT EXISTS (
-        SELECT 1
-        FROM sys.foreign_keys
-        WHERE name = N'FK_Questions_Users_CreatedByUserId'
-          AND parent_object_id = OBJECT_ID(N'dbo.Questions')
-    )
-    BEGIN
-        ALTER TABLE dbo.Questions WITH CHECK
-        ADD CONSTRAINT FK_Questions_Users_CreatedByUserId
-            FOREIGN KEY (CreatedByUserId) REFERENCES dbo.Users(Id);
+        IF NOT EXISTS (
+            SELECT 1
+            FROM sys.foreign_keys
+            WHERE name = N''FK_Questions_Users_CreatedByUserId''
+              AND parent_object_id = OBJECT_ID(N''dbo.Questions'')
+        )
+        BEGIN
+            ALTER TABLE dbo.Questions WITH CHECK
+            ADD CONSTRAINT FK_Questions_Users_CreatedByUserId
+                FOREIGN KEY (CreatedByUserId) REFERENCES dbo.Users(Id);
 
-        ALTER TABLE dbo.Questions
-            CHECK CONSTRAINT FK_Questions_Users_CreatedByUserId;
-    END;
+            ALTER TABLE dbo.Questions
+                CHECK CONSTRAINT FK_Questions_Users_CreatedByUserId;
+        END;
 
-    IF NOT EXISTS (
-        SELECT 1
-        FROM sys.indexes
-        WHERE object_id = OBJECT_ID(N'dbo.Questions')
-          AND name = N'IX_Questions_CreatedByUserId'
-    )
-    BEGIN
-        CREATE INDEX IX_Questions_CreatedByUserId
-            ON dbo.Questions(CreatedByUserId);
-    END;
+        IF NOT EXISTS (
+            SELECT 1
+            FROM sys.indexes
+            WHERE object_id = OBJECT_ID(N''dbo.Questions'')
+              AND name = N''IX_Questions_CreatedByUserId''
+        )
+        BEGIN
+            CREATE INDEX IX_Questions_CreatedByUserId
+                ON dbo.Questions(CreatedByUserId);
+        END;
+    ';
 
     COMMIT TRANSACTION;
     PRINT 'Question creator ownership now references dbo.Users(Id).';
