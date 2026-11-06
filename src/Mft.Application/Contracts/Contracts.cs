@@ -5,11 +5,11 @@ public record LoginRequest(string Username, string Password);
 public record LoginResponse(
     string AccessToken,
     DateTime ExpiresAt,
-    Guid UserId,
+    long UserId,
     string Username,
     string FullName,
     string Role,
-    Guid? DepartmentId);
+    long? DepartmentId);
 
 public record CreateUserRequest(
     string Username,
@@ -18,16 +18,16 @@ public record CreateUserRequest(
     string Role,
     string? Email,
     string? Mobile,
-    Guid? DepartmentId);
+    long? DepartmentId);
 
 public record UpdateUserRequest(
     string FullName,
     string? Email,
     string? Mobile,
-    Guid? DepartmentId,
+    long? DepartmentId,
     bool IsActive);
 
-public record DepartmentRequest(string Name, Guid? ManagerUserId, bool IsActive = true);
+public record DepartmentRequest(string Name, long? ManagerUserId, bool IsActive = true);
 
 public record QuestionRequest(
     string Text,
