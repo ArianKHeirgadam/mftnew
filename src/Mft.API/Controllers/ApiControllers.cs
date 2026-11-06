@@ -927,51 +927,83 @@ public sealed class NotificationsController(CanonicalOperationsDbContext operati
     }
 }
 [ApiController, Route("api/dashboard"), Authorize]
-public class DashboardController(AppDbContext db) : ControllerBase
+public sealed class DashboardController(CanonicalIdentityDbContext identity, CanonicalAcademicDbContext academic) : ControllerBase
 {
     [HttpGet("summary")]
-    public async Task<IActionResult> Summary(CancellationToken ct){
-        var users = db.Users.AsQueryable();
-        var departments = db.Departments.AsQueryable();
-        var questions = db.Questions.AsQueryable();
-        var exams = db.Exams.AsQueryable();
-        var attempts = db.ExamAttempts.AsQueryable();
-        var departmentId = User.DepartmentId();
-        if (User.IsInRole("Department")){
-            users = users.Where(user => user.DepartmentId == departmentId);
-            departments = departments.Where(department => department.Id == departmentId);
-            questions = questions.Where(question => db.Users.Any(user => user.Id == question.CreatedByUserId && user.DepartmentId == departmentId));
-            exams = exams.Where(exam => exam.DepartmentId == departmentId);
-            attempts = attempts.Where(attempt => attempt.Exam.DepartmentId == departmentId);
+    public async Task<IActionResult> Summary(CancellationToken ct)
+    {
+        var users = identity.Users.AsNoTracking().AsQueryable();
+        var departments = identity.Departments.AsNoTracking().AsQueryable();
+        var questions = academic.Questions.AsNoTracking().AsQueryable();
+        var exams = academic.Exams.AsNoTracking().AsQueryable();
+        var attempts = academic.ExamAttempts.AsNoTracking().AsQueryable();
+        var departmentId = User.CanonicalDepartmentId();
+        var userId = User.CanonicalUserId();
+
+        if (User.IsInRole("Department"))
+        {
+            if (!departmentId.HasValue) return Forbid();
+            users = users.Where(x => x.DepartmentId == departmentId.Value);
+            departments = departments.Where(x => x.Id == departmentId.Value);
+            questions = questions.Where(x => identity.Users.Any(u => u.Id == x.CreatedByUserId && u.DepartmentId == departmentId.Value));
+            exams = exams.Where(x => x.DepartmentId == departmentId.Value);
+            attempts = attempts.Where(x => academic.Exams.Any(e => e.Id == x.ExamId && e.DepartmentId == departmentId.Value));
         }
-        if (User.IsInRole("Teacher")){
-            users = users.Where(user => user.Role == UserRole.Student && user.DepartmentId == departmentId);
-            departments = departments.Where(department => department.Id == departmentId);
-            questions = questions.Where(question => question.CreatedByUserId == User.UserId());
-            exams = exams.Where(exam => exam.CreatedByUserId == User.UserId());
-            attempts = attempts.Where(attempt => attempt.Exam.CreatedByUserId == User.UserId());
+        if (User.IsInRole("Teacher"))
+        {
+            if (!userId.HasValue) return Unauthorized();
+            users = users.Where(u => u.DepartmentId == departmentId && u.UserRoles.Any(r => r.Role.Name == CanonicalRoleNames.Student));
+            departments = departments.Where(d => d.Id == departmentId);
+            questions = questions.Where(q => q.CreatedByUserId == userId.Value);
+            exams = exams.Where(e => e.CreatedByUserId == userId.Value);
+            attempts = attempts.Where(a => academic.Exams.Any(e => e.Id == a.ExamId && e.CreatedByUserId == userId.Value));
         }
-        if (User.IsInRole("Student")){
-            attempts = attempts.Where(attempt => attempt.StudentId == User.UserId());
-            var availableExams = db.Exams.Where(exam => exam.IsPublished && (exam.DepartmentId == null || exam.DepartmentId == departmentId));
-            return Ok(new {
-                exams = await availableExams.CountAsync(ct), attempts = await attempts.CountAsync(ct), completed = await attempts.CountAsync(attempt => attempt.Status !="InProgress",  ct), averageScore = await attempts.Where(attempt => attempt.Score != null).Select(attempt => (double?)attempt.Score).AverageAsync(ct)??0
-            }
-            );
+        if (User.IsInRole("Student"))
+        {
+            if (!userId.HasValue) return Unauthorized();
+            attempts = attempts.Where(a => a.StudentUserId == userId.Value);
+            var available = academic.Exams.Where(e => e.IsPublished && (e.DepartmentId == departmentId || departmentId == null));
+            var total = await attempts.CountAsync(ct);
+            var completed = await attempts.CountAsync(a => a.SubmittedAt != null, ct);
+            var average = await attempts.Where(a => a.FinalScore != null).Select(a => (double?)a.FinalScore).AverageAsync(ct) ?? 0;
+            return Ok(new { exams = await available.CountAsync(ct), attempts = total, completed, averageScore = average });
         }
-        return Ok(new DashboardSummary( await users.CountAsync(ct), await users.CountAsync(user => user.Role == UserRole.Student, ct), await users.CountAsync(user => user.Role == UserRole.Teacher, ct), await departments.CountAsync(ct), await questions.CountAsync(ct), await exams.CountAsync(ct), await attempts.CountAsync(ct)));
+
+        var studentCount = await users.CountAsync(u => u.UserRoles.Any(r => r.Role.Name == CanonicalRoleNames.Student), ct);
+        var teacherCount = await users.CountAsync(u => u.UserRoles.Any(r => r.Role.Name == CanonicalRoleNames.Teacher), ct);
+        return Ok(new
+        {
+            users = await users.CountAsync(ct), students = studentCount, teachers = teacherCount,
+            departments = await departments.CountAsync(ct), questions = await questions.CountAsync(ct),
+            exams = await exams.CountAsync(ct), attempts = await attempts.CountAsync(ct)
+        });
     }
+
     [HttpGet("activity")]
-    public async Task<IActionResult> Activity(CancellationToken ct){
+    public async Task<IActionResult> Activity(CancellationToken ct)
+    {
         var since = DateTime.UtcNow.AddDays(-7);
-        var q = db.ExamAttempts.Where(x => x.StartedAt >= since).AsQueryable();
-        if (User.IsInRole("Department"))q = q.Where(x => x.Exam.DepartmentId == User.DepartmentId());
-        if (User.IsInRole("Teacher"))q = q.Where(x => x.Exam.CreatedByUserId == User.UserId());
-        if (User.IsInRole("Student"))q = q.Where(x => x.StudentId == User.UserId());
-        var data = await q.GroupBy(x => x.StartedAt.Date).Select(g => new{
-            date = g.Key, count = g.Count()
+        var query = academic.ExamAttempts.AsNoTracking().Where(x => x.StartedAt >= since);
+        if (User.IsInRole("Department"))
+        {
+            var departmentId = User.CanonicalDepartmentId();
+            if (!departmentId.HasValue) return Forbid();
+            query = query.Where(x => academic.Exams.Any(e => e.Id == x.ExamId && e.DepartmentId == departmentId.Value));
         }
-        ).ToListAsync(ct);
+        if (User.IsInRole("Teacher"))
+        {
+            var userId = User.CanonicalUserId();
+            if (!userId.HasValue) return Unauthorized();
+            query = query.Where(x => academic.Exams.Any(e => e.Id == x.ExamId && e.CreatedByUserId == userId.Value));
+        }
+        if (User.IsInRole("Student"))
+        {
+            var userId = User.CanonicalUserId();
+            if (!userId.HasValue) return Unauthorized();
+            query = query.Where(x => x.StudentUserId == userId.Value);
+        }
+        var data = await query.GroupBy(x => x.StartedAt.Date)
+            .Select(g => new { date = g.Key, count = g.Count() }).ToListAsync(ct);
         return Ok(data);
     }
 }
@@ -996,83 +1028,75 @@ public sealed class SettingsController(CanonicalOperationsDbContext operations) 
     }
 }
 [ApiController, Route("api/reports"), Authorize(Policy = "DepartmentOrAbove")]
-public class ReportsController(AppDbContext db) : ControllerBase
+public sealed class ReportsController(CanonicalIdentityDbContext identity, CanonicalAcademicDbContext academic) : ControllerBase
 {
     [HttpGet("departments")]
     public async Task<IActionResult> Departments(CancellationToken ct)
     {
-        var q = db.Departments.AsQueryable();
+        var query = identity.Departments.AsNoTracking().AsQueryable();
         if (User.IsInRole("Department"))
-            q = q.Where(d => d.Id == User.DepartmentId());
-
-        var rows = await q.Select(d => new
         {
-            departmentId = (Guid?)d.Id,
-            department = d.Name,
-            students = db.Users.Count(u => u.DepartmentId == d.Id && u.Role == UserRole.Student),
-            teachers = db.Users.Count(u => u.DepartmentId == d.Id && u.Role == UserRole.Teacher),
-            exams = db.Exams.Count(e => e.DepartmentId == d.Id),
-            averageScore = db.ExamAttempts.Where(a => a.Exam.DepartmentId == d.Id && a.Score != null).Select(a => (double?)a.Score).Average() ?? 0,
-            gradedAttempts = db.ExamAttempts.Count(a => a.Exam.DepartmentId == d.Id && a.Score != null),
-            passedAttempts = db.ExamAttempts.Count(a => a.Exam.DepartmentId == d.Id && a.Score != null && a.Score >= a.Exam.PassingScore),
-            passRate = db.ExamAttempts.Where(a => a.Exam.DepartmentId == d.Id && a.Score != null).Count(a => a.Score >= a.Exam.PassingScore) * 100.0 / Math.Max(1, db.ExamAttempts.Count(a => a.Exam.DepartmentId == d.Id && a.Score != null)),
-            participation = db.ExamAttempts.Count(a => a.Exam.DepartmentId == d.Id)
-        }).ToListAsync(ct);
-
+            var current = User.CanonicalDepartmentId();
+            if (!current.HasValue) return Forbid();
+            query = query.Where(x => x.Id == current.Value);
+        }
+        var departments = await query.OrderBy(x => x.Name).Select(x => new { x.Id, x.Name }).ToListAsync(ct);
+        var rows = new List<object>();
+        foreach (var department in departments)
+        {
+            var studentIds = identity.Users.Where(u => u.DepartmentId == department.Id && u.UserRoles.Any(r => r.Role.Name == CanonicalRoleNames.Student)).Select(u => u.Id);
+            var teacherIds = identity.Users.Where(u => u.DepartmentId == department.Id && u.UserRoles.Any(r => r.Role.Name == CanonicalRoleNames.Teacher)).Select(u => u.Id);
+            var examIds = academic.Exams.Where(e => e.DepartmentId == department.Id).Select(e => e.Id);
+            var graded = academic.ExamAttempts.Where(a => examIds.Contains(a.ExamId) && a.FinalScore != null);
+            var gradedCount = await graded.CountAsync(ct);
+            var average = await graded.Select(a => (double?)a.FinalScore).AverageAsync(ct) ?? 0;
+            var passed = await graded.CountAsync(a => a.FinalScore >= 50m, ct);
+            rows.Add(new { departmentId = department.Id, department = department.Name,
+                students = await studentIds.CountAsync(ct), teachers = await teacherIds.CountAsync(ct),
+                exams = await examIds.CountAsync(ct), averageScore = average, gradedAttempts = gradedCount,
+                passedAttempts = passed, passRate = gradedCount == 0 ? 0d : passed * 100d / gradedCount,
+                participation = await academic.ExamAttempts.CountAsync(a => examIds.Contains(a.ExamId), ct) });
+        }
         if (User.IsInRole("SuperAdmin"))
         {
-            var unassignedStudents = await db.Users.CountAsync(u => u.DepartmentId == null && u.Role == UserRole.Student, ct);
-            var unassignedTeachers = await db.Users.CountAsync(u => u.DepartmentId == null && u.Role == UserRole.Teacher, ct);
+            var unassignedStudents = await identity.Users.CountAsync(u => u.DepartmentId == null && u.UserRoles.Any(r => r.Role.Name == CanonicalRoleNames.Student), ct);
+            var unassignedTeachers = await identity.Users.CountAsync(u => u.DepartmentId == null && u.UserRoles.Any(r => r.Role.Name == CanonicalRoleNames.Teacher), ct);
             if (unassignedStudents > 0 || unassignedTeachers > 0)
-            {
-                rows.Add(new
-                {
-                    departmentId = (Guid?)null,
-                    department = "بدون دپارتمان",
-                    students = unassignedStudents,
-                    teachers = unassignedTeachers,
-                    exams = 0,
-                    averageScore = 0d,
-                    gradedAttempts = 0,
-                    passedAttempts = 0,
-                    passRate = 0d,
-                    participation = 0
-                });
-            }
+                rows.Add(new { departmentId = (long?)null, department = "بدون دپارتمان", students = unassignedStudents,
+                    teachers = unassignedTeachers, exams = 0, averageScore = 0d, gradedAttempts = 0,
+                    passedAttempts = 0, passRate = 0d, participation = 0 });
         }
-
         return Ok(rows);
     }
 
     [HttpGet("recent-attempts")]
-    public async Task<IActionResult> RecentAttempts([FromQuery] Guid? departmentId, [FromQuery] string? search, [FromQuery] int take = 100, CancellationToken ct = default)
+    public async Task<IActionResult> RecentAttempts([FromQuery] long? departmentId, [FromQuery] string? search,
+        [FromQuery] int take = 100, CancellationToken ct = default)
     {
-        var q = db.ExamAttempts.AsNoTracking().Where(a => a.Status != "InProgress" && a.SubmittedAt != null);
-        if (User.IsInRole("Department")) q = q.Where(a => a.Exam.DepartmentId == User.DepartmentId());
-        else if (departmentId.HasValue) q = q.Where(a => a.Exam.DepartmentId == departmentId.Value);
+        var query = from attempt in academic.ExamAttempts.AsNoTracking()
+                    join exam in academic.Exams.AsNoTracking() on attempt.ExamId equals exam.Id
+                    join student in identity.Users.AsNoTracking() on attempt.StudentUserId equals student.Id
+                    join department in identity.Departments.AsNoTracking() on exam.DepartmentId equals department.Id
+                    where attempt.SubmittedAt != null
+                    select new { attempt, exam, student, department };
+        if (User.IsInRole("Department"))
+        {
+            var current = User.CanonicalDepartmentId();
+            if (!current.HasValue) return Forbid();
+            query = query.Where(x => x.exam.DepartmentId == current.Value);
+        }
+        else if (departmentId.HasValue) query = query.Where(x => x.exam.DepartmentId == departmentId.Value);
         if (!string.IsNullOrWhiteSpace(search))
         {
             var term = search.Trim();
-            q = q.Where(a => a.Exam.Title.Contains(term) ||
-                db.Users.Any(u => u.Id == a.StudentId && u.FullName.Contains(term)));
+            query = query.Where(x => x.exam.Title.Contains(term) || x.student.FullName.Contains(term));
         }
-        var rows = await q
-            .OrderBy(a => db.Departments.Where(d => d.Id == a.Exam.DepartmentId).Select(d => d.Name).FirstOrDefault())
-            .ThenByDescending(a => a.SubmittedAt)
+        var rows = await query.OrderBy(x => x.department.Name).ThenByDescending(x => x.attempt.SubmittedAt)
             .Take(Math.Clamp(take, 1, 250))
-            .Select(a => new
-            {
-                attemptId = a.Id,
-                departmentId = a.Exam.DepartmentId,
-                department = db.Departments.Where(d => d.Id == a.Exam.DepartmentId).Select(d => d.Name).FirstOrDefault() ?? "بدون دپارتمان",
-                studentId = a.StudentId,
-                student = db.Users.Where(u => u.Id == a.StudentId).Select(u => u.FullName).FirstOrDefault() ?? "کاربر حذف‌شده",
-                exam = a.Exam.Title,
-                score = a.Score,
-                status = a.Status,
-                startedAt = a.StartedAt,
-                submittedAt = a.SubmittedAt
-            }).ToListAsync(ct);
+            .Select(x => new { attemptId = x.attempt.Id, departmentId = x.exam.DepartmentId,
+                department = x.department.Name, studentId = x.student.Id, student = x.student.FullName,
+                exam = x.exam.Title, score = x.attempt.FinalScore, status = x.attempt.StatusId,
+                startedAt = x.attempt.StartedAt, submittedAt = x.attempt.SubmittedAt }).ToListAsync(ct);
         return Ok(rows);
     }
 }
