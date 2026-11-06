@@ -165,7 +165,7 @@
         : document.querySelectorAll('#manualPick input[type=checkbox]:checked').length;
       document.getElementById("prevQuestionCount").textContent = pdfOnly ? "فقط PDF (بدون سؤال ساختاریافته)" : `${selectedCount} سوال${randomMode ? ' (تصادفی)' : ''}`;
       document.getElementById("prevDuration").textContent = `${document.getElementById("examDuration").value || 0} دقیقه`;
-      document.getElementById("prevPassingScore").textContent = `${document.getElementById("examPassingScore").value || 0} از ۲۰`;
+      document.getElementById("prevPassingScore").textContent = `${document.getElementById("examPassingScore").value || 0} از ۱۰۰`;
     }
   }
   document.addEventListener("click", event => {
@@ -232,7 +232,8 @@
         try {
           await api.request(`/exam-files/exams/${encodeURIComponent(createdExam.id)}`, { method: "POST", body: form });
         } catch (uploadError) {
-          showToast(`آزمون ایجاد شد، اما بارگذاری PDF ناموفق بود: ${uploadError.message}`, "warn");
+          showToast(`بارگذاری PDF ناموفق بود؛ آزمون ناقص حذف می‌شود: ${uploadError.message}`, "warn");
+          await api.request(`/exams/${encodeURIComponent(createdExam.id)}`, { method: "DELETE" }).catch(() => null);
           setTimeout(() => location.href = "dashboard-teacher.html", 1800);
           return;
         }
