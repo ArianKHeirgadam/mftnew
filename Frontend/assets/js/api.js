@@ -151,9 +151,13 @@
   async function loadQuestions() {
     if (!$('body[data-active="bank"]')) return;
     const search = $('body[data-active="bank"] .search-box input')?.value.trim();
-    const rows = await request(`/questions${search ? `?search=${encodeURIComponent(search)}` : ''}`);
+    const rows = await request(`/canonical/questions${search ? `?search=${encodeURIComponent(search)}` : ''}`);
+    const typeNames = { MultipleChoice: 'چهارگزینه‌ای', Essay: 'تشریحی', Matching: 'وصل‌کردنی' };
+    const difficultyNames = { 1: 'آسان', 2: 'متوسط', 3: 'سخت' };
     renderRows('body[data-active="bank"] table tbody', rows, row => `<tr>
-      <td>${escapeHtml(row.text)}</td><td>${escapeHtml(row.category)}</td><td>${escapeHtml(row.type)}</td><td>${escapeHtml(row.difficulty)}</td>
+      <td>${escapeHtml(row.text)}</td><td>${escapeHtml(row.skillName || row.categoryName || '—')}</td>
+      <td>${escapeHtml(typeNames[row.questionTypeCode] || row.questionTypeName || row.questionTypeCode || '—')}</td>
+      <td>${escapeHtml(difficultyNames[Number(row.difficultyLevel)] || '—')}</td>
       <td><button class="btn btn-outline btn-sm" data-question-edit="${row.id}">ویرایش</button>
       <button class="btn btn-danger btn-sm" data-question-delete="${row.id}">حذف</button></td></tr>`, 5);
   }
@@ -775,23 +779,40 @@
 
   async function loadExamWizard() {
     if (!document.body.matches('[data-active="exams"]') || !$('#wizardSteps')) return;
-    const [departments, questions] = await Promise.all([
+    const [departments, lookups, questions, me] = await Promise.all([
       request('/departments').catch(() => []),
-      request('/questions').catch(() => [])
+      request('/canonical/questions/lookups'),
+      request('/canonical/questions'),
+      request('/auth/me').catch(() => null)
     ]);
     const departmentWrap = $('#deptChoices');
-    const questionWrap = $('#manualPick');
     if (departmentWrap) {
-      departmentWrap.innerHTML = departments.length ? departments.map((dept, index) => `<div class="choice-card ${index === 0 ? 'selected' : ''}" data-id="${dept.id}" data-value="${escapeHtml(dept.name)}"><div class="mohr sm"><div class="mohr-inner"><b>${escapeHtml(dept.name.slice(0, 2))}</b></div></div><b>${escapeHtml(dept.name)}</b></div>`).join('') : '<p class="text-soft">دپارتمانی ثبت نشده است. از گزینه «ایجاد دپارتمان» استفاده کنید.</p>';
+      const role = String(me?.role || currentUser()?.role || '').toLowerCase();
+      const visibleDepartments = role === 'superadmin' ? departments.filter(x => x.isActive !== false) : departments.filter(x => Number(x.id) === Number(me?.departmentId));
+      departmentWrap.innerHTML = visibleDepartments.length
+        ? visibleDepartments.map((dept, index) => `<div class="choice-card ${index === 0 ? 'selected' : ''}" data-id="${dept.id}" data-value="${escapeHtml(dept.name)}"><div class="mohr sm"><div class="mohr-inner"><b>${escapeHtml(dept.name.slice(0, 2))}</b></div></div><b>${escapeHtml(dept.name)}</b></div>`).join('')
+        : '<p class="text-soft">دپارتمان متصل به حساب شما پیدا نشد؛ ابتدا اتصال حساب به دپارتمان را بررسی کنید.</p>';
     }
-    if (questionWrap) {
-      questionWrap.innerHTML = questions.map(question => `<label class="qpick-row"><input type="checkbox" data-question-type="${escapeHtml(question.type)}" value="${question.id}"><span style="flex:1">${escapeHtml(question.text)}</span><span class="badge badge-info">${escapeHtml(question.type)}</span></label>`).join('') || '<p class="text-soft">ابتدا از بانک سؤال، سؤال ثبت کنید.</p>';
-    }
+    const categorySelect = $('#examCategory');
+    if (categorySelect) categorySelect.innerHTML = '<option value="">انتخاب دسته‌بندی آزمون</option>' +
+      lookups.categories.map(x => `<option value="${x.id}">${escapeHtml(x.name)}</option>`).join('');
+    const questionWrap = $('#manualPick');
+    const renderQuestions = () => {
+      const categoryId = Number(categorySelect?.value || 0);
+      const skillIds = new Set(lookups.skills.filter(s => !categoryId || Number(s.examCategoryId) === categoryId).map(s => Number(s.id)));
+      const available = questions.filter(q => skillIds.has(Number(q.skillId)));
+      if (questionWrap) questionWrap.innerHTML = available.map(question => {
+        const type = question.questionTypeCode || '';
+        const typeName = ({ MultipleChoice: 'چهارگزینه‌ای', Essay: 'تشریحی', Matching: 'وصل‌کردنی' })[type] || question.questionTypeName || type;
+        return `<label class="qpick-row"><input type="checkbox" data-question-type="${escapeHtml(type)}" data-skill-id="${question.skillId}" value="${question.id}"><span style="flex:1">${escapeHtml(question.text)}</span><span class="badge badge-info">${escapeHtml(question.skillName || 'مهارت')}</span><span class="badge badge-muted">${escapeHtml(typeName)}</span></label>`;
+      }).join('') || '<p class="text-soft">برای این دسته‌بندی هنوز سؤالی در بانک canonical ثبت نشده است.</p>';
+    };
+    categorySelect?.addEventListener('change', renderQuestions);
+    renderQuestions();
     const teacherWrap = $('#teacherChoices');
     if (teacherWrap) {
-      const me = await request('/auth/me').catch(() => null);
-      const teachers = me?.role === 'Teacher' ? [me] : await request('/users?role=Teacher').catch(() => []);
-      teacherWrap.innerHTML = teachers.map((teacher, index) => `<div class="choice-card ${index === 0 ? 'selected' : ''}" data-id="${teacher.id}" data-value="${escapeHtml(teacher.fullName)}"><div class="mohr sm"><div class="mohr-inner"><b>${escapeHtml(teacher.fullName.slice(0, 2))}</b></div></div><b>${escapeHtml(teacher.fullName)}</b></div>`).join('') || '<p class="text-soft">استادی برای انتخاب وجود ندارد. می‌توانید استاد جدید ایجاد کنید.</p>';
+      const name = me?.fullName || currentUser()?.fullName || 'کاربر واردشده';
+      teacherWrap.innerHTML = `<div class="choice-card selected" data-id="${me?.id || ''}" data-value="${escapeHtml(name)}"><div class="mohr sm"><div class="mohr-inner"><b>${escapeHtml(name.slice(0, 2))}</b></div></div><b>${escapeHtml(name)} (حساب فعلی)</b></div>`;
     }
   }
 
