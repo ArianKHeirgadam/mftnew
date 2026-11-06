@@ -44,7 +44,7 @@ public sealed class CanonicalAcademicDbContext(
         modelBuilder.Entity<CanonicalQuestionType>(e =>
         {
             e.ToTable("QuestionTypes"); e.HasKey(x => x.Id);
-            e.Property(x => x.Id).HasColumnType("bigint").ValueGeneratedNever();
+            e.Property(x => x.Id).HasColumnType("bigint").UseIdentityColumn();
             e.Property(x => x.Code).HasMaxLength(50).IsRequired();
             e.Property(x => x.Name).HasMaxLength(100).IsRequired();
             e.HasIndex(x => x.Code).IsUnique();
