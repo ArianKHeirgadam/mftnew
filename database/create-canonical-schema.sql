@@ -42,7 +42,7 @@ CREATE TABLE dbo.Users (
     CONSTRAINT FK_Users_Departments FOREIGN KEY (DepartmentId) REFERENCES dbo.Departments(Id) ON DELETE NO ACTION
 );
 CREATE UNIQUE INDEX UX_Users_Username ON dbo.Users(Username);
-CREATE UNIQUE INDEX UX_Users_PhoneNumber_NotNull ON dbo.Users(PhoneNumber) WHERE PhoneNumber IS NOT NULL;
+EXEC(N'CREATE UNIQUE INDEX UX_Users_PhoneNumber_NotNull ON dbo.Users(PhoneNumber) WHERE PhoneNumber IS NOT NULL;');
 CREATE INDEX IX_Users_DepartmentId ON dbo.Users(DepartmentId);
 
 CREATE TABLE dbo.Roles (
