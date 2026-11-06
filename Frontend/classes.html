@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>مدیریت کلاس‌ها | سامانه سنجش</title>
+  <link rel="stylesheet" href="assets/css/style.css">
+  <link rel="stylesheet" href="assets/css/responsive.css">
+  <link rel="stylesheet" href="assets/css/dark.css">
+</head>
+<body data-role="superadmin" data-active="classes">
+<div class="app-shell">
+  <div id="sidebar-root"></div>
+  <div class="main-col">
+    <div id="topbar-root" data-title="مدیریت کلاس‌ها"></div>
+    <main class="content fade-in">
+      <div class="page-head">
+        <div>
+          <div class="breadcrumb">سامانه سنجش <span>/</span> <b>مدیریت کلاس‌ها</b></div>
+          <h1>کلاس‌ها و اعضا</h1>
+          <p class="text-soft">اعضای هر کلاس مشخص می‌کنند کدام دانشجو مجاز به مشاهده و شرکت در آزمون‌های آن کلاس است.</p>
+        </div>
+      </div>
+
+      <div class="grid-2" style="align-items:start">
+        <section class="card card-pad">
+          <h3 style="margin-bottom:16px">ایجاد کلاس</h3>
+          <div class="field" id="classDepartmentField">
+            <label for="classDepartment">دپارتمان</label>
+            <select class="select" id="classDepartment"><option value="">در حال دریافت دپارتمان‌ها...</option></select>
+          </div>
+          <div class="field">
+            <label for="className">نام کلاس</label>
+            <input class="input" id="className" maxlength="200" placeholder="مثلاً گروه کامپیوتر ۱۴۰۵">
+          </div>
+          <button class="btn btn-primary" id="classCreate">ایجاد کلاس</button>
+          <div class="divider" style="margin:20px 0"></div>
+          <h3 style="margin-bottom:12px">فهرست کلاس‌ها</h3>
+          <div class="field">
+            <label for="classSelect">انتخاب کلاس برای مدیریت اعضا</label>
+            <select class="select" id="classSelect"><option value="">در حال دریافت کلاس‌ها...</option></select>
+          </div>
+          <div id="classSummary" class="text-soft text-sm">کلاسی انتخاب نشده است.</div>
+        </section>
+
+        <section class="card card-pad">
+          <div class="flex items-center justify-between gap-8" style="margin-bottom:12px">
+            <h3>اعضای کلاس</h3>
+            <span class="text-soft text-sm" id="memberCount">۰ دانشجو</span>
+          </div>
+          <div class="field">
+            <label for="studentSearch">جستجوی دانشجو</label>
+            <input class="input" id="studentSearch" placeholder="نام یا نام کاربری دانشجو">
+          </div>
+          <div class="flex items-center justify-between gap-8" style="margin-bottom:12px">
+            <label class="checkbox-row"><input type="checkbox" id="selectAllStudents"> انتخاب همه نتایج</label>
+            <span class="text-soft text-sm" id="selectedCount">۰ انتخاب‌شده</span>
+          </div>
+          <div id="classStudents" class="flex flex-col gap-8" style="max-height:420px;overflow:auto">
+            <p class="text-soft">ابتدا یک کلاس انتخاب کنید.</p>
+          </div>
+          <div class="flex justify-end" style="margin-top:18px">
+            <button class="btn btn-primary" id="saveMembers" disabled>ذخیره اعضای کلاس</button>
+          </div>
+        </section>
+      </div>
+    </main>
+  </div>
+</div>
+<script src="assets/js/theme.js"></script>
+<script src="assets/js/app.js"></script>
+<script src="assets/js/api.js"></script>
+<script>
+(() => {
+  const $ = selector => document.querySelector(selector);
+  const esc = value => String(value ?? '').replace(/[&<>"']/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
+  let classes = [], students = [], selectedIds = new Set(), currentClass = null, me = null;
+  const notify = (message, type = 'info') => window.showToast?.(message, type);
+  const api = () => window.MftApi;
+
+  function updateCounts() {
+    const visible = [...$('#classStudents').querySelectorAll('[data-student-id]')];
+    const selected = visible.filter(row => row.querySelector('input').checked).length;
+    $('#selectedCount').textContent = selected + ' انتخاب‌شده از ' + selectedIds.size;
+    $('#memberCount').textContent = selectedIds.size + ' دانشجو';
+    $('#selectAllStudents').checked = visible.length > 0 && visible.every(row => row.querySelector('input').checked);
+  }
+
+  function renderStudents() {
+    const term = $('#studentSearch').value.trim().toLocaleLowerCase();
+    const rows = students.filter(student =>
+      !term || (student.fullName || '').toLocaleLowerCase().includes(term) ||
+      (student.username || '').toLocaleLowerCase().includes(term));
+    $('#classStudents').innerHTML = rows.length ? rows.map(student => {
+      const checked = selectedIds.has(Number(student.id)) ? 'checked' : '';
+      return '<label class="qpick-row" data-student-id="' + student.id + '">' +
+        '<input type="checkbox" ' + checked + '><span style="flex:1"><b>' + esc(student.fullName) +
+        '</b><small class="text-soft" style="display:block">' + esc(student.username) + '</small></span></label>';
+    }).join('') : '<p class="text-soft">دانشجویی برای این کلاس پیدا نشد.</p>';
+    updateCounts();
+  }
+
+  async function loadClasses(preferredId) {
+    classes = await api().request('/canonical/classes');
+    $('#classSelect').innerHTML = '<option value="">انتخاب کلاس</option>' + classes.map(item =>
+      '<option value="' + item.id + '">' + esc(item.name) + ' — ' + esc(item.department || '') +
+      ' (' + Number(item.memberCount || 0) + ' نفر)</option>').join('');
+    if (preferredId) $('#classSelect').value = String(preferredId);
+    if ($('#classSelect').value) await loadClassMembers(Number($('#classSelect').value));
+  }
+
+  async function loadClassMembers(id) {
+    currentClass = classes.find(item => Number(item.id) === id) || null;
+    if (!currentClass) return;
+    const [members, allStudents] = await Promise.all([
+      api().request('/canonical/classes/' + id + '/members'),
+      api().request('/users?role=Student')
+    ]);
+    const memberIds = new Set((members.members || []).map(item => Number(item.id)));
+    students = allStudents.filter(item => Number(item.departmentId) === Number(currentClass.departmentId) && item.isActive !== false);
+    selectedIds = memberIds;
+    $('#classSummary').textContent = currentClass.name + ' — ' + (currentClass.department || me?.department || 'دپارتمان') +
+      ' — ' + selectedIds.size + ' عضو';
+    $('#saveMembers').disabled = false;
+    renderStudents();
+  }
+
+  async function initialize() {
+    await api().refresh();
+    me = await api().request('/auth/me');
+    const departments = await api().request('/departments');
+    const departmentSelect = $('#classDepartment');
+    const departmentField = $('#classDepartmentField');
+    if (me.role !== 'superadmin') {
+      departmentField.hidden = true;
+    } else {
+      departmentSelect.innerHTML = '<option value="">انتخاب دپارتمان</option>' + departments.filter(d => d.isActive !== false)
+        .map(d => '<option value="' + d.id + '">' + esc(d.name) + '</option>').join('');
+    }
+    await loadClasses();
+  }
+
+  $('#classCreate').addEventListener('click', async () => {
+    const name = $('#className').value.trim();
+    const departmentId = me?.role === 'superadmin' ? Number($('#classDepartment').value || 0) : Number(me?.departmentId || 0);
+    if (!name) return notify('نام کلاس را وارد کنید.', 'warn');
+    if (!departmentId) return notify('دپارتمان معتبر انتخاب نشده است.', 'warn');
+    try {
+      const created = await api().request('/canonical/classes', {
+        method: 'POST', body: JSON.stringify({ name, departmentId })
+      });
+      $('#className').value = '';
+      await loadClasses(created.id);
+      notify('کلاس ایجاد شد.', 'ok');
+    } catch (error) { notify(error.message || 'ایجاد کلاس ناموفق بود.', 'danger'); }
+  });
+
+  $('#classSelect').addEventListener('change', async () => {
+    selectedIds = new Set();
+    $('#classStudents').innerHTML = '<p class="text-soft">در حال دریافت اعضا...</p>';
+    if ($('#classSelect').value) {
+      try { await loadClassMembers(Number($('#classSelect').value)); }
+      catch (error) { notify(error.message, 'danger'); }
+    } else {
+      currentClass = null; students = [];
+      $('#classStudents').innerHTML = '<p class="text-soft">ابتدا یک کلاس انتخاب کنید.</p>';
+      $('#classSummary').textContent = 'کلاسی انتخاب نشده است.';
+      $('#saveMembers').disabled = true; updateCounts();
+    }
+  });
+
+  $('#classStudents').addEventListener('change', event => {
+    const row = event.target.closest('[data-student-id]');
+    if (!row) return;
+    const id = Number(row.dataset.studentId);
+    if (event.target.checked) selectedIds.add(id); else selectedIds.delete(id);
+    updateCounts();
+  });
+
+  $('#selectAllStudents').addEventListener('change', event => {
+    for (const row of $('#classStudents').querySelectorAll('[data-student-id]')) {
+      const id = Number(row.dataset.studentId);
+      if (event.target.checked) selectedIds.add(id); else selectedIds.delete(id);
+      row.querySelector('input').checked = event.target.checked;
+    }
+    updateCounts();
+  });
+
+  $('#studentSearch').addEventListener('input', renderStudents);
+
+  $('#saveMembers').addEventListener('click', async () => {
+    if (!currentClass) return;
+    $('#saveMembers').disabled = true;
+    try {
+      await api().request('/canonical/classes/' + currentClass.id + '/members', {
+        method: 'PUT', body: JSON.stringify({ studentIds: [...selectedIds] })
+      });
+      await loadClasses(currentClass.id);
+      notify('اعضای کلاس ذخیره شدند.', 'ok');
+    } catch (error) { notify(error.message || 'ذخیره اعضا ناموفق بود.', 'danger'); }
+    finally { $('#saveMembers').disabled = false; }
+  });
+
+  $('#classStudents').innerHTML = '<p class="text-soft">در حال آماده‌سازی...</p>';
+  initialize().catch(error => {
+    $('#classStudents').innerHTML = '<p class="text-soft">بارگذاری کلاس‌ها ناموفق بود.</p>';
+    notify(error.message || 'دریافت اطلاعات کلاس‌ها ناموفق بود.', 'danger');
+  });
+})();
+</script>
+</body>
+</html>
