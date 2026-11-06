@@ -530,6 +530,22 @@
     }, 'تنظیمات ذخیره شد.');
   }
 
+  async function loadRecentAttempts() {
+    const body = $('[data-recent-attempts]');
+    if (!body) return;
+    const params = new URLSearchParams({ take: '100' });
+    const departmentId = $('[data-report-department]')?.value;
+    const search = $('[data-report-search]')?.value.trim();
+    if (departmentId) params.set('departmentId', departmentId);
+    if (search) params.set('search', search);
+    const rows = await request('/reports/recent-attempts?' + params.toString());
+    body.innerHTML = rows.length ? rows.map(row => {
+      const status = row.status === 'Graded' ? 'تصحیح‌شده' : row.status === 'Submitted' ? 'ارسال‌شده' : escapeHtml(row.status);
+      const date = value => value ? new Date(value).toLocaleString('fa-IR') : '—';
+      return `<tr><td>${escapeHtml(row.department)}</td><td>${escapeHtml(row.student)}</td><td>${escapeHtml(row.exam)}</td><td>${date(row.startedAt)}</td><td>${date(row.submittedAt)}</td><td>${status}</td><td>${row.score == null ? 'در انتظار تصحیح' : Number(row.score).toLocaleString('fa-IR')}</td></tr>`;
+    }).join('') : '<tr><td colspan="7" class="text-soft" style="text-align:center;padding:24px">تلاشی برای این فیلتر پیدا نشد.</td></tr>';
+  }
+
   async function loadReports() {
     if (!document.body.matches('[data-active="reports"]')) return;
     const rows = await request('/reports/departments');
@@ -542,13 +558,74 @@
     const totalStudents = rows.reduce((sum, row) => sum + Number(row.students || 0), 0);
     const totalAttempts = rows.reduce((sum, row) => sum + Number(row.participation || 0), 0);
     const metrics = { exams: totalExams, passRate: weightedPassRate, participation: totalAttempts, students: totalStudents };
-    $$('body[data-active="reports"] [data-metric]').forEach(element => {
+    $('body[data-active="reports"] [data-metric]').forEach(element => {
       const key = element.dataset.metric;
       if (key in metrics) element.textContent = faNumber(Math.round(metrics[key] * 10) / 10);
     });
+    const departmentFilter = $('[data-report-department]');
+    if (departmentFilter) {
+      const selected = departmentFilter.value;
+      departmentFilter.innerHTML = '<option value="">همه دپارتمان‌ها</option>' + rows.filter(row => row.department !== 'بدون دپارتمان' && row.departmentId).map(row => `<option value="${row.departmentId}">${escapeHtml(row.department)}</option>`).join('');
+      departmentFilter.value = selected;
+    }
     const activity = await request('/dashboard/activity').catch(() => []);
     window.MftChartData = { ...(window.MftChartData || {}), activity, departments: rows };
     document.dispatchEvent(new Event('mft:data-ready'));
+    await loadRecentAttempts();
+    const searchInput = $('[data-report-search]');
+    const deptSelect = $('[data-report-department]');
+    const refresh = $('[data-report-refresh]');
+    if (searchInput && !searchInput.dataset.wired) {
+      searchInput.dataset.wired = 'true';
+      let timer;
+      searchInput.addEventListener('input', () => { clearTimeout(timer); timer = setTimeout(() => safe(loadRecentAttempts), 300); });
+    }
+    if (deptSelect && !deptSelect.dataset.wired) {
+      deptSelect.dataset.wired = 'true';
+      deptSelect.addEventListener('change', () => safe(loadRecentAttempts));
+    }
+    if (refresh && !refresh.dataset.wired) {
+      refresh.dataset.wired = 'true';
+      refresh.addEventListener('click', () => safe(loadReports));
+    }
+  }
+
+  async function setupNotificationComposer() {
+    const panel = $('[data-notification-compose]');
+    if (!panel) return;
+    const role = (currentUser()?.role || '').toLowerCase();
+    if (role !== 'superadmin') return;
+    panel.hidden = false;
+    const [departments, users] = await Promise.all([request('/departments'), request('/users')]);
+    const departmentSelect = $('[data-notification-department]');
+    const userSelect = $('[data-notification-user]');
+    if (departmentSelect) departmentSelect.innerHTML = '<option value="">انتخاب دپارتمان</option>' + departments.map(item => `<option value="${item.id}">${escapeHtml(item.name)}</option>`).join('');
+    if (userSelect) userSelect.innerHTML = '<option value="">انتخاب کاربر</option>' + users.filter(item => item.isActive !== false).map(item => `<option value="${item.id}">${escapeHtml(item.fullName || item.username)} — ${escapeHtml(item.role)}</option>`).join('');
+    const audience = $('[data-notification-audience]');
+    const sync = () => {
+      const value = audience?.value;
+      $('[data-notification-department-wrap]').hidden = value !== 'Department';
+      $('[data-notification-user-wrap]').hidden = value !== 'User';
+      $('[data-notification-class-note]').hidden = value !== 'Class';
+    };
+    audience?.addEventListener('change', sync);
+    sync();
+  }
+
+  async function sendNotification() {
+    const audience = $('[data-notification-audience]')?.value;
+    const title = $('[data-notification-title]')?.value.trim();
+    const message = $('[data-notification-message]')?.value.trim();
+    if (!title || !message) return notify('عنوان و متن اعلان را وارد کنید.', 'warn');
+    const payload = { audience, title, message };
+    if (audience === 'Department') payload.departmentId = $('[data-notification-department]')?.value;
+    if (audience === 'User') payload.userId = $('[data-notification-user]')?.value;
+    await safe(async () => {
+      const result = await request('/notifications', { method: 'POST', body: JSON.stringify(payload) });
+      $('[data-notification-title]').value = '';
+      $('[data-notification-message]').value = '';
+      notify(`اعلان برای ${faNumber(result.sent)} نفر ثبت شد.`, 'ok');
+    });
   }
 
   async function openUserEditor(id, role) {
@@ -651,6 +728,8 @@
       if (event.target.closest('[data-backup-unavailable], [data-restore-unavailable]')) { event.preventDefault(); notify('پشتیبان‌گیری و بازیابی دیتابیس هنوز در سمت سرور پیکربندی نشده است؛ این دکمه داده‌ها را تغییر نمی‌دهد.', 'warn'); return; }
       const resetUnavailable = event.target.closest('[data-password-reset-unavailable]');
       if (resetUnavailable) { event.preventDefault(); notify('بازیابی خودکار رمز هنوز به سرویس ایمیل یا پیامک متصل نشده است؛ با مدیر سامانه تماس بگیرید.', 'warn'); return; }
+      const sendNotice = event.target.closest('[data-notification-send]');
+      if (sendNotice) { event.preventDefault(); sendNotification(); return; }
       const readAll = event.target.closest('[data-notification-read-all]');
       if (readAll) { event.preventDefault(); safe(async () => { await request('/notifications/read-all', { method: 'PUT' }); await loadNotifications(); }, 'همه اعلان‌ها خوانده شدند.'); return; }
       const settingsSave = event.target.closest('[data-settings-save]');
@@ -951,6 +1030,7 @@
     await safe(async () => {
       await loadCurrentUser();
       await loadNotificationIndicators();
+      if (document.body.dataset.active === 'notifications') await setupNotificationComposer();
       const isSuperAdmin = (currentUser()?.role || '').toLowerCase() === 'superadmin';
       $$('[data-create-department], [data-create-manager]').forEach(button => { button.hidden = !isSuperAdmin; });
       $$('[data-create-teacher]').forEach(button => { button.hidden = !['superadmin', 'department'].includes((currentUser()?.role || '').toLowerCase()); });
