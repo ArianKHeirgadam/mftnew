@@ -539,6 +539,7 @@
     if (departmentId) params.set('departmentId', departmentId);
     if (search) params.set('search', search);
     const rows = await request('/reports/recent-attempts?' + params.toString());
+    if (!Array.isArray(rows)) throw new Error('پاسخ تلاش‌های اخیر معتبر نیست.');
     body.innerHTML = rows.length ? rows.map(row => {
       const status = row.status === 'Graded' ? 'تصحیح‌شده' : row.status === 'Submitted' ? 'ارسال‌شده' : escapeHtml(row.status);
       const date = value => value ? new Date(value).toLocaleString('fa-IR') : '—';
@@ -549,7 +550,8 @@
   async function loadReports() {
     if (!document.body.matches('[data-active="reports"]')) return;
     const rows = await request('/reports/departments');
-    const table = $('body[data-active="reports"] table tbody');
+    if (!Array.isArray(rows)) throw new Error('پاسخ گزارش دپارتمان‌ها معتبر نیست.');
+    const table = $('body[data-active="reports"] .card table tbody');
     if (table) renderRows('body[data-active="reports"] table tbody', rows, row => `<tr><td>${escapeHtml(row.department)}</td><td>${faNumber(row.students)}</td><td>${faNumber(row.teachers)}</td><td>${faNumber(row.exams)}</td><td>${Number(row.averageScore || 0).toLocaleString('fa-IR')}</td><td>${Number(row.passRate || 0).toLocaleString('fa-IR', { maximumFractionDigits: 1 })}%</td><td>${faNumber(row.participation)}</td></tr>`, 7);
     const totalExams = rows.reduce((sum, row) => sum + Number(row.exams || 0), 0);
     const gradedAttempts = rows.reduce((sum, row) => sum + Number(row.gradedAttempts || 0), 0);
@@ -571,7 +573,7 @@
     const activity = await request('/dashboard/activity').catch(() => []);
     window.MftChartData = { ...(window.MftChartData || {}), activity, departments: rows };
     document.dispatchEvent(new Event('mft:data-ready'));
-    await loadRecentAttempts();
+    await safe(loadRecentAttempts);
     const searchInput = $('[data-report-search]');
     const deptSelect = $('[data-report-department]');
     const refresh = $('[data-report-refresh]');
