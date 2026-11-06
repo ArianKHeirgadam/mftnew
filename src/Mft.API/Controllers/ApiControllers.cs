@@ -1024,6 +1024,44 @@ public class ResultsController(AppDbContext db) : ControllerBase
     }
 }
 
+[ApiController, Route("api/classes"), Authorize]
+public class ClassesController(AppDbContext db) : ControllerBase
+{
+    [HttpGet, Authorize(Policy = "SuperAdmin")]
+    public async Task<IActionResult> List(CancellationToken ct)
+    {
+        var rows = await db.Classes.AsNoTracking().OrderBy(x => x.Name)
+            .Select(x => new { id = x.Id, name = x.Name, departmentId = x.DepartmentId,
+                department = db.Departments.Where(d => d.Id == x.DepartmentId).Select(d => d.Name).FirstOrDefault(),
+                memberCount = db.ClassMembers.Count(m => m.ClassId == x.Id) })
+            .ToListAsync(ct);
+        return Ok(rows);
+    }
+
+    [HttpPost, Authorize(Policy = "SuperAdmin")]
+    public async Task<IActionResult> Create([FromBody] JsonElement payload, CancellationToken ct)
+    {
+        var name = payload.TryGetProperty("name", out var n) ? n.GetString()?.Trim() : null;
+        if (string.IsNullOrWhiteSpace(name) || name.Length > 200)
+            return BadRequest(new { message = "نام کلاس الزامی و حداکثر ۲۰۰ کاراکتر است." });
+        if (!payload.TryGetProperty("departmentId", out var d) || !Guid.TryParse(d.GetString(), out var departmentId))
+            return BadRequest(new { message = "دپارتمان کلاس را انتخاب کنید." });
+        if (!await db.Departments.AnyAsync(x => x.Id == departmentId, ct))
+            return BadRequest(new { message = "دپارتمان انتخاب‌شده معتبر نیست." });
+        var studentIds = payload.TryGetProperty("studentIds", out var ids) && ids.ValueKind == JsonValueKind.Array
+            ? ids.EnumerateArray().Where(x => x.ValueKind == JsonValueKind.String && Guid.TryParse(x.GetString(), out _)).Select(x => Guid.Parse(x.GetString()!)).Distinct().ToArray()
+            : Array.Empty<Guid>();
+        var validIds = await db.Users.Where(x => studentIds.Contains(x.Id) && x.Role == UserRole.Student && x.DepartmentId == departmentId && x.IsActive).Select(x => x.Id).ToListAsync(ct);
+        if (validIds.Count != studentIds.Length)
+            return BadRequest(new { message = "همه اعضا باید دانشجوی فعال همان دپارتمان باشند." });
+        var entity = new StudentClass { Name = name, DepartmentId = departmentId };
+        db.Classes.Add(entity);
+        db.ClassMembers.AddRange(validIds.Select(id => new StudentClassMember { ClassId = entity.Id, StudentUserId = id }));
+        await db.SaveChangesAsync(ct);
+        return Ok(new { id = entity.Id, name = entity.Name, memberCount = validIds.Length });
+    }
+}
+
 [ApiController, Route("api/notifications"), Authorize]
 public class NotificationsController(AppDbContext db) : ControllerBase
 {
@@ -1053,6 +1091,14 @@ public class NotificationsController(AppDbContext db) : ControllerBase
         }
         else if (string.Equals(audience, "Managers", StringComparison.OrdinalIgnoreCase))
             recipients = recipients.Where(u => u.Role == UserRole.Department);
+        else if (string.Equals(audience, "Class", StringComparison.OrdinalIgnoreCase))
+        {
+            if (!payload.TryGetProperty("classId", out var classValue) || !Guid.TryParse(classValue.GetString(), out var classId))
+                return BadRequest(new { message = "کلاس مقصد را انتخاب کنید." });
+            if (!await db.Classes.AnyAsync(x => x.Id == classId, ct))
+                return BadRequest(new { message = "کلاس انتخاب‌شده معتبر نیست." });
+            recipients = recipients.Where(u => db.ClassMembers.Any(m => m.ClassId == classId && m.StudentUserId == u.Id) && u.Role == UserRole.Student);
+        }
         else if (string.Equals(audience, "User", StringComparison.OrdinalIgnoreCase))
         {
             if (!payload.TryGetProperty("userId", out var userValue) || !Guid.TryParse(userValue.GetString(), out var userId))
