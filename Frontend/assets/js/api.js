@@ -877,7 +877,7 @@
           await openUserEditor(target.dataset.userEdit, target.dataset.userRole || 'Student');
         } else if (target.dataset.questionDelete) {
           if (!confirm('این سؤال حذف شود؟')) return;
-          await request(`/questions/${target.dataset.questionDelete}`, { method: 'DELETE' });
+          await request(`/canonical/questions/${target.dataset.questionDelete}`, { method: 'DELETE' });
           await loadQuestions();
         } else if (target.dataset.questionEdit) {
           await editQuestion(target.dataset.questionEdit);
@@ -1102,30 +1102,27 @@
   }
 
   async function editQuestion(id) {
-    const question = await request(`/questions/${id}`);
+    const [question, lookups] = await Promise.all([
+      request(`/canonical/questions/${encodeURIComponent(id)}`),
+      request('/canonical/questions/lookups')
+    ]);
     const modal = $('#questionModal');
     if (!modal) return;
     modal.dataset.editId = String(id);
-    const fields = $$('textarea, input, select', modal);
-    fields.find(field => field.tagName === 'TEXTAREA').value = question.text || '';
-    $('#qType', modal).value = question.type || 'MultipleChoice';
-    $('[data-question-difficulty]', modal).value = question.difficulty || 'Medium';
-    $('[data-question-category]', modal).value = question.category || 'عمومی';
-    $$('[data-question-option]', modal).forEach((field, index) => field.value = question.type === 'MultipleChoice' ? (question.options?.[index] || '') : '');
-    if (question.type === 'Matching') {
-      let pairs = {};
-      try { pairs = JSON.parse(question.correctAnswer || '{}'); } catch { pairs = {}; }
-      $$('[data-match-left]', modal).forEach((field, index) => { field.value = question.options?.[index] || ''; });
-      $$('[data-match-right]', modal).forEach((field, index) => { field.value = pairs[question.options?.[index]] || ''; });
-      $('#mcqOptions', modal).style.display = 'none';
-      $('#matchingOptions', modal).hidden = false;
-    } else {
-      $('#mcqOptions', modal).style.display = question.type === 'MultipleChoice' ? 'block' : 'none';
-      $('#matchingOptions', modal).hidden = true;
-    }
-    const correctIndex = question.options?.indexOf(question.correctAnswer) ?? -1;
+    $('[data-question-text]', modal).value = question.text || '';
+    $('#qType', modal).value = lookups.questionTypes.find(x => Number(x.id) === Number(question.questionTypeId))?.code || 'MultipleChoice';
+    $('[data-question-difficulty]', modal).value = ({1:'Easy',2:'Medium',3:'Hard'})[Number(question.difficultyLevel)] || 'Medium';
+    $('#questionSkill', modal).innerHTML = '<option value="">انتخاب مهارت</option>' +
+      lookups.skills.map(x => `<option value="${x.id}">${escapeHtml(x.name)}</option>`).join('');
+    $('#questionSkill', modal).value = String(question.skillId);
+    $('#questionPoints', modal).value = question.points || 1;
+    $$('[data-question-option]', modal).forEach((field, index) => field.value = question.options?.[index]?.optionText || '');
+    $$('[data-match-left]', modal).forEach((field, index) => field.value = question.matchingPairs?.[index]?.leftItem || '');
+    $$('[data-match-right]', modal).forEach((field, index) => field.value = question.matchingPairs?.[index]?.rightItem || '');
+    $('#mcqOptions', modal).style.display = $('#qType', modal).value === 'MultipleChoice' ? 'block' : 'none';
+    $('#matchingOptions', modal).hidden = $('#qType', modal).value !== 'Matching';
+    const correctIndex = question.options?.findIndex(x => x.isCorrect) ?? -1;
     if ($('#correctOption', modal)) $('#correctOption', modal).value = correctIndex >= 0 ? String(correctIndex + 1) : '';
-    if ($('#questionDepartment', modal) && question.departmentId) $('#questionDepartment', modal).value = question.departmentId;
     modal.classList.add('show');
   }
 
