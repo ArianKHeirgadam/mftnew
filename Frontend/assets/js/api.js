@@ -807,7 +807,7 @@
         return `<label class="qpick-row"><input type="checkbox" data-question-type="${escapeHtml(type)}" data-skill-id="${question.skillId}" value="${question.id}"><span style="flex:1">${escapeHtml(question.text)}</span><span class="badge badge-info">${escapeHtml(question.skillName || 'مهارت')}</span><span class="badge badge-muted">${escapeHtml(typeName)}</span></label>`;
       }).join('') || '<p class="text-soft">برای این دسته‌بندی هنوز سؤالی در بانک canonical ثبت نشده است.</p>';
     };
-    categorySelect?.addEventListener('change', renderQuestions);
+    if (categorySelect) categorySelect.onchange = renderQuestions;
     renderQuestions();
     const teacherWrap = $('#teacherChoices');
     if (teacherWrap) {
