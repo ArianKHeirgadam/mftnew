@@ -115,3 +115,21 @@ The API's live Swagger document is the source of truth. These routes describe co
 - Student result list/detail endpoints intentionally hide unpublished results and answer keys. The teacher's result detail page exposes manual-grading inputs and the protected PDF download control.
 
 The SQL Server patch is `database/patch-exam-pdf-workflow.sql`. Back up the database and test the additive patch on a development copy before applying it. PDFs are stored under the API's private `App_Data/exam-files` directory, outside `wwwroot`, using generated filenames. The application must have write access to this directory, and deployment backups must include it.
+
+
+## Canonical teacher question bank and exam creation
+
+The teacher-facing question bank and exam wizard now use the canonical bigint academic API instead of the legacy GUID question/exam routes.
+
+- `GET /api/canonical/questions/lookups` — returns canonical exam categories, skills, and question types.
+- `GET /api/canonical/questions?search={text}&skillId={id}&questionTypeId={id}` — lists questions visible to the caller, including their skill/category and question-type metadata.
+- `GET /api/canonical/questions/{id}` — loads a question and its options, matching pairs, and essay criteria for editing.
+- `POST /api/canonical/questions` / `PUT /api/canonical/questions/{id}` — creates or updates a question using `skillId`, `questionTypeId`, `text`, `points`, `difficultyLevel`, `options`, `matchingPairs`, and `criteria`.
+- `DELETE /api/canonical/questions/{id}` — deletes an unused question; questions already included in an exam cannot be deleted.
+- `POST /api/canonical/exams` — creates a canonical exam with `title`, `examCategoryId`, `departmentId` (required for SuperAdmin; other roles use their authenticated department), `startAt`, `endAt`, `durationMinutes`, `isPublished`, and `sections`. Each section contains `skillId`, `durationMinutes`, `weightPercent`, and `questionIds`; section weights must total 100%.
+- `PUT /api/canonical/exams/{id}` — updates a canonical exam only before any student attempt exists. After the first attempt, exam structure is immutable.
+- The question type lookup IDs are SQL Server `tinyint`; canonical question, skill, category, exam, section, and question IDs are `bigint`.
+- The current canonical teacher wizard creates structured bank-based exams. PDF-only creation/upload remains a separate legacy workflow and is not offered by this canonical wizard.
+- The student canonical workflow enforces one attempt per student per exam. An in-progress attempt may be resumed using its existing attempt ID; a submitted attempt cannot be started again.
+
+These routes and UI changes have been checked for JavaScript syntax, but have not been built against .NET or exercised against SQL Server in this environment.
