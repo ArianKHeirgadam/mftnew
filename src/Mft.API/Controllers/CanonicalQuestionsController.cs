@@ -22,7 +22,15 @@ public sealed class CanonicalQuestionsController(
     {
         var q = academic.Questions.AsNoTracking().AsQueryable();
         if (User.IsInRole("Teacher")) q = q.Where(x => x.CreatedByUserId == CurrentUserId);
-        if (User.IsInRole("Department")) q = q.Where(x => identity.Users.Any(u => u.Id == x.CreatedByUserId && u.DepartmentId == CurrentDepartmentId));
+        if (User.IsInRole("Department"))
+        {
+            // Resolve department-owned user IDs in the identity context first.
+            // EF Core cannot translate query roots from two DbContext instances.
+            var departmentUserIds = await identity.Users.AsNoTracking()
+                .Where(u => u.DepartmentId == CurrentDepartmentId)
+                .Select(u => u.Id).ToListAsync(ct);
+            q = q.Where(x => departmentUserIds.Contains(x.CreatedByUserId));
+        }
         if (skillId.HasValue) q = q.Where(x => x.SkillId == skillId.Value);
         if (questionTypeId.HasValue) q = q.Where(x => x.QuestionTypeId == questionTypeId.Value);
         if (!string.IsNullOrWhiteSpace(search)) q = q.Where(x => x.Text.Contains(search));
