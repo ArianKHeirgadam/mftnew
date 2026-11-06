@@ -34,6 +34,8 @@ Do not execute that script until the application code has completed the bigint c
 
 Canonical exam targeting uses the separate `CanonicalClasses` and `CanonicalClassMembers` tables rather than the legacy `Classes` and `ClassMembers` names. This avoids collisions with existing GUID-based class tables. Run `database/patch-canonical-exam-class-targeting.sql` after canonical `Users`, `Departments`, and `Exams` are available with bigint keys; it creates the isolated roster tables and adds nullable `Exams.ClassId`.
 
+For previously unassigned exams, use `POST /api/canonical/exams/{id}/assign-class` only when the exam has no attempts. The endpoint uses a serializable transaction and refuses reassignment or exams with attempts. Before considering any legacy exam that already has attempts, run the read-only `database/audit-unassigned-canonical-exams.sql`; verify that every historical attempt owner is already a member of the intended same-department class. Such cases require an explicitly reviewed, separate data operation and must not be bulk-migrated by the normal API.
+
 ## Implementation sequence
 
 1. Canonical identity persistence records and mappings for Users, Departments, Roles, and UserRoles are implemented in CanonicalIdentityDbContext.
