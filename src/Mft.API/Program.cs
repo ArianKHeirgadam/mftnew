@@ -179,11 +179,8 @@ using (var scope = app.Services.CreateScope())
                 throw new InvalidOperationException(
                     "Bootstrap:Password must contain at least 12 characters.");
 
-            if (string.IsNullOrWhiteSpace(phoneNumber))
-                throw new InvalidOperationException(
-                    "Bootstrap:Mobile is required because canonical Users.PhoneNumber is NOT NULL and unique.");
-
-            if (await db.Users.AnyAsync(user => user.PhoneNumber == phoneNumber))
+            if (!string.IsNullOrWhiteSpace(phoneNumber) &&
+                await db.Users.AnyAsync(user => user.PhoneNumber == phoneNumber))
                 throw new InvalidOperationException(
                     "Bootstrap:Mobile is already assigned to another user.");
 
@@ -220,10 +217,8 @@ using (var scope = app.Services.CreateScope())
             if (string.IsNullOrWhiteSpace(password) || password.Length < 12)
                 throw new InvalidOperationException(
                     "Bootstrap:SecondSuperAdmin:Password must contain at least 12 characters.");
-            if (string.IsNullOrWhiteSpace(phoneNumber))
-                throw new InvalidOperationException(
-                    "Bootstrap:SecondSuperAdmin:Mobile is required and must be unique.");
-            if (await db.Users.AnyAsync(user => user.PhoneNumber == phoneNumber))
+            if (!string.IsNullOrWhiteSpace(phoneNumber) &&
+                await db.Users.AnyAsync(user => user.PhoneNumber == phoneNumber))
                 throw new InvalidOperationException(
                     "Bootstrap:SecondSuperAdmin:Mobile is already assigned to another user.");
 
