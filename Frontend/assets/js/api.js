@@ -424,7 +424,7 @@
       request('/notifications').catch(() => [])
     ]);
     const count = Array.isArray(unread) ? unread.length : 0;
-    $('[data-notification-count]').forEach(element => {
+    document.querySelectorAll('[data-notification-count]').forEach(element => {
       element.textContent = faNumber(count);
       element.hidden = count === 0;
     });
