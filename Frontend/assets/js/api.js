@@ -644,7 +644,7 @@
     if (audience === 'User') payload.userId = $('[data-notification-user]')?.value;
     if (audience === 'Class') payload.classId = $('[data-notification-class]')?.value;
     await safe(async () => {
-      const result = const result = await request('/notifications', { method: 'POST', body: JSON.stringify(payload) });
+      const result = await request('/notifications', { method: 'POST', body: JSON.stringify(payload) });
       $('[data-notification-title]').value = '';
       $('[data-notification-message]').value = '';
       notify(`اعلان برای ${faNumber(result.sent)} نفر ثبت شد.`, 'ok');
