@@ -183,9 +183,17 @@ public sealed class CanonicalExamsController(
             return BadRequest(new { message = "یک یا چند سؤال معتبر نیست یا با مهارت بخش آزمون تطابق ندارد." });
         if (User.IsInRole("Teacher") && await academic.Questions.AnyAsync(x => questionIds.Contains(x.Id) && x.CreatedByUserId != CurrentUserId, ct))
             return BadRequest(new { message = "فقط سؤال‌های ثبت‌شده توسط خودتان قابل استفاده هستند." });
-        if (User.IsInRole("Department") && await academic.Questions.AnyAsync(x => questionIds.Contains(x.Id) &&
-            !identity.Users.Any(u => u.Id == x.CreatedByUserId && u.DepartmentId == CurrentDepartmentId), ct))
-            return BadRequest(new { message = "یک یا چند سؤال خارج از دپارتمان شماست." });
+        if (User.IsInRole("Department"))
+        {
+            // Load permitted creators separately; cross-context subqueries cannot be
+            // composed into one EF Core query.
+            var departmentUserIds = await identity.Users.AsNoTracking()
+                .Where(u => u.DepartmentId == CurrentDepartmentId)
+                .Select(u => u.Id).ToListAsync(ct);
+            if (await academic.Questions.AnyAsync(x => questionIds.Contains(x.Id) &&
+                !departmentUserIds.Contains(x.CreatedByUserId), ct))
+                return BadRequest(new { message = "یک یا چند سؤال خارج از دپارتمان شماست." });
+        }
         return null;
     }
 
