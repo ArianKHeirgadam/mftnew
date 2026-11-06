@@ -129,7 +129,7 @@
     finalizing=true;clearTimeout(saveTimer);clearInterval(timer);
     const button=document.getElementById('confirmFinishBtn');if(button){button.disabled=true;button.textContent='در حال ثبت...';}
     try{
-      await api.request(`/canonical/exams/${encodeURIComponent(examId)}/attempt/${encodeURIComponent(attemptId)}/answers`,{method:'PUT',body:JSON.stringify({answers:requestPayload()})});
+      while(saving) await new Promise(resolve=>setTimeout(resolve,40));
       const result=await api.request(`/canonical/exams/${encodeURIComponent(examId)}/attempt/${encodeURIComponent(attemptId)}/submit`,{method:'POST',body:JSON.stringify({answers:requestPayload()})});
       finished=true;
       if(root)root.innerHTML='<div class="alert alert-ok">آزمون با موفقیت ثبت نهایی شد. امکان شرکت مجدد در این آزمون وجود ندارد.</div><p class="mt-16">وضعیت تصحیح: '+(result.requiresManualGrading?'در انتظار تصحیح پاسخ‌های تشریحی':'تصحیح خودکار انجام شد')+'</p><a class="btn btn-primary mt-16" href="dashboard-student.html">بازگشت به داشبورد</a>';
