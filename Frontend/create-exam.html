@@ -228,7 +228,6 @@
     const weightUnits = Math.floor(10000 / groups.length);
     let remainingWeight = 10000;
     let remainingMinutes = durationMinutes;
-    const totalQuestions = selected.length;
     const sections = groups.map(([skillId, questionIds], index) => {
       const weight = index === groups.length - 1 ? remainingWeight : weightUnits;
       remainingWeight -= weight;
