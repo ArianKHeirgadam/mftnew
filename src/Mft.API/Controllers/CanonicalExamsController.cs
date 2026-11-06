@@ -19,8 +19,10 @@ public sealed class CanonicalExamsController(
     [HttpGet]
     public async Task<IActionResult> List(CancellationToken ct)
     {
+        var isStudent = User.IsInRole("Student");
+        var studentId = CurrentUserId;
         var q = academic.Exams.AsNoTracking().AsQueryable();
-        if (User.IsInRole("Student"))
+        if (isStudent)
             q = q.Where(x => x.IsPublished && x.DepartmentId == CurrentDepartmentId);
         else if (User.IsInRole("Department"))
             q = q.Where(x => x.DepartmentId == CurrentDepartmentId);
@@ -32,13 +34,13 @@ public sealed class CanonicalExamsController(
             SectionCount = academic.ExamSections.Count(s => s.ExamId == x.Id),
             QuestionCount = academic.ExamSections.Where(s => s.ExamId == x.Id)
                 .SelectMany(s => academic.ExamQuestions.Where(eq => eq.ExamSectionId == s.Id)).Count(),
-            ExistingAttemptId = User.IsInRole("Student")
-                ? academic.ExamAttempts.Where(a => a.ExamId == x.Id && a.StudentUserId == CurrentUserId).Select(a => (long?)a.Id).FirstOrDefault()
+            ExistingAttemptId = isStudent
+                ? academic.ExamAttempts.Where(a => a.ExamId == x.Id && a.StudentUserId == studentId).Select(a => (long?)a.Id).FirstOrDefault()
                 : null,
-            ExistingAttemptStatusId = User.IsInRole("Student")
-                ? academic.ExamAttempts.Where(a => a.ExamId == x.Id && a.StudentUserId == CurrentUserId).Select(a => (byte?)a.StatusId).FirstOrDefault()
+            ExistingAttemptStatusId = isStudent
+                ? academic.ExamAttempts.Where(a => a.ExamId == x.Id && a.StudentUserId == studentId).Select(a => (byte?)a.StatusId).FirstOrDefault()
                 : null,
-            HasAttempt = User.IsInRole("Student") && academic.ExamAttempts.Any(a => a.ExamId == x.Id && a.StudentUserId == CurrentUserId)
+            HasAttempt = isStudent && academic.ExamAttempts.Any(a => a.ExamId == x.Id && a.StudentUserId == studentId)
         }).ToListAsync(ct);
         return Ok(rows);
     }
