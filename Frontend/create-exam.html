@@ -96,13 +96,9 @@
           <h3 style="margin-bottom:16px">اطلاعات آزمون، مدت زمان و نمره قبولی</h3>
           <div class="field"><label>عنوان آزمون</label><input class="input" id="examTitle" required placeholder="مثلاً آزمون میان‌ترم"></div>
           
-          <div class="field"><label>درس / موضوع</label><input class="input" id="examSubject" placeholder="نام درس"></div>
-          <div class="field"><label>توضیحات</label><textarea class="textarea" id="examDescription" rows="2" placeholder="توضیحات اختیاری"></textarea></div>
           <div class="grid-2" style="grid-template-columns:1fr 1fr">
             <div class="field"><label>مدت زمان آزمون (دقیقه)</label><input class="input" id="examDuration" type="number" min="1" max="600" value="45"></div>
-            <div class="field"><label>نمره قبولی (از ۱۰۰)</label><input class="input" id="examPassingScore" type="number" min="0" max="100" step="0.25" value="50"></div>
           </div>
-          <div class="checkbox-row"><input type="checkbox" id="allowQuestionNavigation" checked> امکان جابجایی بین سوالات فعال باشد</div>
         </div>
 
         <!-- Step 5: Schedule -->
@@ -125,7 +121,6 @@
             <li class="flex justify-between" style="border-bottom:1px solid var(--border);padding-bottom:8px"><span class="text-soft">استاد</span><b id="prevTeacher">—</b></li>
             <li class="flex justify-between" style="border-bottom:1px solid var(--border);padding-bottom:8px"><span class="text-soft">تعداد سوالات</span><b id="prevQuestionCount">۰ سوال</b></li>
             <li class="flex justify-between"><span class="text-soft">مدت زمان</span><b id="prevDuration">۴۵ دقیقه</b></li>
-            <li class="flex justify-between"><span class="text-soft">نمره قبولی</span><b id="prevPassingScore">۵۰ از ۱۰۰</b></li>
           </ul>
         </div>
 
@@ -164,7 +159,6 @@
         : document.querySelectorAll('#manualPick input[type=checkbox]:checked').length;
       document.getElementById("prevQuestionCount").textContent = selectedCount + " سوال" + (randomMode ? " (تصادفی)" : "");
       document.getElementById("prevDuration").textContent = `${document.getElementById("examDuration").value || 0} دقیقه`;
-      document.getElementById("prevPassingScore").textContent = `${document.getElementById("examPassingScore").value || 0} از ۱۰۰`;
     }
   }
   document.addEventListener("click", event => {
