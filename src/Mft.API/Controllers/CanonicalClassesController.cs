@@ -55,7 +55,8 @@ public sealed class CanonicalClassesController(
         var studentIds = await academic.ClassMembers.AsNoTracking()
             .Where(x => x.ClassId == id).Select(x => x.StudentUserId).ToListAsync(ct);
         var members = await identity.Users.AsNoTracking()
-            .Where(x => studentIds.Contains(x.Id) && x.DepartmentId == classInfo.DepartmentId)
+            .Where(x => studentIds.Contains(x.Id) && x.DepartmentId == classInfo.DepartmentId && x.IsActive &&
+                x.UserRoles.Any(ur => ur.Role.Name == CanonicalRoleNames.Student))
             .OrderBy(x => x.FullName)
             .Select(x => new { id = x.Id, fullName = x.FullName, username = x.Username })
             .ToListAsync(ct);
