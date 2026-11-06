@@ -29,6 +29,19 @@ IF EXISTS (
 )
     THROW 52034, 'dbo.Exams.Id must be bigint before canonical class targeting.', 1;
 
+IF OBJECT_ID(N'dbo.CanonicalClasses', N'U') IS NOT NULL AND EXISTS (
+    SELECT 1 FROM sys.columns
+    WHERE object_id = OBJECT_ID(N'dbo.CanonicalClasses') AND name = N'Id'
+      AND TYPE_NAME(user_type_id) <> N'bigint'
+)
+    THROW 52036, 'Existing dbo.CanonicalClasses.Id is not bigint.', 1;
+IF OBJECT_ID(N'dbo.CanonicalClassMembers', N'U') IS NOT NULL AND EXISTS (
+    SELECT 1 FROM sys.columns
+    WHERE object_id = OBJECT_ID(N'dbo.CanonicalClassMembers') AND name = N'Id'
+      AND TYPE_NAME(user_type_id) <> N'bigint'
+)
+    THROW 52037, 'Existing dbo.CanonicalClassMembers.Id is not bigint.', 1;
+
 IF OBJECT_ID(N'dbo.CanonicalClasses', N'U') IS NULL
 BEGIN
     CREATE TABLE dbo.CanonicalClasses
