@@ -32,6 +32,8 @@ The supplied schema export did not include all UI feature tables. The additive s
 
 Do not execute that script until the application code has completed the bigint cutover. Back up and test on a restored development database first. Existing GUID-based scripts for these features are legacy artifacts and must not be used with the canonical database.
 
+Canonical exam targeting uses the separate `CanonicalClasses` and `CanonicalClassMembers` tables rather than the legacy `Classes` and `ClassMembers` names. This avoids collisions with existing GUID-based class tables. Run `database/patch-canonical-exam-class-targeting.sql` after canonical `Users`, `Departments`, and `Exams` are available with bigint keys; it creates the isolated roster tables and adds nullable `Exams.ClassId`.
+
 ## Implementation sequence
 
 1. Canonical identity persistence records and mappings for Users, Departments, Roles, and UserRoles are implemented in CanonicalIdentityDbContext.
