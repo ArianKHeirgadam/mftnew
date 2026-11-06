@@ -32,7 +32,7 @@ Base URL: `https://localhost:7081/api` (ASP.NET launch profile). All routes requ
 | POST / PUT / DELETE | `/questions[/{id}]` | Create/edit/delete questions; teacher ownership enforced; MCQ options/correct answer validated |
 | GET | `/exams` | Student sees published exams; Teacher sees owned exams; Department sees department exams; SuperAdmin sees all |
 | GET | `/exams/{id}` | Exam detail within role scope |
-| POST / PUT / DELETE | `/exams[/{id}]` | Create/update/delete exams; title, duration, pass mark (0–100), navigation setting, teacher ownership and selected question ownership validated; exam question points are normalized to a total of 100 |
+| POST / PUT / DELETE | `/exams[/{id}]` | SuperAdmin, Department and Teacher can create/update/delete within role scope; creator is a Users identity, department scope is enforced, and selected question ownership is validated; exam question points are normalized to a total of 100 |
 | POST | `/exams/{id}/start` | Student starts or resumes a published exam within its schedule; correct answers are not returned |
 | PUT | `/exams/attempts/{attemptId}/answers` | Save answers for the authenticated student's active attempt while its server-side duration remains valid |
 | POST | `/exams/attempts/{attemptId}/submit` | Finalize an active attempt; objective questions are auto-scored, essay answers remain pending manual grading, and expired attempts cannot submit new answers |
