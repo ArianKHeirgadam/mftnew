@@ -7,7 +7,7 @@
 <link rel="stylesheet" href="assets/css/style.css">
 <link rel="stylesheet" href="assets/css/responsive.css">
 <link rel="stylesheet" href="assets/css/dark.css">
-<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.4/chart.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
 </head>
 <body data-role="superadmin" data-active="reports">
 <div class="app-shell">
@@ -46,6 +46,21 @@
             <tbody>
               <tr><td colspan="7" class="text-soft" style="text-align:center;padding:24px">در حال دریافت گزارش دپارتمان‌ها...</td></tr>
             </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="card card-pad mt-24">
+        <div class="section-title"><h3>تلاش‌های اخیر آزمون دانشجویان به تفکیک دپارتمان</h3><span class="text-soft text-sm">حداکثر ۱۰۰ تلاش اخیر</span></div>
+        <div class="flex gap-8" style="flex-wrap:wrap;margin:12px 0 16px">
+          <input class="input" type="search" placeholder="جست‌وجو بر اساس نام دانشجو یا آزمون..." data-report-search style="flex:1;min-width:220px">
+          <select class="input" data-report-department style="min-width:190px;max-width:280px"><option value="">همه دپارتمان‌ها</option></select>
+          <button class="btn btn-outline" type="button" data-report-refresh>بروزرسانی</button>
+        </div>
+        <div class="table-wrap">
+          <table class="dt">
+            <thead><tr><th>دپارتمان</th><th>دانشجو</th><th>آزمون</th><th>شروع</th><th>ارسال</th><th>وضعیت</th><th>نمره</th></tr></thead>
+            <tbody data-recent-attempts><tr><td colspan="7" class="text-soft" style="text-align:center;padding:24px">در حال دریافت تلاش‌ها...</td></tr></tbody>
           </table>
         </div>
       </div>
