@@ -38,6 +38,7 @@ const NAV_BY_ROLE = {
       section: "مدیریت آموزشی", items: [
         { key: "departments", label: "دپارتمان‌ها", href: "departments.html", icon: ICON.building },
         { key: "students", label: "دانشجویان", href: "students.html", icon: ICON.students },
+        { key: "classes", label: "کلاس‌ها و اعضا", href: "classes.html", icon: ICON.students },
         { key: "teachers", label: "اساتید", href: "teachers.html", icon: ICON.teacher },
         { key: "bank", label: "بانک سوالات", href: "question-bank.html", icon: ICON.bank },
         { key: "exams", label: "آزمون‌ها", href: "create-exam.html", icon: ICON.exam },
@@ -62,6 +63,7 @@ const NAV_BY_ROLE = {
     {
       section: "دپارتمان مهندسی کامپیوتر", items: [
         { key: "students", label: "دانشجویان", href: "students.html", icon: ICON.students },
+        { key: "classes", label: "کلاس‌ها و اعضا", href: "classes.html", icon: ICON.students },
         { key: "teachers", label: "اساتید", href: "teachers.html", icon: ICON.teacher },
         { key: "bank", label: "بانک سوالات", href: "question-bank.html", icon: ICON.bank },
         { key: "exams", label: "آزمون‌ها", href: "create-exam.html", icon: ICON.exam },
@@ -85,6 +87,7 @@ const NAV_BY_ROLE = {
     },
     {
       section: "آموزش", items: [
+        { key: "classes", label: "کلاس‌ها و اعضا", href: "classes.html", icon: ICON.students },
         { key: "bank", label: "بانک سوالات", href: "question-bank.html", icon: ICON.bank },
         { key: "exams", label: "ساخت آزمون", href: "create-exam.html", icon: ICON.exam },
         { key: "results", label: "تصحیح و نتایج", href: "results.html", icon: ICON.result },
