@@ -106,10 +106,12 @@
  async function loadDepartments(){
   try{
    const rows=await api.request('/departments');
-   dept.innerHTML='<option value="">انتخاب دپارتمان</option>'+rows.filter(x=>x.isActive!==false).map(x=>'<option value="'+x.id+'">'+esc(x.name)+'</option>').join('');
    const me=await api.request('/auth/me').catch(()=>null);
+   const activeRows=rows.filter(x=>x.isActive!==false);
+   dept.innerHTML='<option value="">'+(activeRows.length?'انتخاب دپارتمان':'دپارتمانی برای حساب شما در دسترس نیست')+'</option>'+activeRows.map(x=>'<option value="'+x.id+'">'+esc(x.name)+'</option>').join('');
    if(me?.departmentId) dept.value=me.departmentId;
-   if(rows.length===1) dept.value=rows[0].id;
+   if(activeRows.length===1) dept.value=activeRows[0].id;
+   if(!activeRows.length) notify(me?.role==='Teacher'?'حساب استاد به دپارتمان متصل نیست؛ مدیر سامانه باید ابتدا دپارتمان حساب را تعیین کند.':'ابتدا یک دپارتمان فعال ایجاد کنید یا دسترسی حساب را بررسی کنید.','warn');
   }catch(e){dept.innerHTML='<option value="">دریافت دپارتمان ناموفق بود</option>';notify(e.message,'danger');}
  }
  document.getElementById('qType').addEventListener('change',function(){
@@ -124,8 +126,10 @@
   if(type==='MultipleChoice'&&(options.length!==4||!correct.value||!options[idx]))return notify('هر چهار گزینه را وارد و گزینه صحیح را انتخاب کنید.','warn');
   const body={text,departmentId:dept.value,category:document.querySelector('[data-question-category]').value,type,difficulty:document.querySelector('[data-question-difficulty]').value,options:type==='MultipleChoice'?options:[],correctAnswer:type==='MultipleChoice'?options[idx]:null,score:1};
   try{
-   await api.request('/questions',{method:'POST',body:JSON.stringify(body)});
-   notify('سؤال با موفقیت ذخیره شد.','ok');modal.classList.remove('show');
+   const editId=modal.dataset.editId;
+   await api.request(editId?'/questions/'+encodeURIComponent(editId):'/questions',{method:editId?'PUT':'POST',body:JSON.stringify(body)});
+   delete modal.dataset.editId;
+   notify(editId?'سؤال با موفقیت ویرایش شد.':'سؤال با موفقیت ذخیره شد.','ok');modal.classList.remove('show');
    document.querySelector('[data-question-text]').value='';inputs.forEach(x=>x.value='');correct.value='';
    const rows=await api.request('/questions'), tbody=document.querySelector('body[data-active="bank"] table tbody');
    if(tbody)tbody.innerHTML=rows.map(r=>'<tr><td>'+esc(r.text)+'</td><td>'+esc(r.category)+'</td><td>'+esc(r.type)+'</td><td>'+esc(r.difficulty)+'</td><td>—</td></tr>').join('');
