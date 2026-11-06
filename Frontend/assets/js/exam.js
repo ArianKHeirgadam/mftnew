@@ -176,6 +176,9 @@
     attempt = JSON.parse(raw);
     if (!attempt?.attemptId || !Array.isArray(attempt.questions)) throw new Error('اطلاعات آزمون معتبر نیست؛ آزمون را دوباره شروع کنید.');
     questions = attempt.questions;
+    const hasEssayQuestions = questions.some(q => ['Essay', 'Text'].includes(String(q.type || '').trim()));
+    const studentPdfUpload = document.getElementById('studentPdfUpload');
+    if (studentPdfUpload) studentPdfUpload.hidden = !hasEssayQuestions;
     allowQuestionNavigation = attempt.exam?.allowQuestionNavigation !== false;
     if (!questions.length) {
       if (!attempt.exam?.examPdfAvailable) throw new Error('برای این آزمون نه سؤال ثبت شده و نه فایل PDF بارگذاری شده است.');
