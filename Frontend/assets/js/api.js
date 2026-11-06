@@ -446,7 +446,17 @@
       <button class="btn btn-sm btn-danger" data-notification-delete="${row.id}">حذف</button></div></article>`;
     Object.entries(panels).forEach(([id, items]) => {
       const panel = document.getElementById(id);
-      if (panel) panel.innerHTML = items.length ? items.map(render).join('') : `<div class="empty-state">${empty[id]}</div>`;
+      if (!panel) return;
+      // Replace the complete panel content so an empty-state from the previous tab
+      // can never remain beside or above the new tab's empty-state.
+      panel.replaceChildren();
+      if (items.length) panel.innerHTML = items.map(render).join('');
+      else {
+        const state = document.createElement('div');
+        state.className = 'empty-state';
+        state.textContent = empty[id];
+        panel.appendChild(state);
+      }
     });
     const tabs = $$('[data-tabs] .tab-btn');
     if (tabs.length >= 3) {
@@ -617,12 +627,33 @@
       $('[data-class-create-wrap]').hidden = value !== 'Class';
     };
     audience?.addEventListener('change', sync); sync();
-    classDepartment?.addEventListener('change', () => {
-      const dept = classDepartment.value;
-      const members = $('[data-class-members]');
-      if (members) members.innerHTML = users.filter(x => x.role === 'Student' && x.isActive !== false && String(x.departmentId) === dept)
-        .map(x => `<option value="${x.id}">${escapeHtml(x.fullName || x.username)}</option>`).join('');
+    const membersSelect = $('[data-class-members]');
+    const fillClassMembers = (departmentId, selectedIds = []) => {
+      if (!membersSelect) return;
+      const selected = new Set(selectedIds.map(String));
+      membersSelect.innerHTML = users.filter(x => x.role === 'Student' && x.isActive !== false && String(x.departmentId) === String(departmentId))
+        .map(x => `<option value="${x.id}" ${selected.has(String(x.id)) ? 'selected' : ''}>${escapeHtml(x.fullName || x.username)}</option>`).join('');
+    };
+    classDepartment?.addEventListener('change', () => fillClassMembers(classDepartment.value));
+    classSelect?.addEventListener('change', () => {
+      const selectedClass = classes.find(x => String(x.id) === classSelect.value);
+      if (!selectedClass) return;
+      classDepartment.value = String(selectedClass.departmentId);
+      fillClassMembers(selectedClass.departmentId, selectedClass.memberIds || []);
+      const nameField = $('[data-class-name]');
+      if (nameField) nameField.value = selectedClass.name;
     });
+    $('[data-class-save-members]')?.addEventListener('click', () => safe(async () => {
+      const classId = classSelect?.value;
+      if (!classId) throw new Error('ابتدا کلاس موردنظر را انتخاب کنید.');
+      const studentIds = $('[data-class-members] option:checked').map(x => x.value);
+      const result = await request(`/classes/${classId}/members`, { method: 'PUT', body: JSON.stringify({ studentIds }) });
+      const item = classes.find(x => String(x.id) === String(classId));
+      if (item) { item.memberIds = result.memberIds || studentIds; item.memberCount = result.memberCount; }
+      const option = classSelect.selectedOptions[0];
+      if (option && item) option.textContent = `${item.name} — ${item.department || ''} (${faNumber(item.memberCount)} نفر)`;
+      notify('اعضای کلاس به‌روزرسانی شدند.', 'ok');
+    }));
     $('[data-class-create]')?.addEventListener('click', () => safe(async () => {
       const name = $('[data-class-name]')?.value.trim();
       const departmentId = classDepartment?.value;
