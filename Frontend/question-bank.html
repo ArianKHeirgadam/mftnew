@@ -140,7 +140,7 @@
    document.querySelectorAll('[data-question-option],[data-match-left],[data-match-right]').forEach(x=>x.value='');
    correct.value=''; skill.value=''; document.getElementById('questionPoints').value='1';
    notify(id?'سؤال با موفقیت ویرایش شد.':'سؤال با موفقیت ذخیره شد.','ok');
-   await api.refresh();
+   location.reload();
   }catch(e){notify(e.message||'ذخیره سؤال ناموفق بود.','danger');}
  });
  loadCanonicalLookups();
