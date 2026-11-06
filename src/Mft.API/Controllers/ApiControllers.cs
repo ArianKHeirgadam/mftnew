@@ -1049,7 +1049,7 @@ public class NotificationsController(AppDbContext db) : ControllerBase
                 return BadRequest(new { message = "دپارتمان مقصد را انتخاب کنید." });
             if (!await db.Departments.AnyAsync(d => d.Id == departmentId, ct))
                 return BadRequest(new { message = "دپارتمان انتخاب‌شده معتبر نیست." });
-            recipients = recipients.Where(u => u.DepartmentId == departmentId && u.Role != UserRole.SuperAdmin);
+            recipients = recipients.Where(u => (u.DepartmentId == departmentId || db.Departments.Any(d => d.Id == departmentId && d.ManagerUserId == u.Id)) && u.Role != UserRole.SuperAdmin);
         }
         else if (string.Equals(audience, "Managers", StringComparison.OrdinalIgnoreCase))
             recipients = recipients.Where(u => u.Role == UserRole.Department);
