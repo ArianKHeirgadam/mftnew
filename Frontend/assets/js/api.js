@@ -438,19 +438,22 @@
   async function loadNotifications() {
     if (!document.body.matches('[data-active="notifications"]')) return;
     const rows = await request('/notifications');
-    const list = $('[data-notification-list]') || $('.notification-list');
-    if (!list) return;
-    const renderNotification = row => `<article class="notification-item ${row.isRead ? '' : 'unread'}" data-notification-id="${row.id}">
+    const panels = { tAll: rows, tUnread: rows.filter(row => !row.isRead), tRead: rows.filter(row => row.isRead) };
+    const empty = { tAll: 'اعلانی وجود ندارد.', tUnread: 'اعلان خوانده‌نشده‌ای وجود ندارد.', tRead: 'اعلان خوانده‌شده‌ای وجود ندارد.' };
+    const render = row => `<article class="notification-item ${row.isRead ? '' : 'unread'}" data-notification-id="${row.id}">
       <div><b>${escapeHtml(row.title)}</b><p>${escapeHtml(row.message)}</p><small>${new Date(row.createdAt).toLocaleString('fa-IR')}</small></div>
       <div class="flex gap-8"><button class="btn btn-sm" data-notification-read="${row.id}" ${row.isRead ? 'disabled' : ''}>خوانده شد</button>
       <button class="btn btn-sm btn-danger" data-notification-delete="${row.id}">حذف</button></div></article>`;
-    list.innerHTML = rows.length ? rows.map(renderNotification).join('') : '<div class="empty-state">اعلانی وجود ندارد.</div>';
-    const unreadPanel = $('#tUnread');
-    const readPanel = $('#tRead');
-    if (unreadPanel) unreadPanel.innerHTML = rows.some(row => !row.isRead) ? rows.filter(row => !row.isRead).map(renderNotification).join('') : '<div class="empty-state">اعلان خوانده‌نشده‌ای وجود ندارد.</div>';
-    if (readPanel) readPanel.innerHTML = rows.some(row => row.isRead) ? rows.filter(row => row.isRead).map(renderNotification).join('') : '<div class="empty-state">اعلان خوانده‌شده‌ای وجود ندارد.</div>';
+    Object.entries(panels).forEach(([id, items]) => {
+      const panel = document.getElementById(id);
+      if (panel) panel.innerHTML = items.length ? items.map(render).join('') : `<div class="empty-state">${empty[id]}</div>`;
+    });
     const tabs = $$('[data-tabs] .tab-btn');
-    if (tabs.length >= 3) { tabs[0].textContent = `همه (${faNumber(rows.length)})`; tabs[1].textContent = `خوانده‌نشده (${faNumber(rows.filter(row => !row.isRead).length)})`; tabs[2].textContent = `خوانده‌شده (${faNumber(rows.filter(row => row.isRead).length)})`; }
+    if (tabs.length >= 3) {
+      tabs[0].textContent = `همه (${faNumber(rows.length)})`;
+      tabs[1].textContent = `خوانده‌نشده (${faNumber(panels.tUnread.length)})`;
+      tabs[2].textContent = `خوانده‌شده (${faNumber(panels.tRead.length)})`;
+    }
   }
 
   async function loadDashboard() {
@@ -594,24 +597,41 @@
 
   async function setupNotificationComposer() {
     const panel = $('[data-notification-compose]');
-    if (!panel) return;
-    const role = (currentUser()?.role || '').toLowerCase();
-    if (role !== 'superadmin') return;
+    if (!panel || (currentUser()?.role || '').toLowerCase() !== 'superadmin') return;
     panel.hidden = false;
-    const [departments, users] = await Promise.all([request('/departments'), request('/users')]);
+    const [departments, users, classes] = await Promise.all([request('/departments'), request('/users'), request('/classes')]);
     const departmentSelect = $('[data-notification-department]');
     const userSelect = $('[data-notification-user]');
-    if (departmentSelect) departmentSelect.innerHTML = '<option value="">انتخاب دپارتمان</option>' + departments.map(item => `<option value="${item.id}">${escapeHtml(item.name)}</option>`).join('');
-    if (userSelect) userSelect.innerHTML = '<option value="">انتخاب کاربر</option>' + users.filter(item => item.isActive !== false).map(item => `<option value="${item.id}">${escapeHtml(item.fullName || item.username)} — ${escapeHtml(item.role)}</option>`).join('');
+    const classSelect = $('[data-notification-class]');
+    const classDepartment = $('[data-class-department]');
+    const fillDepartments = select => { if (select) select.innerHTML = '<option value="">انتخاب دپارتمان</option>' + departments.map(x => `<option value="${x.id}">${escapeHtml(x.name)}</option>`).join(''); };
+    fillDepartments(departmentSelect); fillDepartments(classDepartment);
+    if (userSelect) userSelect.innerHTML = '<option value="">انتخاب کاربر</option>' + users.filter(x => x.isActive !== false).map(x => `<option value="${x.id}">${escapeHtml(x.fullName || x.username)} — ${escapeHtml(x.role)}</option>`).join('');
+    if (classSelect) classSelect.innerHTML = '<option value="">انتخاب کلاس</option>' + classes.map(x => `<option value="${x.id}">${escapeHtml(x.name)} — ${escapeHtml(x.department || '')} (${faNumber(x.memberCount)} نفر)</option>`).join('');
     const audience = $('[data-notification-audience]');
     const sync = () => {
       const value = audience?.value;
       $('[data-notification-department-wrap]').hidden = value !== 'Department';
       $('[data-notification-user-wrap]').hidden = value !== 'User';
-      $('[data-notification-class-note]').hidden = value !== 'Class';
+      $('[data-notification-class-wrap]').hidden = value !== 'Class';
+      $('[data-class-create-wrap]').hidden = value !== 'Class';
     };
-    audience?.addEventListener('change', sync);
-    sync();
+    audience?.addEventListener('change', sync); sync();
+    classDepartment?.addEventListener('change', () => {
+      const dept = classDepartment.value;
+      const members = $('[data-class-members]');
+      if (members) members.innerHTML = users.filter(x => x.role === 'Student' && x.isActive !== false && String(x.departmentId) === dept)
+        .map(x => `<option value="${x.id}">${escapeHtml(x.fullName || x.username)}</option>`).join('');
+    });
+    $('[data-class-create]')?.addEventListener('click', () => safe(async () => {
+      const name = $('[data-class-name]')?.value.trim();
+      const departmentId = classDepartment?.value;
+      const studentIds = $$('[data-class-members] option:checked').map(x => x.value);
+      if (!name || !departmentId) throw new Error('نام و دپارتمان کلاس را وارد کنید.');
+      const created = await request('/classes', { method: 'POST', body: JSON.stringify({ name, departmentId, studentIds }) });
+      const option = document.createElement('option'); option.value = created.id; option.textContent = `${created.name} (${faNumber(created.memberCount)} نفر)`; classSelect?.append(option); if (classSelect) classSelect.value = created.id;
+      $('[data-class-name]').value = ''; notify('کلاس و اعضای آن ثبت شدند.', 'ok');
+    }));
   }
 
   async function sendNotification() {
@@ -622,8 +642,9 @@
     const payload = { audience, title, message };
     if (audience === 'Department') payload.departmentId = $('[data-notification-department]')?.value;
     if (audience === 'User') payload.userId = $('[data-notification-user]')?.value;
+    if (audience === 'Class') payload.classId = $('[data-notification-class]')?.value;
     await safe(async () => {
-      const result = await request('/notifications', { method: 'POST', body: JSON.stringify(payload) });
+      const result = const result = await request('/notifications', { method: 'POST', body: JSON.stringify(payload) });
       $('[data-notification-title]').value = '';
       $('[data-notification-message]').value = '';
       notify(`اعلان برای ${faNumber(result.sent)} نفر ثبت شد.`, 'ok');
