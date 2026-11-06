@@ -242,5 +242,5 @@ public sealed class CanonicalSubmittedAnswer
 
 public sealed class SaveAttemptAnswersRequest
 {
-    public List<SubmittedAnswer> Answers { get; set; } = new();
+    public List<CanonicalSubmittedAnswer> Answers { get; set; } = new();
 }
