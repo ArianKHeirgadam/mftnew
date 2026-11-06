@@ -360,15 +360,24 @@
     $('#gradeExamTitle', modal).textContent = `${result.exam} — ${result.answers.length} پاسخ`;
     const answerDetails = $('#gradeAnswerDetails', modal);
     answerDetails.innerHTML = result.answers.map((answer, index) => `<div style="padding:8px 0;border-bottom:1px solid var(--border)"><b>سؤال ${faNumber(index + 1)}:</b> ${escapeHtml(answer.question || '')}<br><span>پاسخ دانشجو: ${escapeHtml(answer.answer || 'بدون پاسخ')}</span><br><span>نمره خودکار: ${faNumber(answer.awardedScore)}</span></div>`).join('') || 'پاسخ متنی ثبت نشده است؛ برگه دست‌نویس را از دکمه زیر بررسی کنید.';
+    const submissionActions = document.createElement('div');
+    submissionActions.className = 'flex gap-8 mt-8';
+    const submissionPreview = document.createElement('button');
+    submissionPreview.type = 'button'; submissionPreview.className = 'btn btn-primary';
+    submissionPreview.textContent = 'مشاهده برگه پاسخ';
+    submissionPreview.addEventListener('click', async () => {
+      try { await window.MftApi.preview(`/exam-files/attempts/${encodeURIComponent(id)}`); }
+      catch (error) { notify(error.message || 'پیش‌نمایش پاسخ دانشجو در دسترس نیست.', 'danger'); }
+    });
     const submissionDownload = document.createElement('button');
-    submissionDownload.type = 'button';
-    submissionDownload.className = 'btn btn-outline btn-block mt-8';
-    submissionDownload.textContent = 'مشاهده / دانلود برگه پاسخ دانشجو';
+    submissionDownload.type = 'button'; submissionDownload.className = 'btn btn-outline';
+    submissionDownload.textContent = 'دانلود برگه پاسخ';
     submissionDownload.addEventListener('click', async () => {
       try { await window.MftApi.download(`/exam-files/attempts/${encodeURIComponent(id)}`); }
       catch (error) { notify(error.message || 'فایل پاسخ دانشجو در دسترس نیست.', 'danger'); }
     });
-    answerDetails.append(submissionDownload);
+    submissionActions.append(submissionPreview, submissionDownload);
+    answerDetails.append(submissionActions);
     const score = $('[data-grade-score]', modal);
     if (score) { score.max = String(result.maxScore ?? 0); score.value = result.score ?? ''; score.placeholder = `حداکثر ${result.maxScore ?? 0}`; }
     modal.classList.add('show');
@@ -935,6 +944,24 @@
     });
   }
 
+  async function preview(path) {
+    const tab = window.open('about:blank', '_blank');
+    if (!tab) throw new Error('مرورگر بازشدن پنجره جدید را مسدود کرد؛ اجازه Pop-up را فعال کنید.');
+    try {
+      const headers = new Headers();
+      if (token()) headers.set('Authorization', `Bearer ${token()}`);
+      const response = await fetch(`${API_BASE}${path}`, { headers });
+      if (!response.ok) {
+        const payload = await response.json().catch(() => null);
+        throw new Error(payload?.message || `خطای دریافت فایل (${response.status})`);
+      }
+      const blob = await response.blob();
+      const url = URL.createObjectURL(blob);
+      tab.location.href = url;
+      setTimeout(() => URL.revokeObjectURL(url), 60000);
+    } catch (error) { tab.close(); throw error; }
+  }
+
   async function download(path) {
     const headers = new Headers();
     if (token()) headers.set('Authorization', `Bearer ${token()}`);
@@ -957,6 +984,7 @@
   window.MftApi = {
     request,
     download,
+    preview,
     logout() { clearSession(); location.href = 'login.html'; },
     refresh: init
   };
