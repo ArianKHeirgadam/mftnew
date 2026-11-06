@@ -973,7 +973,7 @@ public class ResultsController(AppDbContext db) : ControllerBase
         if (inProgress) return BadRequest(new { message = "هنوز دانشجویی در حال برگزاری آزمون است." });
         var pending = await db.ExamAttempts.Where(x => x.ExamId == examId)
             .AnyAsync(x => x.Answers.Any(a => a.IsCorrect == null) ||
-                (!x.Exam.Questions.Any() && x.Status != "Graded"), ct);
+                (!db.ExamQuestions.Any(question => question.ExamId == x.ExamId) && x.Status != "Graded"), ct);
         if (pending) return BadRequest(new { message = "هنوز پاسخ تشریحی تصحیح‌نشده وجود دارد." });
         var completedAttempts = await db.ExamAttempts.Include(x => x.Answers)
             .Where(x => x.ExamId == examId && x.Status != "InProgress").ToListAsync(ct);
