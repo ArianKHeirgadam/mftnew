@@ -24,11 +24,11 @@ public sealed class CanonicalIdentityDbContext(
             entity.ToTable("Users");
             entity.HasKey(x => x.Id);
             entity.Property(x => x.Id).HasColumnType("bigint").UseIdentityColumn();
-            entity.Property(x => x.Username).HasMaxLength(100).IsRequired();
-            entity.Property(x => x.PasswordHash).HasMaxLength(300).IsRequired();
-            entity.Property(x => x.FullName).HasMaxLength(200).IsRequired();
-            entity.Property(x => x.PhoneNumber).HasMaxLength(20).IsRequired();
-            entity.Property(x => x.Email).HasMaxLength(256);
+            entity.Property(x => x.Username).HasMaxLength(200).IsRequired();
+            entity.Property(x => x.PasswordHash).HasMaxLength(600).IsRequired();
+            entity.Property(x => x.FullName).HasMaxLength(400).IsRequired();
+            entity.Property(x => x.PhoneNumber).HasMaxLength(40).IsRequired(false);
+            entity.Property(x => x.Email).HasMaxLength(512).IsRequired(false);
             entity.Property(x => x.IsActive).HasDefaultValue(true);
             entity.Property(x => x.CreatedAt).HasColumnType("datetime2")
                 .HasDefaultValueSql("sysutcdatetime()");
@@ -82,7 +82,7 @@ public sealed class CanonicalUser
     public string Username { get; set; } = "";
     public string PasswordHash { get; set; } = "";
     public string FullName { get; set; } = "";
-    public string PhoneNumber { get; set; } = "";
+    public string? PhoneNumber { get; set; }
     public string? Email { get; set; }
     public long? DepartmentId { get; set; }
     public bool IsActive { get; set; } = true;
