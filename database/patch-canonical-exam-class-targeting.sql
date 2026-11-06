@@ -10,6 +10,25 @@ IF OBJECT_ID(N'dbo.Users', N'U') IS NULL OR OBJECT_ID(N'dbo.Departments', N'U') 
 IF OBJECT_ID(N'dbo.Exams', N'U') IS NULL
     THROW 52031, 'Canonical Exams table was not found.', 1;
 
+IF EXISTS (
+    SELECT 1 FROM sys.columns
+    WHERE object_id = OBJECT_ID(N'dbo.Users') AND name = N'Id'
+      AND TYPE_NAME(user_type_id) <> N'bigint'
+)
+    THROW 52032, 'dbo.Users.Id must be bigint before canonical class targeting.', 1;
+IF EXISTS (
+    SELECT 1 FROM sys.columns
+    WHERE object_id = OBJECT_ID(N'dbo.Departments') AND name = N'Id'
+      AND TYPE_NAME(user_type_id) <> N'bigint'
+)
+    THROW 52033, 'dbo.Departments.Id must be bigint before canonical class targeting.', 1;
+IF EXISTS (
+    SELECT 1 FROM sys.columns
+    WHERE object_id = OBJECT_ID(N'dbo.Exams') AND name = N'Id'
+      AND TYPE_NAME(user_type_id) <> N'bigint'
+)
+    THROW 52034, 'dbo.Exams.Id must be bigint before canonical class targeting.', 1;
+
 IF OBJECT_ID(N'dbo.CanonicalClasses', N'U') IS NULL
 BEGIN
     CREATE TABLE dbo.CanonicalClasses
@@ -48,6 +67,12 @@ END;
 
 IF COL_LENGTH(N'dbo.Exams', N'ClassId') IS NULL
     ALTER TABLE dbo.Exams ADD ClassId bigint NULL;
+ELSE IF EXISTS (
+    SELECT 1 FROM sys.columns
+    WHERE object_id = OBJECT_ID(N'dbo.Exams') AND name = N'ClassId'
+      AND TYPE_NAME(user_type_id) <> N'bigint'
+)
+    THROW 52035, 'Existing dbo.Exams.ClassId is not bigint; review it before continuing.', 1;
 
 IF NOT EXISTS (
     SELECT 1 FROM sys.foreign_keys
