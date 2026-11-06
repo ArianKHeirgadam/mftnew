@@ -53,7 +53,7 @@
     const q=questions[current]; if(!q || !root) return;
     root.querySelectorAll('[data-canonical-question], [data-canonical-answer]').forEach(n=>n.remove());
     const heading=root.querySelector('h3');
-    if(heading) { heading.textContent=q.text || 'بدون متن'; heading.dataset.canonicalQuestion='1'; }
+    if(heading) heading.textContent=q.text || 'بدون متن';
     const badge=root.querySelector('.badge'); if(badge) badge.textContent=/multiplechoice/i.test(q.type)?'چهارگزینه‌ای':/matching/i.test(q.type)?'وصل‌کردنی':'تشریحی';
     const v=valueFor(q);
     let anchor=heading;
@@ -77,7 +77,8 @@
         q.rightItems.forEach(right=>{const option=document.createElement('option');option.value=right;option.textContent=right;select.append(option);});
         select.value=selected.get(left)||'';
         select.addEventListener('change',()=>{
-          const pairs=q.leftItems.map(item=>({leftItem:item,rightItem:item===left?select.value:(selected.get(item)||'')}));
+          selected.set(left,select.value);
+          const pairs=q.leftItems.map(item=>({leftItem:item,rightItem:selected.get(item)||''}));
           answers.set(q.examQuestionId,{pairs});changed();
         });
         wrap.append(label,select);add(wrap);
@@ -128,7 +129,7 @@
     finalizing=true;clearTimeout(saveTimer);clearInterval(timer);
     const button=document.getElementById('confirmFinishBtn');if(button){button.disabled=true;button.textContent='در حال ثبت...';}
     try{
-      await saveAnswers();
+      await api.request(`/canonical/exams/${encodeURIComponent(examId)}/attempt/${encodeURIComponent(attemptId)}/answers`,{method:'PUT',body:JSON.stringify({answers:requestPayload()})});
       const result=await api.request(`/canonical/exams/${encodeURIComponent(examId)}/attempt/${encodeURIComponent(attemptId)}/submit`,{method:'POST',body:JSON.stringify({answers:requestPayload()})});
       finished=true;
       if(root)root.innerHTML='<div class="alert alert-ok">آزمون با موفقیت ثبت نهایی شد. امکان شرکت مجدد در این آزمون وجود ندارد.</div><p class="mt-16">وضعیت تصحیح: '+(result.requiresManualGrading?'در انتظار تصحیح پاسخ‌های تشریحی':'تصحیح خودکار انجام شد')+'</p><a class="btn btn-primary mt-16" href="dashboard-student.html">بازگشت به داشبورد</a>';
