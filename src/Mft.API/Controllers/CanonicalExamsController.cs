@@ -23,13 +23,14 @@ public sealed class CanonicalExamsController(
         var studentId = CurrentUserId;
         var q = academic.Exams.AsNoTracking().AsQueryable();
         if (isStudent)
-            q = q.Where(x => x.IsPublished && x.DepartmentId == CurrentDepartmentId);
+            q = q.Where(x => x.IsPublished && x.ClassId.HasValue &&
+                academic.ClassMembers.Any(m => m.ClassId == x.ClassId.Value && m.StudentUserId == studentId));
         else if (User.IsInRole("Department"))
             q = q.Where(x => x.DepartmentId == CurrentDepartmentId);
         else if (User.IsInRole("Teacher"))
             q = q.Where(x => x.CreatedByUserId == CurrentUserId);
         var rows = await q.OrderByDescending(x => x.Id).Select(x => new {
-            x.Id, x.Title, x.ExamCategoryId, x.DepartmentId, x.CreatedByUserId,
+            x.Id, x.Title, x.ExamCategoryId, x.DepartmentId, x.ClassId, x.CreatedByUserId,
             x.StartAt, x.EndAt, x.DurationMinutes, x.IsPublished,
             SectionCount = academic.ExamSections.Count(s => s.ExamId == x.Id),
             QuestionCount = academic.ExamSections.Where(s => s.ExamId == x.Id)
@@ -50,7 +51,9 @@ public sealed class CanonicalExamsController(
     {
         var exam = await academic.Exams.AsNoTracking().FirstOrDefaultAsync(x => x.Id == id, ct);
         if (exam is null) return NotFound();
-        if (!await CanManage(exam, ct) && !(User.IsInRole("Student") && exam.IsPublished && exam.DepartmentId == CurrentDepartmentId))
+        var isEnrolledStudent = User.IsInRole("Student") && exam.IsPublished && exam.ClassId.HasValue &&
+            await academic.ClassMembers.AnyAsync(m => m.ClassId == exam.ClassId.Value && m.StudentUserId == CurrentUserId, ct);
+        if (!await CanManage(exam, ct) && !isEnrolledStudent)
             return Forbid();
         var sections = await academic.ExamSections.AsNoTracking().Where(x => x.ExamId == id)
             .OrderBy(x => x.DisplayOrder).Select(x => new {
@@ -67,14 +70,14 @@ public sealed class CanonicalExamsController(
     public async Task<IActionResult> Create(ExamUpsert request, CancellationToken ct)
     {
         if (CurrentUserId is null) return Unauthorized();
-        var validation = await Validate(request, ct);
-        if (validation is not null) return validation;
         var departmentId = User.IsInRole("SuperAdmin") ? request.DepartmentId : CurrentDepartmentId;
+        var validation = await Validate(request, departmentId, ct);
+        if (validation is not null) return validation;
         if (!departmentId.HasValue || !await identity.Departments.AnyAsync(x => x.Id == departmentId && x.IsActive, ct))
             return BadRequest(new { message = "دپارتمان فعال و معتبر برای آزمون الزامی است." });
         var exam = new CanonicalExam {
             Title = request.Title.Trim(), ExamCategoryId = request.ExamCategoryId,
-            DepartmentId = departmentId.Value, CreatedByUserId = CurrentUserId.Value,
+            DepartmentId = departmentId.Value, ClassId = request.ClassId, CreatedByUserId = CurrentUserId.Value,
             StartAt = request.StartAt, EndAt = request.EndAt,
             DurationMinutes = request.DurationMinutes, IsPublished = request.IsPublished
         };
@@ -93,9 +96,10 @@ public sealed class CanonicalExamsController(
         if (!await CanManage(exam, ct)) return Forbid();
         if (await academic.ExamAttempts.AnyAsync(x => x.ExamId == id, ct))
             return Conflict(new { message = "پس از ثبت اولین تلاش دانشجو، ساختار آزمون و سؤال‌های آن قابل تغییر نیستند تا سوابق پاسخ‌ها مخدوش نشوند." });
-        var validation = await Validate(request, ct);
+        var validation = await Validate(request, exam.DepartmentId, ct);
         if (validation is not null) return validation;
         exam.Title = request.Title.Trim();
+        exam.ClassId = request.ClassId;
         exam.ExamCategoryId = request.ExamCategoryId;
         exam.StartAt = request.StartAt;
         exam.EndAt = request.EndAt;
@@ -117,14 +121,17 @@ public sealed class CanonicalExamsController(
         return Conflict(new { message = "حذف آزمون از طریق این API انجام نمی‌شود؛ ابتدا باید سیاست نگهداری سوابق آزمون و تلاش‌های دانشجویان مشخص شود." });
     }
 
-    private async Task<IActionResult?> Validate(ExamUpsert r, CancellationToken ct)
+    private async Task<IActionResult?> Validate(ExamUpsert r, long? departmentId, CancellationToken ct)
     {
-        if (string.IsNullOrWhiteSpace(r.Title) || r.Title.Length > 300 ||
+        if (string.IsNullOrWhiteSpace(r.Title) || r.Title.Length > 300 || r.ClassId <= 0 ||
             r.DurationMinutes is < 1 or > 600 || r.EndAt <= r.StartAt ||
             r.Sections.Count == 0 || r.Sections.SelectMany(x => x.QuestionIds).Distinct().Count() != r.Sections.Sum(x => x.QuestionIds.Count))
             return BadRequest(new { message = "عنوان، زمان‌بندی، مدت آزمون و فهرست بخش‌ها/سؤال‌ها معتبر نیست." });
         if (!await academic.ExamCategories.AnyAsync(x => x.Id == r.ExamCategoryId, ct))
             return BadRequest(new { message = "دسته‌بندی آزمون معتبر نیست." });
+        if (!departmentId.HasValue || !await academic.Classes.AnyAsync(x =>
+            x.Id == r.ClassId && x.DepartmentId == departmentId.Value, ct))
+            return BadRequest(new { message = "کلاس انتخاب‌شده معتبر نیست یا به دپارتمان آزمون تعلق ندارد." });
         if (r.Sections.Any(x => x.SkillId <= 0 || x.DurationMinutes < 1 || x.QuestionIds.Count == 0 || x.WeightPercent <= 0))
             return BadRequest(new { message = "هر بخش باید مهارت، زمان، وزن و حداقل یک سؤال معتبر داشته باشد." });
         if (Math.Abs(r.Sections.Sum(x => x.WeightPercent) - 100m) > 0.01m)
@@ -180,6 +187,7 @@ public sealed class ExamUpsert
     public string Title { get; set; } = "";
     public long ExamCategoryId { get; set; }
     public long? DepartmentId { get; set; }
+    public long ClassId { get; set; }
     public DateTime StartAt { get; set; }
     public DateTime EndAt { get; set; }
     public int DurationMinutes { get; set; }
