@@ -163,8 +163,9 @@ public sealed class CanonicalExamAttemptController(
             var auto = false;
             if (string.Equals(q.TypeCode, "MultipleChoice", StringComparison.OrdinalIgnoreCase))
             {
+                long optionId = 0;
                 var hasSelection = answer.Value.TryGetProperty("selectedOptionId", out var optionNode) &&
-                    optionNode.ValueKind == JsonValueKind.Number && optionNode.TryGetInt64(out var optionId);
+                    optionNode.ValueKind == JsonValueKind.Number && optionNode.TryGetInt64(out optionId);
                 if (hasSelection)
                 {
                     var option = await academic.MultipleChoiceOptions.AsNoTracking()
