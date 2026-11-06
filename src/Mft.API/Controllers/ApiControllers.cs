@@ -835,77 +835,94 @@ public class ClassesController(AppDbContext db) : ControllerBase
 }
 
 [ApiController, Route("api/notifications"), Authorize]
-public class NotificationsController(AppDbContext db) : ControllerBase
+public sealed class NotificationsController(CanonicalOperationsDbContext operations, CanonicalIdentityDbContext identity, CanonicalAcademicDbContext academic) : ControllerBase
 {
     [HttpGet]
-    public async Task<IActionResult> List([FromQuery]bool? unread, CancellationToken ct){
-        var q = db.Notifications.Where(x => x.UserId == User.UserId()).AsQueryable();
-        if (unread == true)q = q.Where(x => !x.IsRead);
-        if (unread == false)q = q.Where(x => x.IsRead);
-        return Ok(await q.OrderByDescending(x => x.CreatedAt).ToListAsync(ct));
+    public async Task<IActionResult> List([FromQuery] bool? unread, CancellationToken ct)
+    {
+        var userId = User.CanonicalUserId();
+        if (!userId.HasValue) return Unauthorized();
+        var query = operations.Notifications.AsNoTracking().Where(x => x.UserId == userId.Value);
+        if (unread == true) query = query.Where(x => !x.IsRead);
+        if (unread == false) query = query.Where(x => x.IsRead);
+        return Ok(await query.OrderByDescending(x => x.CreatedAt).ToListAsync(ct));
     }
+
     [HttpPost, Authorize(Policy = "SuperAdmin")]
     public async Task<IActionResult> Create([FromBody] JsonElement payload, CancellationToken ct)
     {
-        var title = payload.TryGetProperty("title", out var titleValue) ? titleValue.GetString()?.Trim() : null;
-        var message = payload.TryGetProperty("message", out var messageValue) ? messageValue.GetString()?.Trim() : null;
-        var audience = payload.TryGetProperty("audience", out var audienceValue) ? audienceValue.GetString() : null;
+        var title = payload.TryGetProperty("title", out var t) ? t.GetString()?.Trim() : null;
+        var message = payload.TryGetProperty("message", out var m) ? m.GetString()?.Trim() : null;
+        var audience = payload.TryGetProperty("audience", out var a) ? a.GetString() : null;
         if (string.IsNullOrWhiteSpace(title) || title.Length > 250 || string.IsNullOrWhiteSpace(message))
             return BadRequest(new { message = "عنوان و متن اعلان الزامی است." });
-        IQueryable<User> recipients = db.Users.AsNoTracking().Where(u => u.IsActive);
+        IQueryable<long> recipients = identity.Users.AsNoTracking().Where(x => x.IsActive).Select(x => x.Id);
         if (string.Equals(audience, "Department", StringComparison.OrdinalIgnoreCase))
         {
-            if (!payload.TryGetProperty("departmentId", out var departmentValue) || !Guid.TryParse(departmentValue.GetString(), out var departmentId))
+            if (!payload.TryGetProperty("departmentId", out var raw) || !long.TryParse(raw.ToString(), out var departmentId))
                 return BadRequest(new { message = "دپارتمان مقصد را انتخاب کنید." });
-            if (!await db.Departments.AnyAsync(d => d.Id == departmentId, ct))
+            if (!await identity.Departments.AnyAsync(x => x.Id == departmentId, ct))
                 return BadRequest(new { message = "دپارتمان انتخاب‌شده معتبر نیست." });
-            recipients = recipients.Where(u => (u.DepartmentId == departmentId || db.Departments.Any(d => d.Id == departmentId && d.ManagerUserId == u.Id)) && u.Role != UserRole.SuperAdmin);
+            recipients = recipients.Where(id => identity.Users.Any(u => u.Id == id && u.DepartmentId == departmentId &&
+                !u.UserRoles.Any(ur => ur.Role.Name == CanonicalRoleNames.SuperAdmin)));
         }
         else if (string.Equals(audience, "Managers", StringComparison.OrdinalIgnoreCase))
-            recipients = recipients.Where(u => u.Role == UserRole.Department);
+            recipients = recipients.Where(id => identity.Users.Any(u => u.Id == id && u.UserRoles.Any(ur => ur.Role.Name == CanonicalRoleNames.DepartmentAdmin)));
         else if (string.Equals(audience, "Class", StringComparison.OrdinalIgnoreCase))
         {
-            if (!payload.TryGetProperty("classId", out var classValue) || !Guid.TryParse(classValue.GetString(), out var classId))
+            if (!payload.TryGetProperty("classId", out var raw) || !long.TryParse(raw.ToString(), out var classId))
                 return BadRequest(new { message = "کلاس مقصد را انتخاب کنید." });
-            if (!await db.Classes.AnyAsync(x => x.Id == classId, ct))
+            if (!await academic.Classes.AnyAsync(x => x.Id == classId, ct))
                 return BadRequest(new { message = "کلاس انتخاب‌شده معتبر نیست." });
-            recipients = recipients.Where(u => db.ClassMembers.Any(m => m.ClassId == classId && m.StudentUserId == u.Id) && u.Role == UserRole.Student);
+            recipients = recipients.Where(id => academic.ClassMembers.Any(x => x.ClassId == classId && x.StudentUserId == id));
         }
         else if (string.Equals(audience, "User", StringComparison.OrdinalIgnoreCase))
         {
-            if (!payload.TryGetProperty("userId", out var userValue) || !Guid.TryParse(userValue.GetString(), out var userId))
+            if (!payload.TryGetProperty("userId", out var raw) || !long.TryParse(raw.ToString(), out var userId))
                 return BadRequest(new { message = "کاربر مقصد را انتخاب کنید." });
-            recipients = recipients.Where(u => u.Id == userId);
+            recipients = recipients.Where(id => id == userId);
         }
-        else
-            return BadRequest(new { message = "گروه گیرندگان نامعتبر است. ارسال به کلاس تا زمان تعریف ساختار کلاس‌ها در سامانه فعال نیست." });
-        var recipientIds = await recipients.Select(u => u.Id).Distinct().ToListAsync(ct);
-        if (recipientIds.Count == 0) return BadRequest(new { message = "برای این گروه گیرنده فعالی پیدا نشد." });
+        else return BadRequest(new { message = "گروه گیرندگان نامعتبر است." });
+
+        var ids = await recipients.Distinct().ToListAsync(ct);
+        if (ids.Count == 0) return BadRequest(new { message = "برای این گروه گیرنده فعالی پیدا نشد." });
         var now = DateTime.UtcNow;
-        db.Notifications.AddRange(recipientIds.Select(userId => new Notification { UserId = userId, Title = title, Message = message, IsRead = false, CreatedAt = now }));
-        await db.SaveChangesAsync(ct);
-        return Ok(new { sent = recipientIds.Count, message = "اعلان برای گیرندگان انتخاب‌شده ثبت شد." });
+        operations.Notifications.AddRange(ids.Select(id => new CanonicalNotification { UserId = id, Title = title, Message = message, IsRead = false, CreatedAt = now }));
+        await operations.SaveChangesAsync(ct);
+        return Ok(new { sent = ids.Count, message = "اعلان برای گیرندگان انتخاب‌شده ثبت شد." });
     }
 
-    [HttpPut("{id:guid}/read")]
-    public async Task<IActionResult> Read(Guid id, CancellationToken ct){
-        var n = await db.Notifications.FirstOrDefaultAsync(x => x.Id == id && x.UserId == User.UserId(), ct);
-        if (n is null) return NotFound();
-        n.IsRead = true;
-        await db.SaveChangesAsync(ct);
+    [HttpPut("{id:long}/read")]
+    public async Task<IActionResult> Read(long id, CancellationToken ct)
+    {
+        var userId = User.CanonicalUserId();
+        if (!userId.HasValue) return Unauthorized();
+        var item = await operations.Notifications.FirstOrDefaultAsync(x => x.Id == id && x.UserId == userId.Value, ct);
+        if (item is null) return NotFound();
+        item.IsRead = true;
+        await operations.SaveChangesAsync(ct);
         return NoContent();
     }
+
     [HttpPut("read-all")]
-    public async Task<IActionResult> ReadAll(CancellationToken ct){
-        await db.Notifications.Where(x => x.UserId == User.UserId() && !x.IsRead).ExecuteUpdateAsync(s => s.SetProperty(x => x.IsRead, true), ct);
+    public async Task<IActionResult> ReadAll(CancellationToken ct)
+    {
+        var userId = User.CanonicalUserId();
+        if (!userId.HasValue) return Unauthorized();
+        await operations.Notifications.Where(x => x.UserId == userId.Value && !x.IsRead)
+            .ExecuteUpdateAsync(s => s.SetProperty(x => x.IsRead, true), ct);
         return NoContent();
     }
-    [HttpDelete("{id:guid}")]
-    public async Task<IActionResult> Delete(Guid id, CancellationToken ct){
-        var n = await db.Notifications.FirstOrDefaultAsync(x => x.Id == id && x.UserId == User.UserId(), ct);
-        if (n is null) return NotFound();
-        db.Notifications.Remove(n);
-        await db.SaveChangesAsync(ct);
+
+    [HttpDelete("{id:long}")]
+    public async Task<IActionResult> Delete(long id, CancellationToken ct)
+    {
+        var userId = User.CanonicalUserId();
+        if (!userId.HasValue) return Unauthorized();
+        var item = await operations.Notifications.FirstOrDefaultAsync(x => x.Id == id && x.UserId == userId.Value, ct);
+        if (item is null) return NotFound();
+        operations.Notifications.Remove(item);
+        await operations.SaveChangesAsync(ct);
         return NoContent();
     }
 }
@@ -959,25 +976,22 @@ public class DashboardController(AppDbContext db) : ControllerBase
     }
 }
 [ApiController, Route("api/settings"), Authorize(Policy = "SuperAdmin")]
-public class SettingsController(AppDbContext db) : ControllerBase
+public sealed class SettingsController(CanonicalOperationsDbContext operations) : ControllerBase
 {
     [HttpGet]
-    public async Task<IActionResult> List(CancellationToken ct) => Ok(await db.Settings.OrderBy(x => x.Key).ToListAsync(ct));
+    public async Task<IActionResult> List(CancellationToken ct) =>
+        Ok(await operations.AppSettings.AsNoTracking().OrderBy(x => x.Key).ToListAsync(ct));
+
     [HttpPut]
-    public async Task<IActionResult> Save(SaveSettingRequest r, CancellationToken ct){
-        var s = await db.Settings.SingleOrDefaultAsync(x => x.Key == r.Key, ct);
-        if (s is null){
-            s = new AppSetting{
-                Key = r.Key, Value = r.Value
-            }
-            ;
-            db.Settings.Add(s);
-        }
-        else{
-            s.Value = r.Value;
-            s.UpdatedAt = DateTime.UtcNow;
-        }
-        await db.SaveChangesAsync(ct);
+    public async Task<IActionResult> Save(SaveSettingRequest request, CancellationToken ct)
+    {
+        if (string.IsNullOrWhiteSpace(request.Key) || request.Key.Length > 100 || request.Value is null)
+            return BadRequest(new { message = "کلید و مقدار تنظیمات معتبر الزامی است." });
+        var setting = await operations.AppSettings.SingleOrDefaultAsync(x => x.Key == request.Key, ct);
+        if (setting is null)
+            operations.AppSettings.Add(new CanonicalAppSetting { Key = request.Key, Value = request.Value, UpdatedAt = DateTime.UtcNow });
+        else { setting.Value = request.Value; setting.UpdatedAt = DateTime.UtcNow; }
+        await operations.SaveChangesAsync(ct);
         return NoContent();
     }
 }
@@ -1069,90 +1083,68 @@ static class ClaimsExtensions{
 
 
 [ApiController, Route("api/attendance"), Authorize(Policy = "TeacherOrAbove")]
-public sealed class AttendanceController(AppDbContext db) : ControllerBase
+public sealed class AttendanceController(CanonicalIdentityDbContext identity, CanonicalOperationsDbContext operations) : ControllerBase
 {
     [HttpGet]
-    public async Task<IActionResult> List([FromQuery] DateOnly? date, [FromQuery] Guid? departmentId, CancellationToken ct)
+    public async Task<IActionResult> List([FromQuery] DateOnly? date, [FromQuery] long? departmentId, CancellationToken ct)
     {
-        var effectiveDepartmentId = User.IsInRole("SuperAdmin") ? departmentId : User.DepartmentId();
-        if (!effectiveDepartmentId.HasValue)
-            return BadRequest(new { message = "دپارتمان را انتخاب کنید." });
-
-        var departmentExists = await db.Departments.AnyAsync(x => x.Id == effectiveDepartmentId.Value, ct);
-        if (!departmentExists) return NotFound(new { message = "دپارتمان پیدا نشد." });
-
+        var effectiveDepartmentId = User.IsInRole("SuperAdmin") ? departmentId : User.CanonicalDepartmentId();
+        if (!effectiveDepartmentId.HasValue) return BadRequest(new { message = "دپارتمان را انتخاب کنید." });
+        if (!await identity.Departments.AnyAsync(x => x.Id == effectiveDepartmentId.Value, ct))
+            return NotFound(new { message = "دپارتمان پیدا نشد." });
         var targetDate = date ?? DateOnly.FromDateTime(DateTime.Today);
-        var students = await db.Users.AsNoTracking()
-            .Where(x => x.Role == UserRole.Student && x.DepartmentId == effectiveDepartmentId.Value)
-            .OrderBy(x => x.FullName)
-            .Select(x => new { id = x.Id, fullName = x.FullName, username = x.Username })
-            .ToListAsync(ct);
-
+        var students = await identity.Users.AsNoTracking().Where(x => x.IsActive && x.DepartmentId == effectiveDepartmentId.Value &&
+                x.UserRoles.Any(ur => ur.Role.Name == CanonicalRoleNames.Student))
+            .OrderBy(x => x.FullName).Select(x => new { id = x.Id, fullName = x.FullName, username = x.Username }).ToListAsync(ct);
         var ids = students.Select(x => x.id).ToArray();
-        var marks = await db.AttendanceRecords.AsNoTracking()
+        var marks = await operations.AttendanceRecords.AsNoTracking()
             .Where(x => x.DepartmentId == effectiveDepartmentId.Value && x.AttendanceDate == targetDate && ids.Contains(x.StudentUserId))
             .ToDictionaryAsync(x => x.StudentUserId, x => x.Status, ct);
-
-        return Ok(new {
-            date = targetDate,
-            departmentId = effectiveDepartmentId,
-            students = students.Select(x => new {
-                x.id, x.fullName, x.username,
-                status = marks.TryGetValue(x.id, out var status) ? status : (string?)null
-            })
-        });
+        return Ok(new { date = targetDate, departmentId = effectiveDepartmentId,
+            students = students.Select(x => new { x.id, x.fullName, x.username, status = marks.GetValueOrDefault(x.id) }) });
     }
 
     [HttpPut]
-    public async Task<IActionResult> Save(SaveAttendanceRequest request, CancellationToken ct)
+    public async Task<IActionResult> Save(CanonicalSaveAttendanceRequest request, CancellationToken ct)
     {
-        var effectiveDepartmentId = User.IsInRole("SuperAdmin") ? request.DepartmentId : User.DepartmentId();
-        if (!effectiveDepartmentId.HasValue)
-            return BadRequest(new { message = "دپارتمان را انتخاب کنید." });
-        if (request.Records is null || request.Records.Count == 0)
-            return BadRequest(new { message = "حداقل وضعیت یک دانشجو را مشخص کنید." });
-        if (request.Records.Count > 1000)
-            return BadRequest(new { message = "در هر بار حداکثر ۱۰۰۰ دانشجو قابل ثبت است." });
-
+        var departmentId = User.IsInRole("SuperAdmin") ? request.DepartmentId : User.CanonicalDepartmentId();
+        if (!departmentId.HasValue) return BadRequest(new { message = "دپارتمان را انتخاب کنید." });
+        if (request.Records is null || request.Records.Count == 0) return BadRequest(new { message = "حداقل وضعیت یک دانشجو را مشخص کنید." });
+        if (request.Records.Count > 1000) return BadRequest(new { message = "در هر بار حداکثر ۱۰۰۰ دانشجو قابل ثبت است." });
         var allowed = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "Present", "Absent", "Deleted" };
-        if (request.Records.Any(x => !allowed.Contains(x.Status)))
-            return BadRequest(new { message = "وضعیت حضور و غیاب نامعتبر است." });
-
+        if (request.Records.Any(x => !allowed.Contains(x.Status))) return BadRequest(new { message = "وضعیت حضور و غیاب نامعتبر است." });
         var ids = request.Records.Select(x => x.StudentId).Distinct().ToArray();
-        if (ids.Length != request.Records.Count)
-            return BadRequest(new { message = "برای یک دانشجو وضعیت تکراری ارسال شده است." });
-
-        var validIds = await db.Users
-            .Where(x => ids.Contains(x.Id) && x.Role == UserRole.Student && x.DepartmentId == effectiveDepartmentId.Value)
+        if (ids.Length != request.Records.Count) return BadRequest(new { message = "برای یک دانشجو وضعیت تکراری ارسال شده است." });
+        var valid = await identity.Users.Where(x => ids.Contains(x.Id) && x.IsActive && x.DepartmentId == departmentId.Value &&
+                x.UserRoles.Any(ur => ur.Role.Name == CanonicalRoleNames.Student))
             .Select(x => x.Id).ToListAsync(ct);
-        if (validIds.Count != ids.Length)
-            return BadRequest(new { message = "یک یا چند دانشجو به این دپارتمان تعلق ندارند." });
-
-        var existing = await db.AttendanceRecords
-            .Where(x => x.DepartmentId == effectiveDepartmentId.Value && x.AttendanceDate == request.Date && ids.Contains(x.StudentUserId))
-            .ToDictionaryAsync(x => x.StudentUserId, ct);
-
+        if (valid.Count != ids.Length) return BadRequest(new { message = "یک یا چند دانشجو به این دپارتمان تعلق ندارند." });
+        var actorId = User.CanonicalUserId();
+        if (!actorId.HasValue) return Unauthorized();
+        var existing = await operations.AttendanceRecords.Where(x => x.DepartmentId == departmentId.Value &&
+            x.AttendanceDate == request.Date && ids.Contains(x.StudentUserId)).ToDictionaryAsync(x => x.StudentUserId, ct);
         foreach (var item in request.Records)
         {
             if (existing.TryGetValue(item.StudentId, out var record))
             {
-                record.Status = item.Status;
-                record.RecordedByUserId = User.UserId();
-                record.CreatedAt = DateTime.UtcNow;
+                record.Status = item.Status; record.RecordedByUserId = actorId.Value; record.CreatedAt = DateTime.UtcNow;
             }
-            else
-            {
-                db.AttendanceRecords.Add(new AttendanceRecord {
-                    StudentUserId = item.StudentId,
-                    DepartmentId = effectiveDepartmentId.Value,
-                    RecordedByUserId = User.UserId(),
-                    AttendanceDate = request.Date,
-                    Status = item.Status
-                });
-            }
+            else operations.AttendanceRecords.Add(new CanonicalAttendanceRecord { StudentUserId = item.StudentId,
+                DepartmentId = departmentId.Value, RecordedByUserId = actorId.Value, AttendanceDate = request.Date,
+                Status = item.Status, CreatedAt = DateTime.UtcNow });
         }
-
-        await db.SaveChangesAsync(ct);
+        await operations.SaveChangesAsync(ct);
         return Ok(new { message = "حضور و غیاب ذخیره شد.", saved = request.Records.Count, date = request.Date });
     }
+}
+public sealed class CanonicalSaveAttendanceRequest
+{
+    public DateOnly Date { get; set; }
+    public long? DepartmentId { get; set; }
+    public List<CanonicalAttendanceItem>? Records { get; set; }
+}
+public sealed class CanonicalAttendanceItem
+{
+    public long StudentId { get; set; }
+    public string Status { get; set; } = "";
 }
