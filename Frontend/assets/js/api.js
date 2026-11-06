@@ -168,10 +168,12 @@
       const ends = row.endAt ? new Date(row.endAt) : null;
       const now = Date.now();
       const available = row.isPublished && (!starts || starts.getTime() <= now) && (!ends || ends.getTime() >= now);
-      const action = alreadyAttempted
-        ? '<span class="badge badge-muted">تلاش ثبت شده — شرکت مجدد ممنوع</span>'
-        : available ? `<button class="btn btn-primary" data-exam-start="${row.id}">شروع آزمون</button>`
-        : '<span class="badge badge-muted">خارج از بازه برگزاری</span>';
+      const action = alreadyAttempted && Number(row.existingAttemptStatusId) === 1
+        ? `<button class="btn btn-primary" data-exam-continue="${row.id}" data-attempt-id="${row.existingAttemptId}">ادامه آزمون قبلی</button>`
+        : alreadyAttempted
+          ? '<span class="badge badge-muted">تلاش ثبت نهایی شده — شرکت مجدد ممنوع</span>'
+          : available ? `<button class="btn btn-primary" data-exam-start="${row.id}">شروع آزمون</button>`
+          : '<span class="badge badge-muted">خارج از بازه برگزاری</span>';
       return `<tr>
         <td>${escapeHtml(row.title)}</td><td>—</td>
         <td>${starts ? starts.toLocaleDateString('fa-IR') : '—'}</td>
@@ -842,7 +844,7 @@
       if (userSave) { event.preventDefault(); saveUserFromModal(userSave.closest('.modal-overlay')); return; }
     });
     document.addEventListener('click', async event => {
-      const target = event.target.closest('[data-user-delete], [data-user-edit], [data-question-delete], [data-question-edit], [data-department-delete], [data-department-edit], [data-notification-delete], [data-notification-read], [data-exam-start], [data-result-view]');
+      const target = event.target.closest('[data-user-delete], [data-user-edit], [data-question-delete], [data-question-edit], [data-department-delete], [data-department-edit], [data-notification-delete], [data-notification-read], [data-exam-start], [data-exam-continue], [data-result-view]');
       if (!target) return;
       event.preventDefault();
       await safe(async () => {
@@ -870,6 +872,8 @@
         } else if (target.dataset.notificationRead) {
           await request(`/notifications/${target.dataset.notificationRead}/read`, { method: 'PUT' });
           await loadNotifications();
+        } else if (target.dataset.examContinue) {
+          location.href = `online-exam.html?examId=${encodeURIComponent(target.dataset.examContinue)}&attemptId=${encodeURIComponent(target.dataset.attemptId)}`;
         } else if (target.dataset.examStart) {
           target.disabled = true;
           try {
