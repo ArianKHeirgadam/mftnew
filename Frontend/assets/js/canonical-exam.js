@@ -105,7 +105,7 @@
     clearTimeout(saveTimer);saveTimer=setTimeout(saveAnswers,500);
   }
   async function saveAnswers() {
-    if(finished||finalizing)return;
+    if(finished)return;
     if(saving){pending=true;return;}
     saving=true;pending=false;if(saveLabel)saveLabel.textContent='در حال ذخیره...';
     try{
