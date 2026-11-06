@@ -47,9 +47,44 @@ public sealed class ExamFilesController(AppDbContext db, IWebHostEnvironment env
 
     private string ResolveStoredFile(string storedName)
     {
-        if (Path.GetFileName(storedName) != storedName || !storedName.EndsWith(".pdf", StringComparison.OrdinalIgnoreCase))
+        var extension = Path.GetExtension(storedName).ToLowerInvariant();
+        if (Path.GetFileName(storedName) != storedName || extension is not (".pdf" or ".jpg" or ".jpeg" or ".png"))
             throw new InvalidOperationException("Invalid stored file reference.");
         return Path.Combine(StorageDirectory, storedName);
+    }
+
+    private async Task<(string Path, string Name)?> SaveSubmissionFile(IFormFile? file, CancellationToken ct)
+    {
+        if (file is null || file.Length == 0 || file.Length > MaxPdfBytes) return null;
+        var extension = Path.GetExtension(file.FileName).ToLowerInvariant();
+        if (extension is not (".pdf" or ".jpg" or ".jpeg" or ".png")) return null;
+
+        await using var input = file.OpenReadStream();
+        var header = new byte[8];
+        var read = await input.ReadAsync(header.AsMemory(), ct);
+        var valid = extension switch
+        {
+            ".pdf" => read >= 5 && header.AsSpan(0, 5).SequenceEqual("%PDF-"u8),
+            ".jpg" or ".jpeg" => read >= 3 && header[0] == 0xFF && header[1] == 0xD8 && header[2] == 0xFF,
+            ".png" => read == 8 && header.AsSpan().SequenceEqual(new byte[] { 0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A }),
+            _ => false
+        };
+        if (!valid) return null;
+
+        Directory.CreateDirectory(StorageDirectory);
+        var stored = $"{Guid.NewGuid():N}{extension}";
+        var fullPath = Path.Combine(StorageDirectory, stored);
+        await using (var output = new FileStream(fullPath, FileMode.CreateNew, FileAccess.Write, FileShare.None, 81920, true))
+        {
+            await output.WriteAsync(header.AsMemory(0, read), ct);
+            await input.CopyToAsync(output, ct);
+        }
+
+        var original = new string(Path.GetFileName(file.FileName.Replace('\\', '/'))
+            .Where(character => !char.IsControl(character)).ToArray()).Trim();
+        if (string.IsNullOrWhiteSpace(original)) original = $"submission{extension}";
+        if (original.Length > 255) original = original[^255..];
+        return (fullPath, original);
     }
 
     [HttpPost("exams/{examId:guid}")]
@@ -109,8 +144,8 @@ public sealed class ExamFilesController(AppDbContext db, IWebHostEnvironment env
         if (attempt.Status != "InProgress" || DateTime.UtcNow > attempt.StartedAt.AddMinutes(attempt.Exam.DurationMinutes))
             return BadRequest(new { message = "مهلت بارگذاری پاسخ این آزمون به پایان رسیده است." });
 
-        var saved = await SavePdf(file, ct);
-        if (saved is null) return BadRequest(new { message = "فایل باید PDF معتبر و حداکثر ۲۰ مگابایت باشد." });
+        var saved = await SaveSubmissionFile(file, ct);
+        if (saved is null) return BadRequest(new { message = "فایل پاسخ باید PDF، JPG، JPEG یا PNG معتبر و حداکثر ۲۰ مگابایت باشد." });
         var old = await db.ExamSubmissionDocuments.FirstOrDefaultAsync(x => x.AttemptId == attemptId, ct);
         var oldPath = old is null ? null : ResolveStoredFile(old.StoredFileName);
         if (old is null)
@@ -135,7 +170,7 @@ public sealed class ExamFilesController(AppDbContext db, IWebHostEnvironment env
         if (attempt is null) return NotFound();
         if (User.IsInRole("Student"))
         {
-            if (attempt.StudentId != User.UserId() || !attempt.Exam.ResultsPublished || attempt.Status != "Graded") return NotFound();
+            if (attempt.StudentId != User.UserId()) return NotFound();
         }
         else if (!CanManage(attempt.Exam)) return Forbid();
         var doc = await db.ExamSubmissionDocuments.FirstOrDefaultAsync(x => x.AttemptId == attemptId, ct);
@@ -158,6 +193,12 @@ public sealed class ExamFilesController(AppDbContext db, IWebHostEnvironment env
         if (doc is null) return NotFound();
         var path = ResolveStoredFile(doc.StoredFileName);
         if (!System.IO.File.Exists(path)) return NotFound();
-        return PhysicalFile(path, "application/pdf", doc.OriginalFileName);
+        var contentType = Path.GetExtension(path).ToLowerInvariant() switch
+        {
+            ".jpg" or ".jpeg" => "image/jpeg",
+            ".png" => "image/png",
+            _ => "application/pdf"
+        };
+        return PhysicalFile(path, contentType, doc.OriginalFileName, enableRangeProcessing: true);
     }
 }
