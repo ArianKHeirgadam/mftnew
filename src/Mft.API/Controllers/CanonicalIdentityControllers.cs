@@ -177,6 +177,11 @@ public sealed class CanonicalUsersController(CanonicalIdentityDbContext db) : Co
         if (departmentId.HasValue && !await db.Departments.AnyAsync(item => item.Id == departmentId.Value, ct))
             return BadRequest(new { message = "دپارتمان انتخاب‌شده معتبر نیست." });
 
+        if (databaseRole == CanonicalRoleNames.DepartmentAdmin && departmentId.HasValue &&
+            await db.Users.AnyAsync(item => item.DepartmentId == departmentId.Value &&
+                item.UserRoles.Any(ur => ur.Role.Name == CanonicalRoleNames.DepartmentAdmin), ct))
+            return Conflict(new { message = "این دپارتمان از قبل مدیر دارد." });
+
         if (await db.Users.AnyAsync(item => item.Username == username || item.PhoneNumber == phoneNumber, ct))
             return Conflict(new { message = "نام کاربری یا شماره تماس قبلاً ثبت شده است." });
 
