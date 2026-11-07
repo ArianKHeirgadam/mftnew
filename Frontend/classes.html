@@ -21,7 +21,7 @@
     .roster-preview-chip button{border:0;background:transparent;color:var(--danger);font-weight:700;cursor:pointer}
     .roster-preview-list{display:grid;gap:7px}
     .roster-empty{padding:18px 12px;text-align:center;border:1px dashed var(--border);border-radius:10px;color:var(--text-soft);font-size:12px}
-    #classRosterModal{z-index:1000;padding:12px 20px}
+    #classRosterModal{z-index:1000;padding:12px 20px}\n    #classEditModal{z-index:1100;padding:12px 16px}\n    #classEditModal .modal-box{display:flex;flex-direction:column;min-height:0}\n    #classEditModal .modal-body{overflow:auto;min-height:0}
     #classRosterModal .modal-box{display:flex;flex-direction:column;width:min(1280px,calc(100vw - 40px))!important;max-height:78dvh;min-height:0}
     #classRosterModal .modal-body{overflow:auto;min-height:0}
     #classRosterModal .modal-body>.grid-2{grid-template-columns:minmax(0,1.8fr) minmax(300px,1fr)!important}
@@ -88,6 +88,34 @@
           </div>
           <p class="text-soft text-sm" style="margin-top:14px">برای انتخاب یا حذف اعضا، یک کلاس انتخاب کنید و پنجره مدیریت اعضا را باز کنید.</p>
         </section>
+      </div>
+
+      <div class="modal-overlay" id="classEditModal" style="z-index:1100">
+        <div class="modal-box" style="width:min(560px,calc(100vw - 32px));max-height:90dvh">
+          <div class="modal-head">
+            <div><h3 style="font-size:17px">ویرایش اطلاعات کلاس</h3><p class="text-soft text-sm">نام، ظرفیت و زمان برگزاری را ویرایش کنید.</p></div>
+            <button class="icon-btn" type="button" data-class-edit-close aria-label="بستن">✕</button>
+          </div>
+          <div class="modal-body">
+            <div class="field">
+              <label for="editClassName">نام کلاس</label>
+              <input class="input" id="editClassName" maxlength="200" required>
+            </div>
+            <div class="field">
+              <label for="editClassCapacity">ظرفیت پذیرش (نفر)</label>
+              <input class="input" id="editClassCapacity" type="number" min="1" max="100000" step="1" required>
+              <small class="text-soft">ظرفیت نمی‌تواند از تعداد دانشجویان فعلی کمتر باشد.</small>
+            </div>
+            <div class="field">
+              <label for="editClassSchedule">زمان برگزاری کلاس</label>
+              <input class="input" id="editClassSchedule" maxlength="200" placeholder="مثلاً شنبه و دوشنبه، ساعت ۱۶ تا ۱۸">
+            </div>
+          </div>
+          <div class="modal-foot">
+            <button class="btn btn-primary" id="saveClassDetails" type="button">ذخیره تغییرات</button>
+            <button class="btn btn-outline" type="button" data-class-edit-close>انصراف</button>
+          </div>
+        </div>
       </div>
 
       <div class="modal-overlay" id="classRosterModal">
@@ -280,22 +308,41 @@
     } catch (error) { notify(error.message || 'ایجاد کلاس ناموفق بود.', 'danger'); }
   });
 
-  $('#editClass').addEventListener('click', async () => {
+  const editModal = () => $('#classEditModal');
+  function openClassEditModal() {
     if (!currentClass) return;
-    const name = window.prompt('نام جدید کلاس:', currentClass.name || '');
-    if (name === null) return;
-    const trimmedName = name.trim();
-    if (!trimmedName) return notify('نام کلاس نمی‌تواند خالی باشد.', 'warn');
-    const schedule = window.prompt('زمان برگزاری کلاس (مثلاً شنبه و دوشنبه، ساعت ۱۶ تا ۱۸):', currentClass.schedule || '');
-    if (schedule === null) return;
+    $('#editClassName').value = currentClass.name || '';
+    $('#editClassCapacity').value = currentClass.capacity ?? '';
+    $('#editClassSchedule').value = currentClass.schedule || '';
+    editModal().classList.add('show');
+    $('#editClassName').focus();
+  }
+  $('#editClass').addEventListener('click', openClassEditModal);
+  $('#classCapacitySummary').addEventListener('click', openClassEditModal);
+  all('[data-class-edit-close]').forEach(button => button.addEventListener('click', () => editModal().classList.remove('show')));
+  editModal().addEventListener('click', event => { if (event.target === editModal()) editModal().classList.remove('show'); });
+
+  $('#saveClassDetails').addEventListener('click', async () => {
+    if (!currentClass) return;
+    const name = $('#editClassName').value.trim();
+    const capacity = Number($('#editClassCapacity').value);
+    const schedule = $('#editClassSchedule').value.trim();
+    if (!name) return notify('نام کلاس را وارد کنید.', 'warn');
+    if (!Number.isInteger(capacity) || capacity < 1 || capacity > 100000)
+      return notify('ظرفیت باید عدد صحیح بین ۱ تا ۱۰۰۰۰۰ باشد.', 'warn');
+    if (schedule.length > 200) return notify('زمان برگزاری حداکثر ۲۰۰ کاراکتر است.', 'warn');
+    const button = $('#saveClassDetails');
+    button.disabled = true;
     try {
       await api().request('/canonical/classes/' + currentClass.id, {
         method: 'PUT',
-        body: JSON.stringify({ name: trimmedName, schedule: schedule.trim() || null })
+        body: JSON.stringify({ name, capacity, schedule: schedule || null })
       });
       await loadClasses(currentClass.id);
-      notify('اطلاعات کلاس به‌روزرسانی شد.', 'ok');
+      editModal().classList.remove('show');
+      notify('اطلاعات کلاس با موفقیت به‌روزرسانی شد.', 'ok');
     } catch (error) { notify(error.message || 'ویرایش کلاس ناموفق بود.', 'danger'); }
+    finally { button.disabled = false; }
   });
 
   $('#deleteClass').addEventListener('click', async () => {
@@ -308,22 +355,6 @@
       await loadClasses();
       notify('کلاس حذف شد.', 'ok');
     } catch (error) { notify(error.message || 'حذف کلاس ناموفق بود.', 'danger'); }
-  });
-
-  $('#classCapacitySummary').addEventListener('click', async () => {
-    if (!currentClass) return;
-    const entered = window.prompt('ظرفیت جدید کلاس را وارد کنید:', String(currentClass.capacity || ''));
-    if (entered === null) return;
-    const capacity = Number(entered);
-    if (!Number.isInteger(capacity) || capacity < 1 || capacity > 100000)
-      return notify('ظرفیت باید عدد صحیح بین ۱ تا ۱۰۰۰۰۰ باشد.', 'warn');
-    try {
-      await api().request('/canonical/classes/' + currentClass.id + '/capacity', {
-        method: 'PUT', body: JSON.stringify({ capacity })
-      });
-      await loadClasses(currentClass.id);
-      notify('ظرفیت کلاس به‌روزرسانی شد.', 'ok');
-    } catch (error) { notify(error.message || 'به‌روزرسانی ظرفیت ناموفق بود.', 'danger'); }
   });
 
   $('#classSelect').addEventListener('change', async () => {
