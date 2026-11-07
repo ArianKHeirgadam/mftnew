@@ -15,6 +15,7 @@ public sealed class CanonicalAcademicDbContext(
     public DbSet<CanonicalQuestionType> QuestionTypes => Set<CanonicalQuestionType>();
     public DbSet<CanonicalQuestion> Questions => Set<CanonicalQuestion>();
     public DbSet<CanonicalQuestionImportBatch> QuestionImportBatches => Set<CanonicalQuestionImportBatch>();
+    public DbSet<CanonicalQuestionFolder> QuestionFolders => Set<CanonicalQuestionFolder>();
     public DbSet<CanonicalMultipleChoiceOption> MultipleChoiceOptions => Set<CanonicalMultipleChoiceOption>();
     public DbSet<CanonicalMatchingPair> MatchingPairs => Set<CanonicalMatchingPair>();
     public DbSet<CanonicalEssayGradingCriterion> EssayGradingCriteria => Set<CanonicalEssayGradingCriterion>();
@@ -80,6 +81,9 @@ public sealed class CanonicalAcademicDbContext(
             e.Property(x => x.Points).HasPrecision(6, 2).HasDefaultValue(1m);
             e.Property(x => x.DifficultyLevel).HasColumnType("tinyint");
             e.Property(x => x.MetadataJson).HasColumnType("nvarchar(max)");
+            e.Property(x => x.TagsJson).HasColumnType("nvarchar(max)");
+            e.HasIndex(x => x.FolderId);
+            e.HasOne<CanonicalQuestionFolder>().WithMany().HasForeignKey(x => x.FolderId).OnDelete(DeleteBehavior.NoAction);
             e.Property(x => x.CreatedAt).HasColumnType("datetime2").HasDefaultValueSql("sysutcdatetime()");
             e.HasIndex(x => x.CreatedByUserId); e.HasIndex(x => x.QuestionTypeId); e.HasIndex(x => x.SkillId);
             e.HasIndex(x => x.ImportBatchId);
@@ -97,6 +101,16 @@ public sealed class CanonicalAcademicDbContext(
             e.HasIndex(x => new { x.TeacherUserId, x.CreatedAt });
             e.HasIndex(x => new { x.TeacherUserId, x.Title }).IsUnique();
             e.HasOne<CanonicalUser>().WithMany().HasForeignKey(x => x.TeacherUserId).OnDelete(DeleteBehavior.NoAction);
+        });
+        modelBuilder.Entity<CanonicalQuestionFolder>(e =>
+        {
+            e.ToTable("QuestionFolders"); e.HasKey(x => x.Id);
+            e.Property(x => x.Id).HasColumnType("bigint").UseIdentityColumn();
+            e.Property(x => x.Name).HasMaxLength(150).IsRequired();
+            e.Property(x => x.CreatedAt).HasColumnType("datetime2").HasDefaultValueSql("sysutcdatetime()");
+            e.HasIndex(x => new { x.OwnerUserId, x.ParentFolderId, x.Name }).IsUnique();
+            e.HasOne<CanonicalUser>().WithMany().HasForeignKey(x => x.OwnerUserId).OnDelete(DeleteBehavior.NoAction);
+            e.HasOne<CanonicalQuestionFolder>().WithMany().HasForeignKey(x => x.ParentFolderId).OnDelete(DeleteBehavior.NoAction);
         });
         modelBuilder.Entity<CanonicalMultipleChoiceOption>(e =>
         {
@@ -380,7 +394,8 @@ public sealed class CanonicalAcademicDbContext(
 public sealed class CanonicalExamCategory { public long Id { get; set; } public string Name { get; set; } = ""; public ICollection<CanonicalSkill> Skills { get; set; } = new List<CanonicalSkill>(); }
 public sealed class CanonicalSkill { public long Id { get; set; } public long ExamCategoryId { get; set; } public string Name { get; set; } = ""; public CanonicalExamCategory ExamCategory { get; set; } = null!; }
 public sealed class CanonicalQuestionType { public long Id { get; set; } public string Code { get; set; } = ""; public string Name { get; set; } = ""; }
-public sealed class CanonicalQuestion { public long Id { get; set; } public long SkillId { get; set; } public long QuestionTypeId { get; set; } public string Text { get; set; } = ""; public decimal Points { get; set; } = 1m; public byte? DifficultyLevel { get; set; } public long CreatedByUserId { get; set; } public long? ImportBatchId { get; set; } public string? MetadataJson { get; set; } public DateTime CreatedAt { get; set; } }
+public sealed class CanonicalQuestion { public long Id { get; set; } public long SkillId { get; set; } public long QuestionTypeId { get; set; } public string Text { get; set; } = ""; public decimal Points { get; set; } = 1m; public byte? DifficultyLevel { get; set; } public long CreatedByUserId { get; set; } public long? ImportBatchId { get; set; } public long? FolderId { get; set; } public string? TagsJson { get; set; } public string? MetadataJson { get; set; } public DateTime CreatedAt { get; set; } }
+public sealed class CanonicalQuestionFolder { public long Id { get; set; } public long OwnerUserId { get; set; } public long? ParentFolderId { get; set; } public string Name { get; set; } = ""; public DateTime CreatedAt { get; set; } }
 public sealed class CanonicalQuestionImportBatch { public long Id { get; set; } public long TeacherUserId { get; set; } public string Title { get; set; } = ""; public DateTime CreatedAt { get; set; } }
 public sealed class CanonicalMultipleChoiceOption { public long Id { get; set; } public long QuestionId { get; set; } public string OptionText { get; set; } = ""; public bool IsCorrect { get; set; } public int DisplayOrder { get; set; } }
 public sealed class CanonicalMatchingPair { public long Id { get; set; } public long QuestionId { get; set; } public string LeftItem { get; set; } = ""; public string RightItem { get; set; } = ""; public int DisplayOrder { get; set; } }
