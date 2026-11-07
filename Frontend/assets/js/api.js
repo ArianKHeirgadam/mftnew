@@ -335,6 +335,8 @@
               ? `نمره تستی ${faNumber(result.autoScore)} از ${faNumber(result.maxScore)}`
               : (result.resultsPublished ? 'در انتظار تکمیل تصحیح' : 'هنوز نمره‌ای ثبت نشده');
         heading.textContent = `نتیجه آزمون: ${result.exam} — ${scoreLabel}`;
+        const studentInfo = $('#resultStudentInfo');
+        if (studentInfo) { studentInfo.hidden = !['teacher','department','superadmin'].includes(role); studentInfo.textContent = 'دانشجو: ' + (result.studentName || '—') + ' | شماره دانشجویی: ' + (result.studentNumber || 'ثبت نشده'); }
       }
       const body = $('body[data-active="results"] .card table tbody');
       const canGrade = ['teacher', 'department', 'superadmin'].includes(role);
@@ -379,7 +381,9 @@
         try {
           const info = await request(`/exam-files/attempts/${encodeURIComponent(attemptId)}/info`);
           pdfBox.hidden = false;
-          pdfBox.innerHTML = `<div class="section-title"><h3>${result.isPdfOnly ? 'فایل پاسخ آزمون PDFمحور' : 'پاسخ‌نامه تشریحی دانشجو'}</h3></div><p class="text-soft text-sm">${escapeHtml(info.fileName)} — ${faNumber(Math.ceil(info.size / 1024))} کیلوبایت</p><button type="button" class="btn btn-outline" id="previewSubmissionPdf">مشاهده پاسخ‌نامه</button> <button type="button" class="btn btn-outline" id="downloadSubmissionPdf">دریافت فایل</button>`;
+          pdfBox.innerHTML = `<div class="section-title"><h3>${result.isPdfOnly ? 'فایل پاسخ آزمون PDFمحور' : 'پاسخ‌نامه تشریحی دانشجو'}</h3></div><p class="text-soft text-sm">${escapeHtml(info.fileName)} — ${faNumber(Math.ceil(info.size / 1024))} کیلوبایت</p><iframe id="submissionPdfFrame" title="پاسخ‌نامه PDF دانشجو" style="width:100%;height:620px;border:1px solid var(--border);border-radius:12px;background:#fff" loading="lazy"></iframe><div class="flex gap-8 mt-12"><button type="button" class="btn btn-outline" id="previewSubmissionPdf">بازکردن در زبانه جدید</button> <button type="button" class="btn btn-outline" id="downloadSubmissionPdf">دریافت فایل</button></div>`;
+          const submissionUrl = await window.MftApi.objectUrl(`/exam-files/attempts/${encodeURIComponent(attemptId)}`);
+          $('#submissionPdfFrame').src = submissionUrl;
           $('#previewSubmissionPdf')?.addEventListener('click', () => window.MftApi.preview(`/exam-files/attempts/${encodeURIComponent(attemptId)}`).catch(error => notify(error.message, 'danger')));
           $('#downloadSubmissionPdf')?.addEventListener('click', () => window.MftApi.download(`/exam-files/attempts/${encodeURIComponent(attemptId)}`).catch(error => notify(error.message, 'danger')));
         } catch { pdfBox.hidden = true; pdfBox.innerHTML = ''; }
