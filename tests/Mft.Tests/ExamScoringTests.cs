@@ -36,76 +36,85 @@ public sealed class ExamScoringTests
     }
 
     [Fact]
+    public void FinalTotal_NeverFallsBelowZero()
+    {
+        Assert.Equal(0m, ExamScoring.CalculateFinalTotal(new[] { -2m, 1m }));
+    }
+
+    [Fact]
     public void Matching_NoCorrectPairs_GetsZero()
     {
-        var score = ExamScoring.CalculateMatching(
-            3m,
-            new long[] { 10, 20, 30 },
-            new[] {
-                new MatchingPairSelection(10, 20),
-                new MatchingPairSelection(20, 30),
-                new MatchingPairSelection(30, 10)
-            });
+        var correctMap = new Dictionary<long, long> { [10] = 101, [20] = 102, [30] = 103 };
+        var selections = new[] {
+            new MatchingPairSelection(10, 102),
+            new MatchingPairSelection(20, 103),
+            new MatchingPairSelection(30, 101)
+        };
 
-        Assert.Equal(0m, score);
+        Assert.Equal(0m, ExamScoring.CalculateMatching(3m, correctMap, selections));
     }
 
     [Fact]
     public void Matching_AllCorrectPairs_GetsFullPoints()
     {
-        var score = ExamScoring.CalculateMatching(
-            3m,
-            new long[] { 10, 20, 30 },
-            new[] {
-                new MatchingPairSelection(10, 10),
-                new MatchingPairSelection(20, 20),
-                new MatchingPairSelection(30, 30)
-            });
+        var correctMap = new Dictionary<long, long> { [10] = 101, [20] = 102, [30] = 103 };
+        var selections = new[] {
+            new MatchingPairSelection(10, 101),
+            new MatchingPairSelection(20, 102),
+            new MatchingPairSelection(30, 103)
+        };
 
-        Assert.Equal(3m, score);
+        Assert.Equal(3m, ExamScoring.CalculateMatching(3m, correctMap, selections));
     }
 
     [Fact]
     public void Matching_PartialCorrectPairs_GetsProportionalPoints()
     {
-        var score = ExamScoring.CalculateMatching(
-            1m,
-            new long[] { 10, 20, 30 },
-            new[] {
-                new MatchingPairSelection(10, 10),
-                new MatchingPairSelection(20, 30),
-                new MatchingPairSelection(30, 20)
-            });
+        var correctMap = new Dictionary<long, long> { [10] = 101, [20] = 102, [30] = 103 };
+        var selections = new[] {
+            new MatchingPairSelection(10, 101),
+            new MatchingPairSelection(20, 103),
+            new MatchingPairSelection(30, 102)
+        };
 
-        Assert.Equal(0.33m, score);
+        Assert.Equal(0.33m, ExamScoring.CalculateMatching(1m, correctMap, selections));
     }
 
     [Fact]
     public void Matching_RejectsRepeatedLeftOrRightIds()
     {
+        var correctMap = new Dictionary<long, long> { [10] = 101, [20] = 102 };
         var repeatedLeft = new[] {
-            new MatchingPairSelection(10, 10),
-            new MatchingPairSelection(10, 20)
+            new MatchingPairSelection(10, 101),
+            new MatchingPairSelection(10, 102)
         };
         var repeatedRight = new[] {
-            new MatchingPairSelection(10, 20),
-            new MatchingPairSelection(20, 20)
+            new MatchingPairSelection(10, 101),
+            new MatchingPairSelection(20, 101)
         };
 
-        Assert.Throws<ArgumentException>(() =>
-            ExamScoring.CalculateMatching(2m, new long[] { 10, 20 }, repeatedLeft));
-        Assert.Throws<ArgumentException>(() =>
-            ExamScoring.CalculateMatching(2m, new long[] { 10, 20 }, repeatedRight));
+        Assert.Throws<ArgumentException>(() => ExamScoring.CalculateMatching(2m, correctMap, repeatedLeft));
+        Assert.Throws<ArgumentException>(() => ExamScoring.CalculateMatching(2m, correctMap, repeatedRight));
     }
 
     [Fact]
-    public void Matching_RejectsIdsFromAnotherQuestion()
+    public void Matching_RejectsIdsFromAnotherQuestionOrAttempt()
     {
-        Assert.Throws<ArgumentException>(() =>
-            ExamScoring.CalculateMatching(
-                1m,
-                new long[] { 10, 20 },
-                new[] { new MatchingPairSelection(10, 999) }));
+        var correctMap = new Dictionary<long, long> { [10] = 101, [20] = 102 };
+
+        Assert.Throws<ArgumentException>(() => ExamScoring.CalculateMatching(
+            1m, correctMap, new[] { new MatchingPairSelection(999, 101) }));
+
+        Assert.Throws<ArgumentException>(() => ExamScoring.CalculateMatching(
+            1m, correctMap, new[] { new MatchingPairSelection(10, 999) }));
+    }
+
+    [Fact]
+    public void Matching_RejectsDuplicateRightIdsInCorrectMap()
+    {
+        var invalidMap = new Dictionary<long, long> { [10] = 101, [20] = 101 };
+        Assert.Throws<ArgumentException>(() => ExamScoring.CalculateMatching(
+            2m, invalidMap, Array.Empty<MatchingPairSelection>()));
     }
 
     [Fact]
