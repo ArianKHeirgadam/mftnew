@@ -394,7 +394,9 @@
             <td>${faNumber(index + 1)}</td><td>${questionTitle}</td>
             <td>${answerSummary}</td><td>${correctAnswerSummary}</td>
             <td>${gradeControl}</td></tr>`;
-        }).join('') : '<tr><td colspan="5">پاسخی ثبت نشده است.</td></tr>';
+        }).join('') : (isStudentView && pendingManualCount > 0
+          ? '<tr><td colspan="5" style="text-align:center;padding:24px">بخش تشریحی این آزمون با PDF تصحیح می‌شود و تا زمان تصحیح استاد در این صفحه نمایش داده نمی‌شود.</td></tr>'
+          : '<tr><td colspan="5">پاسخی ثبت نشده است.</td></tr>');
 
         if (canGrade) body.querySelectorAll('[data-grade-answer]').forEach(button => button.addEventListener('click', async () => {
           const row = button.closest('tr');
