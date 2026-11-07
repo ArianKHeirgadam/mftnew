@@ -183,17 +183,10 @@ function renderSidebar() {
         <a class="nav-link" href="login.html"> ${ICON.logout} <span class="nav-label">خروج از حساب</span></a>
         
       </div>
-      <button class="collapse-btn" id="collapseBtn" type="button">
-          ${ICON.chevron}
-          <span class="sidebar-foot-text">جمع‌کردن منو</span>
-        </button>
     </aside>
     <div class="scrim" id="scrim"></div>
   `;
 
-  document.getElementById("collapseBtn").addEventListener("click", () => {
-    document.getElementById("sidebar").classList.toggle("collapsed");
-  });
   document.getElementById("scrim").addEventListener("click", closeMobileSidebar);
 }
 
