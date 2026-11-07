@@ -24,6 +24,7 @@
 .question-row input{margin-top:5px;accent-color:var(--primary)}
 .question-row .qtext{flex:1;line-height:1.9;font-size:13px}
 .question-empty{padding:28px 16px;text-align:center;border:1px dashed var(--border);border-radius:12px;color:var(--text-soft)}
+.exam-folder-nav{display:grid;gap:12px;margin:16px 0}.exam-folder-crumbs{display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-size:13px}.exam-folder-crumbs button{border:0;background:none;color:var(--primary);cursor:pointer;font:inherit}.exam-folder-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:10px}.exam-folder-card{display:flex;align-items:center;gap:10px;text-align:right;padding:14px;border:1px solid var(--border);border-radius:12px;background:var(--surface);color:var(--text);cursor:pointer}.exam-folder-card:hover{border-color:var(--primary)}.exam-folder-card .folder-name{font-weight:700;flex:1}.exam-selected-list{display:grid;gap:8px;margin-top:12px}.exam-selected-item{display:flex;align-items:flex-start;gap:10px;padding:11px;border:1px solid var(--border);border-radius:10px}.exam-selected-item .qtext{flex:1;line-height:1.8;font-size:13px}.exam-modal-tools{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:12px}.exam-modal-tools .input{flex:1;min-width:180px}.exam-modal-list{max-height:55vh;overflow:auto;display:grid;gap:8px}
 .summary-list{display:grid;gap:12px}.summary-item{display:flex;justify-content:space-between;gap:16px;padding-bottom:10px;border-bottom:1px solid var(--border)}
 @media(max-width:700px){.exam-form-grid{grid-template-columns:1fr}.exam-form-grid .wide{grid-column:auto}.summary-item{flex-direction:column;gap:4px}}
 </style>
@@ -59,14 +60,20 @@
       <div><h3>۲. سؤال‌های آزمون</h3><p class="text-soft text-sm mt-8">سؤال‌ها را از بانک انتخاب کنید. نوع هر سؤال هنگام تعریف همان سؤال مشخص می‌شود.</p></div>
       <a class="btn btn-outline btn-sm" href="question-bank.html" target="_blank" rel="noopener">+ تعریف سؤال جدید در بانک</a>
      </div>
-     <div class="exam-import-folders" id="examImportFolders"><div class="question-empty">در حال دریافت پوشه‌های سؤال...</div></div>
-     <p class="text-soft text-sm" id="examSelectedFolderHint">سؤال‌های بدون پوشه در فهرست پایین نمایش داده می‌شوند. با انتخاب یک پوشه، سؤال‌های همان پوشه هم به فهرست اضافه می‌شوند؛ در این مرحله امکان ساخت پوشه وجود ندارد.</p>
      <div class="question-tools">
-      <input class="input" id="questionSearch" type="search" placeholder="جستجو در سؤال‌ها...">
       <span class="badge badge-muted" id="questionCount">۰ سؤال انتخاب‌شده</span>
+      <button class="btn btn-outline btn-sm" id="openQuestionPicker" type="button">نمایش و انتخاب سؤال‌های این پوشه</button>
       <button class="btn btn-ghost btn-sm" id="refreshQuestions" type="button">بروزرسانی بانک سؤال</button>
      </div>
-     <div class="question-list" id="questionList"><div class="question-empty">در حال دریافت سؤال‌ها...</div></div>
+     <section class="exam-folder-nav">
+      <div class="exam-folder-crumbs" id="examFolderBreadcrumbs"></div>
+      <div class="text-soft text-sm" id="examSelectedFolderHint">پوشه‌ای را انتخاب کنید.</div>
+      <div class="exam-folder-grid" id="examChildFolders"><div class="question-empty">در حال دریافت پوشه‌ها...</div></div>
+     </section>
+     <section class="mt-16">
+      <div class="flex justify-between items-center gap-8" style="flex-wrap:wrap"><h4>سؤال‌های انتخاب‌شده برای آزمون</h4><span class="text-soft text-sm" id="selectedQuestionTotal">۰ سؤال</span></div>
+      <div class="exam-selected-list" id="selectedExamQuestions"><div class="question-empty">هنوز سؤالی به آزمون اضافه نشده است.</div></div>
+     </section>
      <div class="flex justify-between gap-8 mt-24"><button class="btn btn-outline" id="backToDetails">مرحله قبل</button><button class="btn btn-primary" id="toReview">ادامه و بررسی آزمون</button></div>
     </section>
     <section class="exam-panel" id="panel3">
@@ -88,50 +95,65 @@
   </main>
  </div>
 </div>
+
+<div class="modal-overlay" id="examQuestionPickerModal" aria-hidden="true">
+ <div class="modal-box" role="dialog" aria-modal="true" aria-labelledby="examQuestionPickerTitle" style="width:min(900px,100%)">
+  <div class="modal-head"><div><h3 id="examQuestionPickerTitle" style="font-size:16px">انتخاب سؤال برای آزمون</h3><p class="text-soft text-sm mt-8" id="examQuestionPickerFolder"></p></div><button class="icon-btn" type="button" id="closeExamQuestionPicker" aria-label="بستن">✕</button></div>
+  <div class="modal-body">
+   <div class="exam-modal-tools"><input class="input" id="examModalQuestionSearch" type="search" placeholder="جستجو در سؤال‌های این پوشه..."><span class="badge badge-muted" id="examModalSelectedCount">۰ انتخاب‌شده</span></div>
+   <div class="exam-modal-list" id="examModalQuestionList"><div class="question-empty">سؤال‌ها بارگذاری نشده‌اند.</div></div>
+  </div>
+  <div class="modal-foot"><button class="btn btn-primary" type="button" id="confirmExamQuestionSelection">تأیید و افزودن به آزمون</button><button class="btn btn-outline" type="button" id="cancelExamQuestionPicker">انصراف</button></div>
+ </div>
+</div>
 <script src="assets/js/theme.js"></script>
 <script src="assets/js/app.js"></script>
 <script src="assets/js/api.js"></script>
 <script>
 (async function(){
  const $=id=>document.getElementById(id), api=window.MftApi;
- const selectedIds=new Set();let lookups={categories:[],skills:[]},questions=[],importBatches=[],questionFolders=[],selectedBatchId=null,selectedOrgFolderId=null;
+ const selectedIds=new Set();let lookups={categories:[],skills:[]},questions=[],questionFolders=[],currentFolderId=null,modalDraftIds=new Set();
  let pendingExamId=null,pendingPdfUploaded=false,pendingEssaySectionId=null,pendingEssayPdfUploaded=false;
  const escapeHtml=value=>String(value??'').replace(/[&<>"']/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
  const typeNames={MultipleChoice:'چهارگزینه‌ای',Essay:'تشریحی',Matching:'وصل‌کردنی'};
  const steps=['مشخصات آزمون','سؤال‌ها','بررسی و انتشار'];let current=1;
  function showStep(n){current=n;document.querySelectorAll('.exam-panel').forEach(p=>p.classList.toggle('active',p.id==='panel'+n));$('examSteps').innerHTML=steps.map((s,i)=>{const k=i+1;return '<div class="exam-step '+(k===n?'active':k<n?'done':'')+'"><span class="n">'+(k<n?'✓':k)+'</span><span>'+s+'</span></div>'+(i<2?'<span style="width:28px;height:1px;background:var(--border)"></span>':'');}).join('');}
  function selectedQuestions(){return questions.filter(q=>selectedIds.has(String(q.id)));}
- function renderImportFolders(){
-  const host=$('examImportFolders');
-  const grouped=new Map();
-  importBatches.forEach(batch=>{const key=String(batch.teacherUserId);if(!grouped.has(key))grouped.set(key,{name:batch.teacherName||'استاد',items:[]});grouped.get(key).items.push(batch);});
-  const orgHtml=questionFolders.length?'<section class="exam-import-folder-group"><b>پوشه‌های مستقل بانک سؤال</b><div class="exam-import-folder-grid">'+questionFolders.map(folder=>'<button type="button" class="exam-import-folder '+(Number(selectedOrgFolderId)===Number(folder.id)?'active':'')+'" data-exam-folder="'+Number(folder.id)+'"><b>'+escapeHtml(folder.name)+'</b><span class="badge badge-muted">'+Number(folder.questionCount||0).toLocaleString('fa-IR')+' سؤال</span><small>'+escapeHtml(folder.ownerName||'استاد')+'</small></button>').join('')+'</div></section>':'';
-  const batchHtml=importBatches.length?[...grouped.entries()].map(([teacherId,group])=>'<section class="exam-import-folder-group"><b>پوشه‌های ورود گروهی — استاد: '+escapeHtml(group.name)+'</b><div class="exam-import-folder-grid">'+group.items.map(batch=>'<button type="button" class="exam-import-folder '+(selectedOrgFolderId===null&&Number(selectedBatchId)===Number(batch.id)?'active':'')+'" data-exam-batch="'+Number(batch.id)+'"><b>'+escapeHtml(batch.title)+'</b><span class="badge badge-muted">'+Number(batch.questionCount||0).toLocaleString('fa-IR')+' سؤال</span><small>'+escapeHtml(new Date(batch.createdAt).toLocaleDateString('fa-IR'))+'</small></button>').join('')+'</div></section>').join(''):'';
-  host.innerHTML=orgHtml+batchHtml||'<div class="question-empty">هنوز پوشه‌ای برای سؤال‌ها ثبت نشده است.</div>';
-  const selected=importBatches.find(batch=>Number(batch.id)===Number(selectedBatchId));
-  const selectedOrg=questionFolders.find(folder=>Number(folder.id)===Number(selectedOrgFolderId));
-  $('examSelectedFolderHint').textContent=selectedOrg?'پوشه انتخاب‌شده: '+selectedOrg.name+' — سؤال‌های بدون پوشه نیز در فهرست پایین نمایش داده می‌شوند.':selected?'پوشه انتخاب‌شده: '+selected.title+' — استاد: '+(selected.teacherName||'استاد'):'سؤال‌های بدون پوشه در پایین نمایش داده می‌شوند. برای مشاهده سؤال‌های پوشه‌ای، یکی از پوشه‌ها را انتخاب کنید. در این مرحله امکان ساخت پوشه وجود ندارد.';
+ function currentFolder(){return currentFolderId===null?null:questionFolders.find(x=>Number(x.id)===Number(currentFolderId))||null;}
+ function folderPath(){const path=[];let folder=currentFolder();const seen=new Set();while(folder&&!seen.has(Number(folder.id))){seen.add(Number(folder.id));path.unshift(folder);folder=folder.parentFolderId?questionFolders.find(x=>Number(x.id)===Number(folder.parentFolderId)):null;}return path;}
+ function renderFolderNavigation(){
+  const crumbs=$('examFolderBreadcrumbs');const path=folderPath();
+  crumbs.innerHTML='<button type="button" data-folder-crumb="root">همه پوشه‌ها</button>'+path.map((folder,i)=>'<span class="text-soft">/</span><button type="button" data-folder-crumb="'+Number(folder.id)+'" '+(i===path.length-1?'aria-current="page"':'')+'>'+escapeHtml(folder.name)+'</button>').join('');
+  const children=questionFolders.filter(x=>(x.parentFolderId==null?null:Number(x.parentFolderId))===currentFolderId);
+  $('examChildFolders').innerHTML=children.length?children.map(folder=>'<button type="button" class="exam-folder-card" data-open-folder="'+Number(folder.id)+'"><span aria-hidden="true">📁</span><span class="folder-name">'+escapeHtml(folder.name)+'</span><span class="badge badge-muted">'+Number(folder.questionCount||0).toLocaleString('fa-IR')+' سؤال</span><span aria-hidden="true">‹</span></button>').join(''):'<div class="question-empty">'+(currentFolderId===null?'پوشهٔ اصلی دیگری وجود ندارد.':'این پوشه زیرپوشه‌ای ندارد.')+'</div>';
+  const folder=currentFolder();$('examSelectedFolderHint').textContent=folder?'مسیر فعلی: '+path.map(x=>x.name).join(' / '):'پوشه‌های اصلی بانک سؤال';
+  $('openQuestionPicker').textContent=folder?'نمایش و انتخاب سؤال‌های «'+folder.name+'»':'نمایش و انتخاب سؤال‌های بدون پوشه';
  }
- function renderQuestions(){
-  const categoryId=Number($('examCategory').value||0),term=$('questionSearch').value.trim().toLocaleLowerCase();
+ function questionsInCurrentFolder(){
+  const categoryId=Number($('examCategory').value||0);
   const skillIds=new Set(lookups.skills.filter(s=>Number(s.examCategoryId)===categoryId).map(s=>Number(s.id)));
-  const visibleBatchQuestions=questions.filter(q=>{if(q.folderId!=null)return selectedOrgFolderId!==null&&Number(q.folderId)===Number(selectedOrgFolderId);return q.importBatchId==null||(selectedBatchId!==null&&Number(q.importBatchId)===Number(selectedBatchId));});
-  const eligible=visibleBatchQuestions.filter(q=>skillIds.has(Number(q.skillId))&&!/essay/i.test(String(q.questionTypeCode||q.questionType||''))&&(!term||String(q.text||'').toLocaleLowerCase().includes(term)));
-  const unfiledRows=eligible.filter(q=>q.folderId==null&&q.importBatchId==null);
-  const folderRows=eligible.filter(q=>q.folderId!=null||q.importBatchId!=null);
-  $('questionCount').textContent=selectedIds.size+' سؤال انتخاب‌شده';
-  const renderRows=rows=>rows.map(q=>'<label class="question-row"><input type="checkbox" value="'+Number(q.id)+'" '+(selectedIds.has(String(q.id))?'checked':'')+'><span class="qtext">'+escapeHtml(q.text)+'</span><span class="badge badge-info">'+escapeHtml(typeNames[q.questionTypeCode]||q.questionTypeName||'سؤال')+'</span></label>').join('');
-  const sections=[];
-  if(unfiledRows.length)sections.push('<div class="question-group-title">سؤال‌های بدون پوشه</div>'+renderRows(unfiledRows));
-  if(folderRows.length){const folder=questionFolders.find(x=>Number(x.id)===Number(selectedOrgFolderId));const batch=importBatches.find(x=>Number(x.id)===Number(selectedBatchId));sections.push('<div class="question-group-title">سؤال‌های پوشه '+escapeHtml(folder?.name||batch?.title||'انتخاب‌شده')+'</div>'+renderRows(folderRows));}
-  $('questionList').innerHTML=sections.length?sections.join(''):'<div class="question-empty">'+(categoryId?'برای این دسته‌بندی سؤال آنلاین قابل انتخابی پیدا نشد. سؤال‌های تشریحی متنی قدیمی در آزمون جدید قابل افزودن نیستند؛ برای Essay از بخش PDF تشریحی استفاده کنید.':'ابتدا دسته‌بندی آزمون را مشخص کنید؛ سؤال‌های بدون پوشه پس از انتخاب دسته‌بندی در اینجا نمایش داده می‌شوند.')+'</div>';
+  return questions.filter(q=>(currentFolderId===null?(q.folderId==null):(Number(q.folderId)===Number(currentFolderId)))&&skillIds.has(Number(q.skillId))&&!/essay/i.test(String(q.questionTypeCode||q.questionType||'')));
  }
+ function renderSelectedExamQuestions(){
+  const chosen=selectedQuestions();$('questionCount').textContent=chosen.length.toLocaleString('fa-IR')+' سؤال انتخاب‌شده';$('selectedQuestionTotal').textContent=chosen.length.toLocaleString('fa-IR')+' سؤال';
+  $('selectedExamQuestions').innerHTML=chosen.length?chosen.map((q,i)=>'<article class="exam-selected-item"><span class="badge badge-muted">'+(i+1).toLocaleString('fa-IR')+'</span><span class="qtext">'+escapeHtml(q.text)+'</span><span class="badge badge-info">'+escapeHtml(typeNames[q.questionTypeCode]||q.questionTypeName||'سؤال')+'</span><button class="btn btn-danger btn-sm" type="button" data-remove-selected="'+Number(q.id)+'">حذف</button></article>').join(''):'<div class="question-empty">هنوز سؤالی به آزمون اضافه نشده است.</div>';
+ }
+ function renderModalQuestions(){
+  const term=$('examModalQuestionSearch').value.trim().toLocaleLowerCase();const rows=questionsInCurrentFolder().filter(q=>!term||String(q.text||'').toLocaleLowerCase().includes(term));
+  $('examModalSelectedCount').textContent=modalDraftIds.size.toLocaleString('fa-IR')+' انتخاب‌شده';
+  $('examModalQuestionList').innerHTML=rows.length?rows.map(q=>'<label class="question-row"><input type="checkbox" data-modal-question="'+Number(q.id)+'" '+(modalDraftIds.has(String(q.id))?'checked':'')+'><span class="qtext">'+escapeHtml(q.text)+'</span><span class="badge badge-info">'+escapeHtml(typeNames[q.questionTypeCode]||q.questionTypeName||'سؤال')+'</span></label>').join(''):'<div class="question-empty">'+(Number($('examCategory').value||0)?'در این پوشه سؤال آنلاینی برای دسته‌بندی انتخاب‌شده وجود ندارد.':'ابتدا دسته‌بندی آزمون را مشخص کنید.')+'</div>';
+ }
+ function openQuestionPicker(){
+  modalDraftIds=new Set(selectedIds);const folder=currentFolder();$('examQuestionPickerFolder').textContent=folder?'پوشه: '+folderPath().map(x=>x.name).join(' / '):'سؤال‌های بدون پوشه';$('examModalQuestionSearch').value='';renderModalQuestions();$('examQuestionPickerModal').classList.add('show');$('examQuestionPickerModal').setAttribute('aria-hidden','false');
+ }
+ function closeQuestionPicker(){ $('examQuestionPickerModal').classList.remove('show');$('examQuestionPickerModal').setAttribute('aria-hidden','true'); }
+ function renderQuestions(){renderFolderNavigation();renderSelectedExamQuestions();}
  async function loadData(){
-  const [l,q,classes,batches,orgFolders]=await Promise.all([api.request('/questions/lookups'),api.request('/questions'),api.request('/canonical/classes'),api.request('/questions/import/batches'),api.request('/questions/folders').catch(()=>[])]);
-  lookups=l||{categories:[],skills:[]};questions=Array.isArray(q)?q:[];importBatches=Array.isArray(batches)?batches:[];questionFolders=Array.isArray(orgFolders)?orgFolders:[];
+  const [l,q,classes,orgFolders]=await Promise.all([api.request('/questions/lookups'),api.request('/questions'),api.request('/canonical/classes'),api.request('/questions/folders').catch(()=>[])]);
+  lookups=l||{categories:[],skills:[]};questions=Array.isArray(q)?q:[];questionFolders=Array.isArray(orgFolders)?orgFolders:[];
   $('examCategory').innerHTML='<option value="">انتخاب دسته‌بندی</option>'+lookups.categories.map(x=>'<option value="'+Number(x.id)+'">'+escapeHtml(x.name)+'</option>').join('');
   $('examClass').innerHTML='<option value="">انتخاب کلاس</option>'+(Array.isArray(classes)?classes:[]).map(x=>'<option value="'+Number(x.id)+'" data-department-id="'+Number(x.departmentId)+'">'+escapeHtml(x.name)+' — '+escapeHtml(x.department||'')+'</option>').join('');
-  renderImportFolders();renderQuestions();
+  renderQuestions();
  }
  function getEssayPdfSizeMb(){
   if(!$('essaySectionPdfFile').files[0])return null;
@@ -167,11 +189,16 @@
  $('backToDetails').addEventListener('click',()=>showStep(1));
  $('toReview').addEventListener('click',()=>{const e=validateDetails();if(e)return window.showToast?.(e,'warn');if(!selectedIds.size&&!$('examPdfFile').files[0]&&!$('essaySectionPdfFile').files[0])return window.showToast?.('برای آزمون باید سؤال آنلاین یا یکی از فایل‌های PDF را انتخاب کنید.','warn');showSummary();showStep(3);});
  $('backToQuestions').addEventListener('click',()=>showStep(2));
- $('questionSearch').addEventListener('input',renderQuestions);
- $('examImportFolders').addEventListener('click',event=>{const folder=event.target.closest('[data-exam-folder]'),batch=event.target.closest('[data-exam-batch]');if(folder){selectedOrgFolderId=Number(folder.dataset.examFolder);selectedBatchId=null;renderImportFolders();renderQuestions();}if(batch){selectedBatchId=Number(batch.dataset.examBatch);selectedOrgFolderId=null;renderImportFolders();renderQuestions();}});
- $('questionList').addEventListener('change',e=>{const input=e.target;if(!input.matches('input[type=checkbox]'))return;input.checked?selectedIds.add(String(input.value)):selectedIds.delete(String(input.value));$('questionCount').textContent=selectedIds.size+' سؤال انتخاب‌شده';});
- $('examCategory').addEventListener('change',()=>{selectedIds.clear();renderQuestions();});
- $('refreshQuestions').addEventListener('click',async()=>{try{const [updatedQuestions,updatedBatches,updatedFolders]=await Promise.all([api.request('/questions'),api.request('/questions/import/batches'),api.request('/questions/folders').catch(()=>[])]);questions=Array.isArray(updatedQuestions)?updatedQuestions:[];importBatches=Array.isArray(updatedBatches)?updatedBatches:[];questionFolders=Array.isArray(updatedFolders)?updatedFolders:[];renderImportFolders();renderQuestions();window.showToast?.('پوشه‌ها و بانک سؤال بروزرسانی شدند.','ok');}catch(e){window.showToast?.(e.message||'دریافت بانک سؤال ناموفق بود.','danger');}});
+ $('examFolderBreadcrumbs').addEventListener('click',event=>{const button=event.target.closest('[data-folder-crumb]');if(!button)return;currentFolderId=button.dataset.folderCrumb==='root'?null:Number(button.dataset.folderCrumb);renderFolderNavigation();});
+ $('examChildFolders').addEventListener('click',event=>{const button=event.target.closest('[data-open-folder]');if(!button)return;currentFolderId=Number(button.dataset.openFolder);renderFolderNavigation();});
+ $('openQuestionPicker').addEventListener('click',openQuestionPicker);
+ ['closeExamQuestionPicker','cancelExamQuestionPicker'].forEach(id=>$(id).addEventListener('click',closeQuestionPicker));
+ $('confirmExamQuestionSelection').addEventListener('click',()=>{selectedIds.clear();modalDraftIds.forEach(id=>selectedIds.add(id));closeQuestionPicker();renderSelectedExamQuestions();});
+ $('examModalQuestionSearch').addEventListener('input',renderModalQuestions);
+ $('examModalQuestionList').addEventListener('change',event=>{const input=event.target.closest('[data-modal-question]');if(!input)return;const id=String(input.dataset.modalQuestion);input.checked?modalDraftIds.add(id):modalDraftIds.delete(id);$('examModalSelectedCount').textContent=modalDraftIds.size.toLocaleString('fa-IR')+' انتخاب‌شده';});
+ $('selectedExamQuestions').addEventListener('click',event=>{const button=event.target.closest('[data-remove-selected]');if(!button)return;selectedIds.delete(String(button.dataset.removeSelected));renderSelectedExamQuestions();});
+ $('examCategory').addEventListener('change',()=>{renderQuestions();if($('examQuestionPickerModal').classList.contains('show')){modalDraftIds=new Set(selectedIds);renderModalQuestions();}});
+ $('refreshQuestions').addEventListener('click',async()=>{try{const [updatedQuestions,updatedFolders]=await Promise.all([api.request('/questions'),api.request('/questions/folders').catch(()=>[])]);questions=Array.isArray(updatedQuestions)?updatedQuestions:[];questionFolders=Array.isArray(updatedFolders)?updatedFolders:[];if(currentFolderId!==null&&!questionFolders.some(x=>Number(x.id)===Number(currentFolderId)))currentFolderId=null;renderQuestions();if($('examQuestionPickerModal').classList.contains('show'))renderModalQuestions();window.showToast?.('پوشه‌ها و بانک سؤال بروزرسانی شدند.','ok');}catch(e){window.showToast?.(e.message||'دریافت بانک سؤال ناموفق بود.','danger');}});
  $('createExam').addEventListener('click',async()=>{
   const err=validateDetails();if(err)return window.showToast?.(err,'warn');
    const chosen=selectedQuestions(),file=$('examPdfFile').files[0],essayFile=$('essaySectionPdfFile').files[0];
