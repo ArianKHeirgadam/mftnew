@@ -106,6 +106,8 @@ public sealed class ExamSectionFilesController(
         if (!await CanManage(exam, ct)) return Forbid();
         if (!string.Equals(section.SectionType, "Essay", StringComparison.OrdinalIgnoreCase))
             return BadRequest(new { message = "فقط برای بخش Essay امکان بارگذاری PDF صورت سؤال وجود دارد." });
+        if (exam.IsPublished || await academic.ExamAttempts.AnyAsync(x => x.ExamId == exam.Id, ct))
+            return Conflict(new { message = "پس از انتشار آزمون یا شروع تلاش دانشجو، PDF صورت سؤال این بخش قابل جایگزینی نیست." });
         if (UserId is null || !await identity.Users.AnyAsync(x => x.Id == UserId && x.IsActive, ct))
             return Unauthorized();
 
