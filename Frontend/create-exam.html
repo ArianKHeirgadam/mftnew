@@ -37,6 +37,8 @@
   .question-picker-tools .input{flex:1;min-width:220px}
   #manualPick{max-height:430px;overflow:auto;padding:2px}
   .question-picker-empty{padding:26px 16px;text-align:center;border:1px dashed var(--border);border-radius:12px;color:var(--text-soft)}
+  .random-question-counts{grid-template-columns:repeat(3,minmax(0,1fr));gap:14px}
+  @media(max-width:700px){.random-question-counts{grid-template-columns:1fr}}
 </style>
 </head>
 <body data-role="teacher" data-active="exams">
@@ -99,9 +101,12 @@
           </div>
           <div id="manualPick"><div class="question-picker-empty">ابتدا دسته‌بندی آزمون را انتخاب کنید.</div></div>
           <div id="randomPick" style="display:none">
-            <div class="field"><label>تعداد سوالات چهارگزینه‌ای</label><input class="input" id="randomMcqCount" type="number" min="0" value="15"></div>
-            <div class="field"><label>تعداد سوالات تشریحی</label><input class="input" id="randomEssayCount" type="number" min="0" value="2"></div>
-            <div class="field"><label>تعداد سؤال‌های وصل‌کردنی</label><input class="input" id="randomMatchingCount" type="number" min="0" value="0"></div>
+            <p class="text-soft text-sm" style="margin-bottom:12px">ظرفیت هر نوع سؤال به‌صورت خودکار از سؤال‌های موجود در بانک و دسته‌بندی انتخاب‌شده محاسبه می‌شود.</p>
+            <div class="grid-2 random-question-counts">
+              <div class="field"><label for="randomMcqCount">تعداد چهارگزینه‌ای</label><input class="input" id="randomMcqCount" type="number" min="0" value="0"><small class="text-soft" id="randomMcqAvailable">در حال محاسبه از بانک سؤال...</small></div>
+              <div class="field"><label for="randomEssayCount">تعداد تشریحی</label><input class="input" id="randomEssayCount" type="number" min="0" value="0"><small class="text-soft" id="randomEssayAvailable">در حال محاسبه از بانک سؤال...</small></div>
+              <div class="field"><label for="randomMatchingCount">تعداد وصل‌کردنی</label><input class="input" id="randomMatchingCount" type="number" min="0" value="0"><small class="text-soft" id="randomMatchingAvailable">در حال محاسبه از بانک سؤال...</small></div>
+            </div>
           </div>
           </div>
         </div>
@@ -162,6 +167,26 @@
   const escapeExamHtml = value => String(value ?? '').replace(/[&<>"']/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
   const questionTypeNames = { MultipleChoice: 'چهارگزینه‌ای', Essay: 'تشریحی', Matching: 'وصل‌کردنی' };
 
+  function updateRandomQuestionLimits(categoryId = Number(document.getElementById('examCategory').value || 0)) {
+    const skillIds = new Set((examLookups?.skills || [])
+      .filter(skill => Number(skill.examCategoryId) === Number(categoryId))
+      .map(skill => Number(skill.id)));
+    const definitions = [
+      ['MultipleChoice', 'randomMcqCount', 'randomMcqAvailable'],
+      ['Essay', 'randomEssayCount', 'randomEssayAvailable'],
+      ['Matching', 'randomMatchingCount', 'randomMatchingAvailable']
+    ];
+    definitions.forEach(([type, inputId, labelId]) => {
+      const available = examQuestionRows.filter(question =>
+        skillIds.has(Number(question.skillId)) && question.questionTypeCode === type).length;
+      const input = document.getElementById(inputId);
+      input.max = String(available);
+      input.disabled = available === 0;
+      if (Number(input.value || 0) > available) input.value = String(available);
+      document.getElementById(labelId).textContent = 'موجود در بانک: ' + available + ' سؤال';
+    });
+  }
+
   function renderExamQuestions() {
     const categoryId = Number(document.getElementById('examCategory').value || 0);
     const term = (document.getElementById('examQuestionSearch')?.value || '').trim().toLocaleLowerCase();
@@ -173,6 +198,7 @@
     });
     const host = document.getElementById('manualPick');
     document.getElementById('examQuestionCount').textContent = rows.length + ' سؤال';
+    updateRandomQuestionLimits(categoryId);
     host.innerHTML = rows.length ? rows.map(question => {
       const type = question.questionTypeCode || '';
       const checked = selectedQuestionIds.has(String(question.id)) ? ' checked' : '';
@@ -231,7 +257,10 @@
     if (number === 6) {
       const randomMode = document.getElementById("randomToggle").checked;
       const selectedCount = randomMode
-        ? Number(document.getElementById("randomMcqCount").value || 0) + Number(document.getElementById("randomEssayCount").value || 0) + Number(document.getElementById("randomMatchingCount").value || 0)
+        ? ['randomMcqCount','randomEssayCount','randomMatchingCount'].reduce((total,id) => {
+            const input = document.getElementById(id);
+            return total + Math.min(Number(input.value || 0), Number(input.max || 0));
+          }, 0)
         : selectedManualQuestions().length;
       document.getElementById("prevQuestionCount").textContent = selectedCount + " سوال" + (randomMode ? " (تصادفی)" : "");
       const previewList = document.getElementById("prevSelectedQuestions");
@@ -313,6 +342,11 @@
       ].map(toSelection);
     }
     if (!selected.length) return showToast("حداقل یک سؤال انتخاب کنید.", "warn");
+    if (document.getElementById("randomToggle").checked) {
+      const requested = ['randomMcqCount','randomEssayCount','randomMatchingCount']
+        .reduce((total,id) => total + Number(document.getElementById(id).value || 0), 0);
+      if (selected.length < requested) showToast('تعداد سؤال‌های انتخاب‌شده با ظرفیت واقعی بانک سؤال محدود شد.', 'warn');
+    }
 
     const date = document.getElementById("examDate").value;
     const time = document.getElementById("examTime").value;
