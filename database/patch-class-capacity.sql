@@ -9,22 +9,21 @@ IF OBJECT_ID(N'dbo.CanonicalClasses', N'U') IS NULL
 
 IF COL_LENGTH(N'dbo.CanonicalClasses', N'Capacity') IS NULL
 BEGIN
-    ALTER TABLE dbo.CanonicalClasses
-        ADD Capacity int NULL;
+    ALTER TABLE dbo.CanonicalClasses ADD Capacity int NULL;
 END;
 
-IF EXISTS
-(
-    SELECT 1
-    FROM dbo.CanonicalClasses
-    WHERE Capacity IS NOT NULL AND Capacity <= 0
-)
-    THROW 51502, 'Existing class capacity values must be positive.', 1;
+-- Run column-dependent statements dynamically so SQL Server compiles them
+-- only after the ALTER TABLE above has completed.
+EXEC sys.sp_executesql N'
+    IF EXISTS
+    (
+        SELECT 1
+        FROM dbo.CanonicalClasses
+        WHERE Capacity IS NOT NULL AND Capacity <= 0
+    )
+        THROW 51502, ''Existing class capacity values must be positive.'', 1;
 
-SELECT
-    Id,
-    Name,
-    DepartmentId,
-    Capacity
-FROM dbo.CanonicalClasses
-ORDER BY DepartmentId, Name;
+    SELECT Id, Name, DepartmentId, Capacity
+    FROM dbo.CanonicalClasses
+    ORDER BY DepartmentId, Name;
+';
