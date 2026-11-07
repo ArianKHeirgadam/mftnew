@@ -51,4 +51,13 @@ IF NOT EXISTS
     CREATE INDEX IX_QuestionImportBatches_TeacherUserId_CreatedAt
         ON dbo.QuestionImportBatches(TeacherUserId, CreatedAt DESC, Id DESC);
 
+IF NOT EXISTS
+(
+    SELECT 1 FROM sys.indexes
+    WHERE name = N'UX_QuestionImportBatches_TeacherUserId_Title'
+      AND object_id = OBJECT_ID(N'dbo.QuestionImportBatches')
+)
+    CREATE UNIQUE INDEX UX_QuestionImportBatches_TeacherUserId_Title
+        ON dbo.QuestionImportBatches(TeacherUserId, Title);
+
 COMMIT TRANSACTION;
