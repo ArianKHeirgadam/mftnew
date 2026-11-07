@@ -28,18 +28,21 @@
     if (answers.has(q.examQuestionId)) return answers.get(q.examQuestionId);
     if (/multiplechoice/i.test(q.type)) return { selectedOptionId: null };
     if (/matching/i.test(q.type)) return { pairs: q.leftItems.map(leftItem => ({ leftItem, rightItem: '' })) };
+    if (/essay/i.test(q.type)) return {};
     return { text: '' };
   }
   function answerText(q) {
     const value=valueFor(q);
     if (/multiplechoice/i.test(q.type)) return value.selectedOptionId ? (q.options.find(o=>o.id===value.selectedOptionId)?.optionText || '—') : 'بدون پاسخ';
     if (/matching/i.test(q.type)) return (value.pairs || []).filter(p=>p.rightItem).length ? 'جفت‌ها انتخاب شده‌اند' : 'بدون پاسخ';
+    if (/essay/i.test(q.type)) return uploadedPdf ? 'پاسخ در فایل PDF بارگذاری شده' : 'فایل PDF پاسخ بارگذاری نشده';
     return value.text || 'بدون پاسخ';
   }
   function answered(q) {
     const v=valueFor(q);
     if (/multiplechoice/i.test(q.type)) return !!v.selectedOptionId;
     if (/matching/i.test(q.type)) return (v.pairs || []).some(p=>p.rightItem);
+    if (/essay/i.test(q.type)) return uploadedPdf;
     return !!String(v.text || '').trim() || (!!exam?.examPdfAvailable && uploadedPdf);
   }
   function updateProgress() {
@@ -83,9 +86,12 @@
         });
         wrap.append(label,select);add(wrap);
       });
+    } else if (/essay/i.test(q.type)) {
+      const note=document.createElement('div');note.className='alert alert-info mt-16';
+      note.textContent='پاسخ این سؤال باید فقط در قالب فایل PDF بارگذاری شود. امکان تایپ پاسخ یا انتخاب گزینه وجود ندارد.';
+      add(note);
     } else {
-      const area=document.createElement('textarea');area.className='input';area.rows=7;area.style.width='100%';area.placeholder='پاسخ تشریحی خود را وارد کنید...';area.value=v.text||'';
-      area.addEventListener('input',()=>{answers.set(q.examQuestionId,{text:area.value});changed();});add(area);
+      const note=document.createElement('div');note.className='alert alert-warn mt-16';note.textContent='نوع این سؤال در سامانه پشتیبانی نمی‌شود.';add(note);
     }
     const prev=document.getElementById('examPrev'),next=document.getElementById('examNext');
     if(prev) prev.disabled=current===0;
@@ -126,7 +132,7 @@
   async function submit(auto=false){
     if(finished||finalizing)return;
     if(uploadingPdf){toast('تا پایان بارگذاری فایل پاسخ صبر کنید.','warn');return;}
-    if(exam?.examPdfAvailable && !uploadedPdf && !auto){toast('برای این آزمون ابتدا فایل PDF پاسخ‌نامه را بارگذاری کنید.','warn');studentPdfInput?.focus();return;}
+    if((exam?.examPdfAvailable || questions.some(q=>/essay/i.test(q.type))) && !uploadedPdf && !auto){toast('برای پاسخ به سؤال تشریحی، ابتدا فایل PDF پاسخ‌نامه را بارگذاری کنید.','warn');studentPdfInput?.focus();return;}
     if(!auto&&!confirm('پس از ثبت نهایی، امکان شرکت مجدد در این آزمون وجود ندارد. پاسخ‌ها ثبت نهایی شوند؟'))return;
     finalizing=true;clearTimeout(saveTimer);clearInterval(timer);
     const button=document.getElementById('confirmFinishBtn');if(button){button.disabled=true;button.textContent='در حال ثبت...';}
@@ -188,9 +194,10 @@
       const frame=document.getElementById('examPdfFrame');
       if(frame)frame.src=await api.objectUrl(`/exam-files/exams/${encodeURIComponent(examId)}`);
     }
-    if(studentPdfBox)studentPdfBox.hidden=!exam.examPdfAvailable;
-    if(exam.examPdfAvailable){
-      const label=studentPdfBox?.querySelector('label');if(label)label.textContent='بارگذاری پاسخ‌نامه PDF (حداکثر ۲۰ مگابایت) — برای ثبت نهایی الزامی است';
+    const hasEssayQuestions=questions.some(q=>/essay/i.test(q.type));
+    if(studentPdfBox)studentPdfBox.hidden=!(exam.examPdfAvailable||hasEssayQuestions);
+    if(exam.examPdfAvailable||hasEssayQuestions){
+      const label=studentPdfBox?.querySelector('label');if(label)label.textContent='بارگذاری پاسخ‌نامه PDF (حداکثر ۲۰ مگابایت) — برای سؤال تشریحی الزامی است';
       try{const info=await api.request(`/exam-files/attempts/${encodeURIComponent(attemptId)}/info`);uploadedPdf=true;if(studentPdfStatus)studentPdfStatus.textContent=`فایل ثبت‌شده: ${info.fileName}`;}catch{uploadedPdf=false;}
     }
     deadline=new Date(data.deadline).getTime();
