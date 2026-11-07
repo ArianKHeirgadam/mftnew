@@ -151,10 +151,16 @@ public sealed class ExamFilesController(
             return BadRequest(new { message = "مهلت بارگذاری پاسخ این آزمون به پایان رسیده است." });
 
         var pdfOnlyExam = !await academic.ExamSections.AnyAsync(x => x.ExamId == exam.Id, ct);
-        var saved = await SaveFile(file, pdfOnly: pdfOnlyExam, ct);
+        var hasEssayQuestions = await academic.ExamQuestions
+            .Where(x => academic.ExamSections.Any(s => s.Id == x.ExamSectionId && s.ExamId == exam.Id))
+            .AnyAsync(x => academic.Questions.Where(q => q.Id == x.QuestionId)
+                .Join(academic.QuestionTypes, q => q.QuestionTypeId, t => t.Id, (q, t) => t.Code)
+                .Any(code => code == "Essay"), ct);
+        var requirePdf = pdfOnlyExam || hasEssayQuestions;
+        var saved = await SaveFile(file, pdfOnly: requirePdf, ct);
         if (saved is null)
-            return BadRequest(new { message = pdfOnlyExam
-                ? "برای آزمون PDFمحور فقط فایل PDF معتبر و حداکثر ۲۰ مگابایت پذیرفته می‌شود."
+            return BadRequest(new { message = requirePdf
+                ? "برای این آزمون فقط فایل PDF معتبر و حداکثر ۲۰ مگابایت پذیرفته می‌شود."
                 : "فایل پاسخ باید PDF، JPG، JPEG یا PNG معتبر و حداکثر ۲۰ مگابایت باشد." });
 
         if (!await identity.Users.AnyAsync(x => x.Id == studentId && x.IsActive, ct))
