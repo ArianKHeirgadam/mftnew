@@ -121,6 +121,16 @@
   </div>
 </div>
 
+<div class="modal-overlay" id="questionOrganizationModal" aria-hidden="true">
+  <div class="modal-box" role="dialog" aria-modal="true" style="width:min(520px,100%)">
+    <div class="modal-head"><h3 style="font-size:16px">مدیریت پوشه و برچسب سؤال</h3><button class="icon-btn" type="button" id="closeQuestionOrganization">✕</button></div>
+    <div class="modal-body">
+      <div class="field"><label for="organizationFolderId">پوشه مقصد</label><select class="select" id="organizationFolderId"><option value="">بدون پوشه</option></select></div>
+      <div class="field"><label for="organizationTags">برچسب‌ها</label><input class="input" id="organizationTags" maxlength="500" placeholder="مثلاً Final, Important, Practice"><small class="text-soft">برچسب‌ها را با کاما از هم جدا کنید؛ حداکثر ۲۰ برچسب.</small></div>
+    </div>
+    <div class="modal-foot"><button class="btn btn-primary" type="button" id="saveQuestionOrganization">ذخیره تغییرات</button><button class="btn btn-outline" type="button" id="cancelQuestionOrganization">انصراف</button></div>
+  </div>
+</div>
 <div class="modal-overlay" id="questionModal">
   <div class="modal-box" style="width:min(620px,100%)">
     <div class="modal-head"><h3 style="font-size:16px">افزودن / ویرایش سوال</h3><button class="icon-btn" data-modal-close>✕</button></div>
@@ -324,6 +334,17 @@
   if(el.checked)selectedQuestionIds.add(id);else selectedQuestionIds.delete(id);
   document.getElementById('selectedQuestionCount').textContent=selectedQuestionIds.size.toLocaleString('fa-IR')+' سؤال انتخاب شده';
  });
+ const organizationModal=document.getElementById('questionOrganizationModal');
+ const closeOrganizationModal=()=>{organizationModal.classList.remove('show');organizationModal.setAttribute('aria-hidden','true');delete organizationModal.dataset.questionId;};
+ ['closeQuestionOrganization','cancelQuestionOrganization'].forEach(id=>document.getElementById(id).addEventListener('click',closeOrganizationModal));
+ document.getElementById('saveQuestionOrganization').addEventListener('click',async()=>{
+  const id=Number(organizationModal.dataset.questionId);if(!id)return;
+  const raw=document.getElementById('organizationTags').value;
+  const tags=raw.split(',').map(x=>x.trim()).filter(Boolean);
+  const folderRaw=document.getElementById('organizationFolderId').value;
+  try{await api.request('/questions/folders/questions/'+id+'/organization',{method:'PUT',body:JSON.stringify({folderId:folderRaw?Number(folderRaw):null,tags})});closeOrganizationModal();await loadQuestions();notify('پوشه و برچسب‌ها ذخیره شد.','ok');}
+  catch(e){notify(e.message||'ذخیره برچسب‌ها ناموفق بود.','danger');}
+ });
  if(searchField)searchField.addEventListener('input',renderQuestions);
  [categoryFilter,difficultyFilter,folderFilter].forEach(x=>x?.addEventListener('change',renderQuestions));
  document.getElementById('questionRows').addEventListener('click',async event=>{
@@ -331,13 +352,14 @@
   const remove=event.target.closest('[data-question-delete]');
   const tagButton=event.target.closest('[data-question-tags]');
   if(tagButton){
-   const q=questionRows.find(x=>Number(x.id)===Number(tagButton.dataset.questionTags));
-   let existing=[];try{existing=JSON.parse(q?.tagsJson||'[]');}catch{}
-   const raw=prompt('برچسب‌ها را با کاما جدا کنید',existing.join(', '));if(raw===null)return;
-   const tags=raw.split(',').map(x=>x.trim()).filter(Boolean);
-   const folderRaw=prompt('شناسه پوشه مقصد را وارد کنید؛ برای بدون پوشه خالی بگذارید',q?.folderId||'');if(folderRaw===null)return;
-   try{await api.request('/questions/folders/questions/'+q.id+'/organization',{method:'PUT',body:JSON.stringify({folderId:folderRaw.trim()?Number(folderRaw):null,tags})});await loadQuestions();notify('پوشه و برچسب‌ها ذخیره شد.','ok');}
-   catch(e){notify(e.message||'ذخیره برچسب‌ها ناموفق بود.','danger');}
+   const q=questionRows.find(x=>Number(x.id)===Number(tagButton.dataset.questionTags));if(!q)return;
+   const host=document.getElementById('questionOrganizationModal');
+   const select=document.getElementById('organizationFolderId');
+   select.innerHTML='<option value="">بدون پوشه</option>'+questionFolders.map(x=>'<option value="'+x.id+'">'+esc(x.name)+'</option>').join('');
+   select.value=q.folderId?String(q.folderId):'';
+   let tags=[];try{tags=JSON.parse(q.tagsJson||'[]');}catch{}
+   document.getElementById('organizationTags').value=tags.join(', ');
+   host.dataset.questionId=String(q.id);host.classList.add('show');host.setAttribute('aria-hidden','false');
   }
   if(edit){
    try{
