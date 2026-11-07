@@ -195,6 +195,8 @@ public sealed class CanonicalEssayGradingController(
                     academic.Questions.Where(item => item.Id == question.QuestionId)
                         .Select(item => item.Points).FirstOrDefault())
                 .SumAsync(ct);
+            if (maxScore <= 0m && string.Equals(section.SectionType, "Essay", StringComparison.OrdinalIgnoreCase))
+                maxScore = 100m;
         }
 
         if (request.Score < 0m || request.Score > maxScore.Value)
@@ -278,6 +280,7 @@ public sealed class CanonicalEssayGradingController(
                 Math.Max(0m, (attempt.AutoGradedScore ?? 0m) + manualTotal),
                 2, MidpointRounding.AwayFromZero);
             attempt.GradingStatus = "Final";
+            attempt.ManualReviewRequired = false;
             attempt.StatusId = finalStatus.Id;
         }
         else
