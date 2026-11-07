@@ -1,4 +1,5 @@
 using Mft.Domain.Exams;
+using Xunit;
 
 namespace Mft.Tests;
 
