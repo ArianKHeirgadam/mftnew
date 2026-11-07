@@ -194,6 +194,7 @@ public sealed class CanonicalClassesController(
     [HttpPost]
     public async Task<IActionResult> Create(CanonicalClassRequest request, CancellationToken ct)
     {
+        if (User.IsInRole("Teacher")) return Forbid();
         var name = request.Name?.Trim();
         if (string.IsNullOrWhiteSpace(name) || name.Length > 200)
             return BadRequest(new { message = "نام کلاس الزامی و حداکثر ۲۰۰ کاراکتر است." });
