@@ -36,7 +36,7 @@ public sealed class CanonicalQuestionsController(
         if (importBatchId.HasValue) q = q.Where(x => x.ImportBatchId == importBatchId.Value);
         if (!string.IsNullOrWhiteSpace(search)) q = q.Where(x => x.Text.Contains(search));
         var rows = await q.OrderByDescending(x => x.Id).Select(x => new {
-            x.Id, x.SkillId, x.QuestionTypeId, x.ImportBatchId, x.Text, x.Points, x.DifficultyLevel,
+            x.Id, x.SkillId, x.QuestionTypeId, x.ImportBatchId, x.FolderId, x.TagsJson, x.Text, x.Points, x.DifficultyLevel,
             ImportBatchTitle = academic.QuestionImportBatches.Where(b => b.Id == x.ImportBatchId).Select(b => b.Title).FirstOrDefault(),
             SkillName = academic.Skills.Where(s => s.Id == x.SkillId).Select(s => s.Name).FirstOrDefault(),
             CategoryName = academic.ExamCategories.Where(cat => cat.Id == academic.Skills.Where(s => s.Id == x.SkillId).Select(s => s.ExamCategoryId).FirstOrDefault()).Select(cat => cat.Name).FirstOrDefault(),
