@@ -397,6 +397,7 @@ public sealed class CanonicalEssayGradingController(
         attempt.ManualGradedScore = decimal.Round(request.Score, 2, MidpointRounding.AwayFromZero);
         attempt.FinalScore = attempt.ManualGradedScore;
         attempt.GradingStatus = "Final";
+        attempt.ManualReviewRequired = false;
         attempt.StatusId = finalStatus.Id;
 
         try
