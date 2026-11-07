@@ -287,6 +287,7 @@
     try {
       const created = await api.request('/questions/lookups/categories', { method: 'POST', body: JSON.stringify({ name }) });
       await loadSkillCategories(created.id);
+      await loadWordLookups();
       $('#importCategoryForm').hidden = true; $('#importCategoryName').value = '';
       $('#importSkillStatus').textContent = 'دسته‌بندی ذخیره شد؛ اکنون نام مهارت را وارد کنید.';
       message('دسته‌بندی جدید ذخیره شد.', 'success');
@@ -317,7 +318,9 @@
         method: 'POST',
         body: JSON.stringify({ name, examCategoryId })
       });
-      $('#importSkillStatus').textContent = 'مهارت «' + (created.name || name) + '» با موفقیت ذخیره شد. حالا همین نام را در ستون Skill فایل وارد کنید.';
+      await loadWordLookups();
+      if ($('#wordCategory').value) populateWordSkills($('#wordCategory').value, created.id);
+      $('#importSkillStatus').textContent = 'مهارت «' + (created.name || name) + '» با موفقیت ذخیره شد و به فهرست مهارت‌های Word اضافه شد.';
       message('مهارت جدید در دسته‌بندی انتخاب‌شده ذخیره شد.', 'success');
       setTimeout(closeSkillModal, 1100);
     } catch (error) {
