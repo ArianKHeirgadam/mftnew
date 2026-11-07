@@ -249,11 +249,15 @@
       while(saving) await new Promise(resolve=>setTimeout(resolve,40));
       const result=await api.request(`/canonical/exams/${encodeURIComponent(examId)}/attempt/${encodeURIComponent(attemptId)}/submit`,{method:'POST',body:JSON.stringify({answers:requestPayload(),autoSubmit:auto})});
       finished=true;
-      const rawAutoScore=Number(result.autoGradedScore ?? result.finalScore ?? 0);
-      const maxPossibleScore=questions.reduce((sum,question)=>sum+Number(question.points||0),0)+essaySections.reduce((sum,section)=>sum+Number(section.totalPoints||100),0);
+      let resultDetails=null;
+      try{resultDetails=await api.request('/canonical/results/'+encodeURIComponent(attemptId));}catch{}
+      const rawAutoScore=Number(resultDetails?.autoScore ?? result.autoGradedScore ?? result.finalScore ?? 0);
+      const fallbackMaxScore=exam?.isPdfOnly?100:questions.reduce((sum,question)=>sum+Number(question.points||0),0)+essaySections.reduce((sum,section)=>sum+Number(section.totalPoints||100),0);
+      const maxPossibleScore=Number(resultDetails?.maxScore ?? fallbackMaxScore);
       const scoreOutOf100=maxPossibleScore>0?Math.max(0,Math.min(100,rawAutoScore/maxPossibleScore*100)):0;
       const scoreText=scoreOutOf100.toLocaleString('fa-IR',{minimumFractionDigits:0,maximumFractionDigits:2});
-      if(root)root.innerHTML='<div class="alert alert-ok">آزمون با موفقیت ثبت نهایی شد. امکان شرکت مجدد در این آزمون وجود ندارد.</div><section class="card card-pad mt-16" aria-live="polite"><div class="text-soft text-sm">نمره اولیه شما</div><div style="font-size:32px;font-weight:800;margin:8px 0">از ۱۰۰: '+scoreText+'</div><p class="text-soft text-sm">وضعیت تصحیح: '+(result.requiresManualGrading?'بخش تشریحی در انتظار تصحیح استاد است.':'تصحیح خودکار انجام شده است.')+'</p><p class="mt-12" style="font-size:13px;line-height:1.9;color:var(--warning,#9a6700)">توجه: این نمره هنوز نهایی و کامل نیست و تا بررسی و اعلام نتیجه نهایی توسط استاد ممکن است تغییر کند.</p></section><a class="btn btn-primary mt-16" href="dashboard-student.html">بازگشت به داشبورد</a>';
+      const pendingCount=Number(resultDetails?.pendingManualCount ?? (result.requiresManualGrading?1:0));
+      if(root)root.innerHTML='<div class="alert alert-ok">آزمون با موفقیت ثبت نهایی شد. امکان شرکت مجدد در این آزمون وجود ندارد.</div><section class="card card-pad mt-16" aria-live="polite"><div class="text-soft text-sm">نمره اولیه شما</div><div style="font-size:32px;font-weight:800;margin:8px 0">از ۱۰۰: '+scoreText+'</div><p class="text-soft text-sm">وضعیت تصحیح: '+(pendingCount>0?'بخش‌هایی در انتظار تصحیح استاد هستند ('+fa(pendingCount)+' مورد).':'تصحیح خودکار انجام شده است.')+'</p><p class="mt-12" style="font-size:13px;line-height:1.9;color:var(--warning,#9a6700)">توجه: این نمره هنوز نهایی و کامل نیست و تا بررسی و اعلام نتیجه نهایی توسط استاد ممکن است تغییر کند.</p></section><a class="btn btn-primary mt-16" href="dashboard-student.html">بازگشت به داشبورد</a>';
       document.querySelector('.exam-nav-panel')?.remove();
       toast('آزمون ثبت نهایی شد.','ok');
     }catch(error){finalizing=false;if(button){button.disabled=false;button.textContent='بله، پایان آزمون';}toast(error.message||'ثبت نهایی ناموفق بود.','danger');}
