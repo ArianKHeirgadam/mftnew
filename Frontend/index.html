@@ -1,29 +1,17 @@
 <!DOCTYPE html>
 <html lang="fa" dir="rtl">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>سامانه سنجش</title>
-<meta http-equiv="refresh" content="0;url=login.html">
-<link rel="stylesheet" href="assets/css/style.css">
-<style>
-  body{display:flex;align-items:center;justify-content:center;min-height:100vh;background:var(--ink-900);}
-  .splash{display:flex;flex-direction:column;align-items:center;gap:18px;color:#fff;animation:fadeIn .5s ease;}
-  .splash .brand-mark{width:66px;height:66px;font-size:26px;}
-  .splash a{color:#fff;text-decoration:underline;font-size:13px;margin-top:8px;}
-</style>
-<script>
-  // Do not leave visitors stuck on the splash screen if meta refresh is ignored.
-  window.location.replace(new URL('login.html', document.baseURI).href);
-</script>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="refresh" content="0;url=login.html">
+  <title>سامانه سنجش</title>
+  <script>
+    window.location.replace(new URL('login.html', document.baseURI).href);
+  </script>
 </head>
 <body>
-  <div class="splash">
-    <div class="brand-mark">س</div>
-    <div style="font-family:var(--font-display);font-weight:800;font-size:18px">سامانه سنجش</div>
-    <div class="spinner" aria-label="در حال انتقال به صفحه ورود"></div>
-    <a href="login.html">اگر صفحه ورود باز نشد، اینجا کلیک کنید</a>
-  </div>
-  <noscript><meta http-equiv="refresh" content="0;url=login.html"></noscript>
+  <noscript>
+    <a href="login.html">ورود به سامانه سنجش</a>
+  </noscript>
 </body>
 </html>
