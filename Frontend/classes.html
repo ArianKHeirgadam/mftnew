@@ -42,17 +42,19 @@
 
       <div class="grid-2" style="align-items:start">
         <section class="card card-pad">
-          <h3 style="margin-bottom:16px">ایجاد کلاس</h3>
-          <div class="field" id="classDepartmentField">
-            <label for="classDepartment">دپارتمان</label>
-            <select class="select" id="classDepartment"><option value="">در حال دریافت دپارتمان‌ها...</option></select>
+          <div id="classCreatePanel">
+            <h3 style="margin-bottom:16px">ایجاد کلاس</h3>
+            <div class="field" id="classDepartmentField">
+              <label for="classDepartment">دپارتمان</label>
+              <select class="select" id="classDepartment"><option value="">در حال دریافت دپارتمان‌ها...</option></select>
+            </div>
+            <div class="field">
+              <label for="className">نام کلاس</label>
+              <input class="input" id="className" maxlength="200" placeholder="مثلاً گروه کامپیوتر ۱۴۰۵">
+            </div>
+            <button class="btn btn-primary" id="classCreate">ایجاد کلاس</button>
+            <div class="divider" style="margin:20px 0"></div>
           </div>
-          <div class="field">
-            <label for="className">نام کلاس</label>
-            <input class="input" id="className" maxlength="200" placeholder="مثلاً گروه کامپیوتر ۱۴۰۵">
-          </div>
-          <button class="btn btn-primary" id="classCreate">ایجاد کلاس</button>
-          <div class="divider" style="margin:20px 0"></div>
           <h3 style="margin-bottom:12px">فهرست کلاس‌ها</h3>
           <div class="field">
             <label for="classSelect">انتخاب کلاس برای مدیریت اعضا</label>
@@ -226,6 +228,7 @@
   async function initialize() {
     await api().refresh();
     me = await api().request('/auth/me');
+    if (String(me?.role || '').toLowerCase() === 'teacher') $('#classCreatePanel').hidden = true;
     const departments = await api().request('/departments');
     const departmentSelect = $('#classDepartment');
     if (!isSuperAdmin()) $('#classDepartmentField').hidden = true;
