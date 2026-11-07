@@ -65,7 +65,7 @@ public sealed class CanonicalQuestionsController(
     [HttpPost("lookups/categories")]
     public async Task<IActionResult> CreateCategory(CategoryCreateRequest request, CancellationToken ct)
     {
-        if (!User.IsInRole("SuperAdmin")) return Forbid();
+        if (!User.IsInRole("SuperAdmin") && !User.IsInRole("Teacher")) return Forbid();
         var name = request.Name?.Trim();
         if (string.IsNullOrWhiteSpace(name) || name.Length > 150)
             return BadRequest(new { message = "نام دسته‌بندی الزامی و حداکثر ۱۵۰ کاراکتر است." });
