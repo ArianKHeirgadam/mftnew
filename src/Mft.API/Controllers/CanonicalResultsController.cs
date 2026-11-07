@@ -125,7 +125,8 @@ public sealed class CanonicalResultsController(
                 .FirstOrDefaultAsync(ct)
             : null;
         var essaySections = await academic.ExamSections.AsNoTracking()
-            .Where(x => x.ExamId == exam.Id && x.SectionType == "Essay")
+            .Where(x => x.ExamId == exam.Id && x.SectionType == "Essay" &&
+                academic.ExamSectionDocuments.Any(document => document.ExamSectionId == x.Id))
             .Select(x => new { x.Id, x.TotalPoints })
             .ToListAsync(ct);
         var gradedEssaySectionIds = await academic.ExamSectionManualGrades.AsNoTracking()
@@ -295,7 +296,8 @@ public sealed class CanonicalResultsController(
         else
         {
             var essaySectionIds = await academic.ExamSections.AsNoTracking()
-                .Where(x => x.ExamId == examId && x.SectionType == "Essay")
+                .Where(x => x.ExamId == examId && x.SectionType == "Essay" &&
+                    academic.ExamSectionDocuments.Any(document => document.ExamSectionId == x.Id))
                 .Select(x => x.Id).ToArrayAsync(ct);
             var sectionGrades = await academic.ExamSectionManualGrades.AsNoTracking()
                 .Where(x => attemptIds.Contains(x.AttemptId) && essaySectionIds.Contains(x.ExamSectionId))
