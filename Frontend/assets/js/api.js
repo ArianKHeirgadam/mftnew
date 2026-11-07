@@ -660,10 +660,29 @@
 
   async function loadStudentPerformance() {
     if (!document.body.matches('[data-active="dashboard"]') || (currentUser()?.role || '').toLowerCase() !== 'student') return;
-    const attempts = await request('/canonical/results');
-    const scored = attempts.filter(attempt => attempt.score != null).sort((a, b) => new Date(a.submittedAt || a.startedAt) - new Date(b.submittedAt || b.startedAt));
-    window.MftChartData = { ...(window.MftChartData || {}), performance: scored.map((attempt, index) => ({ label: attempt.examTitle || `آزمون ${index + 1}`, score: attempt.score })) };
-    document.dispatchEvent(new Event('mft:data-ready'));
+    const canvas = document.getElementById('chartPerformance');
+    const host = canvas?.parentElement;
+    try {
+      const response = await request('/canonical/results');
+      const attempts = Array.isArray(response) ? response : [];
+      const scored = attempts.filter(attempt => attempt.score !== null && attempt.score !== undefined && Number.isFinite(Number(attempt.score)))
+        .sort((a, b) => new Date(a.submittedAt || a.startedAt || 0) - new Date(b.submittedAt || b.startedAt || 0));
+      window.MftChartData = { ...(window.MftChartData || {}), performance: scored.map((attempt, index) => ({
+        label: attempt.examTitle || `آزمون ${index + 1}`, score: Number(attempt.score)
+      })) };
+      if (host) host.dataset.performanceLoad = scored.length ? 'loaded' : 'empty';
+      document.dispatchEvent(new Event('mft:data-ready'));
+    } catch (error) {
+      if (host) {
+        host.dataset.performanceLoad = 'error';
+        let message = host.querySelector('[data-performance-error]');
+        if (!message) { message = document.createElement('div'); message.dataset.performanceError = 'true'; host.appendChild(message); }
+        message.textContent = 'دریافت روند نمرات ناموفق بود: ' + (error.message || 'خطای نامشخص');
+        message.style.cssText = 'padding:12px;text-align:center;color:var(--danger,#b42318);font-size:13px';
+      }
+      window.MftChartData = { ...(window.MftChartData || {}), performance: [] };
+      document.dispatchEvent(new Event('mft:data-ready'));
+    }
   }
 
   async function loadDashboardExtras() {
