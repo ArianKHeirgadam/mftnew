@@ -183,7 +183,7 @@
   async function loadUsers() {
     const studentBody = $('#studentsBody');
     const teacherBody = $('#teachersBody') || $('body[data-active="teachers"] table tbody');
-    const searchField = $('body[data-active="students"] .search-box input, body[data-active="teachers"] .search-box input');
+    const searchField = $('main .table-toolbar .search-box input');
     const search = searchField?.value.trim();
 
     if (studentBody) {
@@ -208,7 +208,7 @@
 
   async function loadDepartments() {
     if (!$('body[data-active="departments"]')) return;
-    const search = $('body[data-active="departments"] .search-box input')?.value.trim();
+    const search = $('main .table-toolbar .search-box input')?.value.trim();
     const rows = await request(`/departments${search ? `?search=${encodeURIComponent(search)}` : ''}`);
     $$('[data-department-field]').forEach(select => {
       const selected = select.value;
@@ -228,7 +228,7 @@
 
   async function loadQuestions() {
     if (!$('body[data-active="bank"]')) return;
-    const search = $('body[data-active="bank"] .search-box input')?.value.trim();
+    const search = $('main .table-toolbar .search-box input')?.value.trim();
     const rows = await request(`/questions${search ? `?search=${encodeURIComponent(search)}` : ''}`);
     const typeNames = { MultipleChoice: 'چهارگزینه‌ای', Essay: 'تشریحی', Matching: 'وصل‌کردنی' };
     const difficultyNames = { 1: 'آسان', 2: 'متوسط', 3: 'سخت' };
@@ -1277,10 +1277,10 @@
           $$('[data-department-field]').forEach(select => { select.innerHTML = '<option value="">انتخاب دپارتمان</option>' + departments.map(dept => `<option value="${dept.id}">${escapeHtml(dept.name)}</option>`).join(''); });
         }
       }
-      if (document.body.dataset.active === 'students') attachSearch('body[data-active="students"] .search-box input', loadUsers);
-      if (document.body.dataset.active === 'teachers') attachSearch('body[data-active="teachers"] .search-box input', loadUsers);
-      if (document.body.dataset.active === 'departments') attachSearch('body[data-active="departments"] .search-box input', loadDepartments);
-      if (document.body.dataset.active === 'bank') attachSearch('body[data-active="bank"] .search-box input', loadQuestions);
+      if (document.body.dataset.active === 'students') attachSearch('main .table-toolbar .search-box input', loadUsers);
+      if (document.body.dataset.active === 'teachers') attachSearch('main .table-toolbar .search-box input', loadUsers);
+      if (document.body.dataset.active === 'departments') attachSearch('main .table-toolbar .search-box input', loadDepartments);
+      if (document.body.dataset.active === 'bank') attachSearch('main .table-toolbar .search-box input', loadQuestions);
       attachGlobalSearch();
     });
   }
