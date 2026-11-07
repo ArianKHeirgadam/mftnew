@@ -247,7 +247,7 @@
    $('createStatus').textContent='آزمون با موفقیت ساخته و منتشر شد.';window.showToast?.('آزمون با موفقیت منتشر شد.','ok');setTimeout(()=>location.href='dashboard-teacher.html',900);
   }catch(e){$('createStatus').textContent=(pendingExamId?'آزمون ذخیره شد؛ برای ادامه دوباره روی انتشار بزنید: ':'ساخت آزمون ناموفق بود: ')+(e.message||'خطای نامشخص');button.disabled=false;}
  });
- try{await loadData();}catch(e){$('questionList').innerHTML='<div class="question-empty">'+escapeHtml(e.message||'دریافت اطلاعات اولیه ناموفق بود.')+'</div>';window.showToast?.(e.message||'دریافت اطلاعات اولیه ناموفق بود.','danger');}
+ try{await loadData();}catch(e){$('examChildFolders').innerHTML='<div class="question-empty">'+escapeHtml(e.message||'دریافت اطلاعات اولیه ناموفق بود.')+'</div>';window.showToast?.(e.message||'دریافت اطلاعات اولیه ناموفق بود.','danger');}
  const now=new Date(),later=new Date(now.getTime()+60*60*1000);const localValue=d=>{const z=n=>String(n).padStart(2,'0');return d.getFullYear()+'-'+z(d.getMonth()+1)+'-'+z(d.getDate())+'T'+z(d.getHours())+':'+z(d.getMinutes());};
  $('examStart').value=localValue(now);$('examEnd').value=localValue(new Date(now.getTime()+24*60*60*1000));
  showStep(1);
