@@ -156,8 +156,9 @@ public sealed class CanonicalExamAttemptController(
             }).ToListAsync(ct);
         var hasExamPdfForSubmission = await academic.ExamDocuments.AnyAsync(x => x.ExamId == examId, ct);
         var hasSubmissionPdfForExam = await academic.ExamSubmissionDocuments.AnyAsync(x => x.AttemptId == attemptId, ct);
-        if (examQuestions.Count > 0 && hasExamPdfForSubmission && !hasSubmissionPdfForExam && !request.AutoSubmit)
-            return BadRequest(new { message = "برای این آزمون، فایل PDF پاسخ‌نامه الزامی است؛ ابتدا آن را بارگذاری کنید." });
+        var hasEssayQuestions = examQuestions.Any(q => string.Equals(q.TypeCode, "Essay", StringComparison.OrdinalIgnoreCase));
+        if (examQuestions.Count > 0 && (hasExamPdfForSubmission || hasEssayQuestions) && !hasSubmissionPdfForExam && !request.AutoSubmit)
+            return BadRequest(new { message = "برای پاسخ به سؤال تشریحی، بارگذاری فایل PDF پاسخ‌نامه الزامی است." });
         if (examQuestions.Count == 0)
         {
             if (!hasExamPdfForSubmission) return Conflict(new { message = "فایل PDF صورت آزمون موجود نیست." });
@@ -225,8 +226,10 @@ public sealed class CanonicalExamAttemptController(
             }
             else if (string.Equals(q.TypeCode, "Essay", StringComparison.OrdinalIgnoreCase))
             {
-                if (answer.Value.ValueKind != JsonValueKind.Object || !answer.Value.TryGetProperty("text", out var essay) || essay.ValueKind != JsonValueKind.String)
-                    return BadRequest(new { message = "متن پاسخ تشریحی معتبر نیست." });
+                if (answer.Value.ValueKind != JsonValueKind.Object)
+                    return BadRequest(new { message = "ساختار پاسخ سؤال تشریحی معتبر نیست." });
+                if (!hasSubmissionPdfForExam && !request.AutoSubmit)
+                    return BadRequest(new { message = "برای پاسخ به سؤال تشریحی، ابتدا فایل PDF پاسخ‌نامه را بارگذاری کنید." });
                 pendingManual = true;
             }
             else return BadRequest(new { message = "نوع سؤال پشتیبانی نمی‌شود." });
