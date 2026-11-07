@@ -159,11 +159,15 @@ CREATE TABLE dbo.Exams (
     EndAt datetime2 NOT NULL,
     DurationMinutes int NOT NULL,
     IsPublished bit NOT NULL,
+    ResultsPublished bit NOT NULL CONSTRAINT DF_Exams_ResultsPublished DEFAULT 0,
+    ResultsPublishedAt datetime2 NULL,
+    ResultsPublishedByUserId bigint NULL,
     CreatedAt datetime2 NOT NULL CONSTRAINT DF_Exams_CreatedAt DEFAULT SYSUTCDATETIME(),
     CONSTRAINT FK_Exams_ExamCategories FOREIGN KEY (ExamCategoryId) REFERENCES dbo.ExamCategories(Id) ON DELETE NO ACTION,
     CONSTRAINT FK_Exams_Departments FOREIGN KEY (DepartmentId) REFERENCES dbo.Departments(Id) ON DELETE NO ACTION,
     CONSTRAINT FK_Exams_Users FOREIGN KEY (CreatedByUserId) REFERENCES dbo.Users(Id) ON DELETE NO ACTION,
-    CONSTRAINT FK_Exams_Classes FOREIGN KEY (ClassId) REFERENCES dbo.CanonicalClasses(Id) ON DELETE NO ACTION
+    CONSTRAINT FK_Exams_Classes FOREIGN KEY (ClassId) REFERENCES dbo.CanonicalClasses(Id) ON DELETE NO ACTION,
+    CONSTRAINT FK_Exams_ResultsPublishedBy FOREIGN KEY (ResultsPublishedByUserId) REFERENCES dbo.Users(Id) ON DELETE NO ACTION
 );
 CREATE INDEX IX_Exams_CreatedByUserId ON dbo.Exams(CreatedByUserId);
 CREATE INDEX IX_Exams_DepartmentId ON dbo.Exams(DepartmentId);
