@@ -182,9 +182,11 @@ using (var scope = app.Services.CreateScope())
             var password = builder.Configuration["Bootstrap:Password"];
             var phoneNumber = builder.Configuration["Bootstrap:Mobile"]?.Trim();
 
-            if (string.IsNullOrWhiteSpace(password) || password.Length < 12)
+            var minimumBootstrapPasswordLength = app.Environment.IsDevelopment() ? 8 : 12;
+            if (string.IsNullOrWhiteSpace(password) ||
+                password.Length < minimumBootstrapPasswordLength)
                 throw new InvalidOperationException(
-                    "Bootstrap:Password must contain at least 12 characters.");
+                    $"Bootstrap:Password must contain at least {minimumBootstrapPasswordLength} characters.");
 
             if (!string.IsNullOrWhiteSpace(phoneNumber) &&
                 await db.Users.AnyAsync(user => user.PhoneNumber == phoneNumber))
