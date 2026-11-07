@@ -17,24 +17,20 @@ public sealed class CanonicalQuestionFoldersController(
     private long? CurrentUserId => long.TryParse(User.FindFirstValue(ClaimTypes.NameIdentifier), out var id) ? id : null;
     private long? CurrentDepartmentId => long.TryParse(User.FindFirstValue("departmentId"), out var id) ? id : null;
 
-    private IQueryable<CanonicalQuestionFolder> VisibleFolders()
-    {
-        var query = academic.QuestionFolders.AsNoTracking().AsQueryable();
-        if (User.IsInRole("Teacher")) return query.Where(x => x.OwnerUserId == CurrentUserId);
-        if (User.IsInRole("Department"))
-        {
-            // Resolve identity IDs before querying the academic database.
-            var ids = identity.Users.AsNoTracking().Where(x => x.DepartmentId == CurrentDepartmentId).Select(x => x.Id);
-            return query.Where(x => ids.Contains(x.OwnerUserId));
-        }
-        return query;
-    }
-
     [HttpGet]
     public async Task<IActionResult> List(CancellationToken ct)
     {
         if (CurrentUserId is null) return Unauthorized();
-        var folders = await VisibleFolders().OrderBy(x => x.Name)
+        var query = academic.QuestionFolders.AsNoTracking().AsQueryable();
+        if (User.IsInRole("Teacher"))
+            query = query.Where(x => x.OwnerUserId == CurrentUserId.Value);
+        else if (User.IsInRole("Department"))
+        {
+            var ids = await identity.Users.AsNoTracking().Where(x => x.DepartmentId == CurrentDepartmentId)
+                .Select(x => x.Id).ToListAsync(ct);
+            query = query.Where(x => ids.Contains(x.OwnerUserId));
+        }
+        var folders = await query.OrderBy(x => x.Name)
             .Select(x => new { x.Id, x.Name, x.OwnerUserId, x.ParentFolderId, x.CreatedAt,
                 QuestionCount = academic.Questions.Count(q => q.FolderId == x.Id) })
             .ToListAsync(ct);
