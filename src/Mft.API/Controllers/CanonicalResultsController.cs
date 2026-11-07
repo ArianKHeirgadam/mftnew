@@ -31,8 +31,9 @@ public sealed class CanonicalResultsController(
 
         if (isStudent)
             query = query.Where(x => x.Attempt.StudentUserId == CurrentUserId &&
-                (academic.ExamSections.Any(section => section.ExamId == x.Exam.Id) &&
-                 (x.Attempt.StatusId == 2 || x.Attempt.StatusId == 3 || x.Attempt.StatusId == 4)));
+                ((academic.ExamSections.Any(section => section.ExamId == x.Exam.Id) &&
+                  (x.Attempt.StatusId == 2 || x.Attempt.StatusId == 3 || x.Attempt.StatusId == 4)) ||
+                 (x.Exam.ResultsPublished && x.Attempt.StatusId == 4)));
         else if (User.IsInRole("Teacher"))
             query = query.Where(x => x.Exam.CreatedByUserId == CurrentUserId ||
                 (x.Exam.ClassId.HasValue && academic.ClassTeachers.Any(t =>
@@ -87,8 +88,9 @@ public sealed class CanonicalResultsController(
         if (exam is null) return NotFound();
         var isStudent = User.IsInRole("Student");
         if (isStudent && (attempt.StudentUserId != CurrentUserId ||
-            !(await academic.ExamSections.AnyAsync(x => x.ExamId == exam.Id, ct) &&
-              (attempt.StatusId == 2 || attempt.StatusId == 3 || attempt.StatusId == 4))))
+            !((await academic.ExamSections.AnyAsync(x => x.ExamId == exam.Id, ct) &&
+               (attempt.StatusId == 2 || attempt.StatusId == 3 || attempt.StatusId == 4)) ||
+              (exam.ResultsPublished && attempt.StatusId == 4))))
             return NotFound();
         if (!isStudent && !await CanManage(exam, ct)) return Forbid();
 
