@@ -59,8 +59,11 @@ public sealed class CanonicalResultsController(
                      academic.ExamSubmissionDocuments.Any(document => document.AttemptId == x.Attempt.Id)),
                 MaxScore = !academic.ExamSections.Any(section => section.ExamId == x.Exam.Id)
                     ? 100m
-                    : (academic.StudentAnswers.Where(answer => answer.ExamAttemptId == x.Attempt.Id)
-                        .Sum(answer => (decimal?)(answer.PointsOverride ?? answer.Points)) ?? 0m)
+                    : ((from examQuestion in academic.ExamQuestions
+                        join section in academic.ExamSections on examQuestion.ExamSectionId equals section.Id
+                        join question in academic.Questions on examQuestion.QuestionId equals question.Id
+                        where section.ExamId == x.Exam.Id
+                        select (decimal?)(examQuestion.PointsOverride ?? question.Points)).Sum() ?? 0m)
                       + (academic.ExamSections.Where(section => section.ExamId == x.Exam.Id && section.SectionType == "Essay")
                         .Sum(section => (decimal?)(section.TotalPoints ?? 100m)) ?? 0m),
                 x.Exam.ResultsPublished,
