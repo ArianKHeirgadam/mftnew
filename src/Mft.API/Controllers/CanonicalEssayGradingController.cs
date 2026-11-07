@@ -121,6 +121,57 @@ public sealed class CanonicalEssayGradingController(
         }));
     }
 
+    [HttpGet("attempts/{attemptId:long}/sections")]
+    public async Task<IActionResult> AttemptEssaySections(long attemptId, CancellationToken ct)
+    {
+        var attempt = await academic.ExamAttempts.AsNoTracking()
+            .FirstOrDefaultAsync(item => item.Id == attemptId && item.ManualReviewRequired.HasValue, ct);
+        if (attempt is null) return NotFound();
+        var exam = await academic.Exams.AsNoTracking()
+            .FirstOrDefaultAsync(item => item.Id == attempt.ExamId, ct);
+        if (exam is null || !await CanAccessExam(exam, ct)) return Forbid();
+
+        var sections = await academic.ExamSections.AsNoTracking()
+            .Where(section => section.ExamId == attempt.ExamId &&
+                section.SectionType == "Essay")
+            .OrderBy(section => section.DisplayOrder)
+            .Select(section => new
+            {
+                section.Id,
+                section.DisplayOrder,
+                section.TotalPoints,
+                QuestionPaperFileName = academic.ExamSectionDocuments
+                    .Where(document => document.ExamSectionId == section.Id)
+                    .Select(document => document.OriginalFileName).FirstOrDefault(),
+                AnswerFileName = academic.ExamSectionSubmissionDocuments
+                    .Where(document => document.AttemptId == attemptId &&
+                        document.ExamSectionId == section.Id)
+                    .Select(document => document.OriginalFileName).FirstOrDefault(),
+                Grade = academic.ExamSectionManualGrades
+                    .Where(grade => grade.AttemptId == attemptId &&
+                        grade.ExamSectionId == section.Id)
+                    .Select(grade => new { grade.Score, grade.Feedback, grade.GradedAt, grade.RowVersion })
+                    .FirstOrDefault()
+            }).ToListAsync(ct);
+
+        return Ok(sections.Select(section => new
+        {
+            section.Id,
+            section.DisplayOrder,
+            TotalPoints = section.TotalPoints ?? 100m,
+            section.QuestionPaperFileName,
+            section.AnswerFileName,
+            HasAnswerPdf = section.AnswerFileName is not null,
+            Grade = section.Grade is null ? null : new
+            {
+                section.Grade.Score,
+                section.Grade.Feedback,
+                section.Grade.GradedAt,
+                RowVersion = Convert.ToBase64String(section.Grade.RowVersion)
+            }
+        }));
+    }
+
     [HttpGet("attempts/{attemptId:long}/sections/{sectionId:long}/answer.pdf")]
     public async Task<IActionResult> DownloadAnswer(long attemptId, long sectionId, CancellationToken ct)
     {
