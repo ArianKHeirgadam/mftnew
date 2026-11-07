@@ -480,7 +480,14 @@
               const saveGrade = document.createElement('button');
               saveGrade.type = 'button';
               saveGrade.className = 'btn btn-primary';
-              saveGrade.textContent = grade ? 'به‌روزرسانی نمره' : 'ثبت نمره بخش';
+              saveGrade.textContent = result.resultsPublished
+                ? 'نتیجه منتشر شده'
+                : (grade ? 'به‌روزرسانی نمره' : 'ثبت نمره بخش');
+              if (result.resultsPublished) {
+                scoreInput.disabled = true;
+                feedbackInput.disabled = true;
+                saveGrade.disabled = true;
+              }
               saveGrade.addEventListener('click', async () => {
                 const raw = scoreInput.value.trim();
                 const score = Number(raw);
