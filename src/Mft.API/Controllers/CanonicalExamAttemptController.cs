@@ -75,7 +75,12 @@ public sealed class CanonicalExamAttemptController(
 
         var sections = await academic.ExamSections.AsNoTracking().Where(x => x.ExamId == examId)
             .OrderBy(x => x.DisplayOrder).Select(s => new {
-                s.Id, s.SkillId, s.DurationMinutes, s.DisplayOrder, s.WeightPercent,
+                s.Id, s.SkillId, s.DurationMinutes, s.DisplayOrder, s.WeightPercent, s.SectionType, s.TotalPoints,
+                QuestionPaper = academic.ExamSectionDocuments.Where(d => d.ExamSectionId == s.Id)
+                    .Select(d => new { d.OriginalFileName, d.FileSize, d.UploadedAt }).FirstOrDefault(),
+                StudentAnswerPdf = academic.ExamSectionSubmissionDocuments
+                    .Where(d => d.ExamSectionId == s.Id && d.AttemptId == attemptId)
+                    .Select(d => new { d.OriginalFileName, d.FileSize, d.UploadedAt }).FirstOrDefault(),
                 Questions = academic.ExamQuestions.Where(eq => eq.ExamSectionId == s.Id).OrderBy(eq => eq.DisplayOrder)
                     .Select(eq => new {
                         ExamQuestionId = eq.Id, eq.DisplayOrder,
@@ -148,6 +153,23 @@ public sealed class CanonicalExamAttemptController(
         if (serverNow > deadline.AddSeconds(30))
             return Conflict(new { message = "مهلت آزمون به پایان رسیده است." });
 
+        var essaySectionIds = await academic.ExamSections.AsNoTracking()
+            .Where(s => s.ExamId == examId && s.SectionType == "Essay")
+            .Select(s => s.Id).ToListAsync(ct);
+        var missingEssayPapers = await academic.ExamSectionDocuments.AsNoTracking()
+            .Where(d => essaySectionIds.Contains(d.ExamSectionId)).Select(d => d.ExamSectionId).ToListAsync(ct);
+        var missingEssayAnswers = await academic.ExamSectionSubmissionDocuments.AsNoTracking()
+            .Where(d => d.AttemptId == attemptId && essaySectionIds.Contains(d.ExamSectionId))
+            .Select(d => d.ExamSectionId).ToListAsync(ct);
+        var missingQuestionPaperIds = essaySectionIds.Except(missingEssayPapers).ToArray();
+        var missingAnswerIds = essaySectionIds.Except(missingEssayAnswers).ToArray();
+        if (missingQuestionPaperIds.Length > 0)
+            return Conflict(new { message = "فایل PDF صورت سؤال برای یک یا چند بخش تشریحی موجود نیست.", missingSectionIds = missingQuestionPaperIds });
+        if (missingAnswerIds.Length > 0 && !request.AutoSubmit)
+            return BadRequest(new { message = "برای ثبت نهایی، پاسخ PDF تمام بخش‌های تشریحی را بارگذاری کنید.", missingSectionIds = missingAnswerIds });
+        if (missingAnswerIds.Length > 0)
+            return Conflict(new { message = "زمان آزمون تمام شده اما پاسخ PDF یک یا چند بخش تشریحی بارگذاری نشده است؛ برای ثبت نهایی باید فایل‌ها بارگذاری شوند.", missingSectionIds = missingAnswerIds });
+
         var examQuestions = await academic.ExamQuestions.AsNoTracking()
             .Where(x => academic.ExamSections.Any(s => s.Id == x.ExamSectionId && s.ExamId == examId))
             .Select(x => new {
@@ -156,6 +178,18 @@ public sealed class CanonicalExamAttemptController(
             }).ToListAsync(ct);
         var hasExamPdfForSubmission = await academic.ExamDocuments.AnyAsync(x => x.ExamId == examId, ct);
         var hasSubmissionPdfForExam = await academic.ExamSubmissionDocuments.AnyAsync(x => x.AttemptId == attemptId, ct);
+        if (examQuestions.Count == 0 && essaySectionIds.Count > 0)
+        {
+            var submittedStatusForEssay = await academic.ExamAttemptStatuses.SingleOrDefaultAsync(x => x.Id == 2 && x.Code == "Submitted", ct);
+            if (submittedStatusForEssay is null) return StatusCode(500, new { message = "وضعیت Submitted در جدول مرجع تعریف نشده است." });
+            attempt.SubmittedAt = DateTime.UtcNow;
+            attempt.StatusId = submittedStatusForEssay.Id;
+            attempt.AutoGradedScore = 0m;
+            attempt.FinalScore = null;
+            attempt.GradingStatus = "PendingManual";
+            await academic.SaveChangesAsync(ct);
+            return Ok(new { attempt.Id, attempt.StatusId, attempt.SubmittedAt, attempt.AutoGradedScore, attempt.FinalScore, RequiresManualGrading = true, IsPdfOnly = false });
+        }
         if (examQuestions.Count == 0)
         {
             if (!hasExamPdfForSubmission) return Conflict(new { message = "فایل PDF صورت آزمون موجود نیست." });
@@ -179,7 +213,7 @@ public sealed class CanonicalExamAttemptController(
             return StatusCode(500, new { message = "وضعیت‌های Submitted و PartiallyGraded باید در جدول مرجع تعریف شده باشند." });
 
         decimal autoScore = 0;
-        var pendingManual = false;
+        var pendingManual = essaySectionIds.Count > 0;
         foreach (var q in examQuestions)
         {
             var answer = request.Answers.SingleOrDefault(x => x.ExamQuestionId == q.Id);
@@ -245,6 +279,7 @@ public sealed class CanonicalExamAttemptController(
             }
         }
         attempt.AutoGradedScore = autoScore;
+        if (pendingManual) attempt.GradingStatus = "PendingManual";
         attempt.SubmittedAt = DateTime.UtcNow;
         attempt.StatusId = pendingManual ? partial.Id : status.Id;
         if (!pendingManual) attempt.FinalScore = autoScore;
