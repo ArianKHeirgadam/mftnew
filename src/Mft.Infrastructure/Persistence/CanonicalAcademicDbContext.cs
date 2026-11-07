@@ -32,6 +32,10 @@ public sealed class CanonicalAcademicDbContext(
     {
         base.OnModelCreating(modelBuilder);
 
+        // This context references users for academic foreign keys, but does not own identity-role mappings.
+        // Ignore the navigation so EF does not discover CanonicalUserRole without its Identity-context key configuration.
+        modelBuilder.Entity<CanonicalUser>().Ignore(x => x.UserRoles);
+
         modelBuilder.Entity<CanonicalExamCategory>(e =>
         {
             e.ToTable("ExamCategories"); e.HasKey(x => x.Id);
