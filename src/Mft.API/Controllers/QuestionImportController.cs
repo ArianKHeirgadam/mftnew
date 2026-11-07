@@ -292,7 +292,8 @@ public sealed class QuestionImportController(
             if (typeCode == "MultipleChoice")
             {
                 options = options.Where(x => x.Length > 0).ToList();
-                if (options.Count is < 2 or > 4) errors.Add("سؤال چهارگزینه‌ای باید ۲ تا ۴ گزینه غیرخالی داشته باشد.");
+                if (row.RequireFourOptions && options.Count != 4) errors.Add("سؤال Word باید دقیقاً چهار گزینه غیرخالی داشته باشد.");
+                else if (options.Count is < 2 or > 4) errors.Add("سؤال چهارگزینه‌ای باید ۲ تا ۴ گزینه غیرخالی داشته باشد.");
                 if (row.CorrectOption is null || row.CorrectOption < 1 || row.CorrectOption > options.Count)
                     errors.Add("CorrectOption باید شماره یکی از گزینه‌های غیرخالی (از ۱ تا تعداد گزینه‌ها) باشد.");
             }
@@ -316,6 +317,7 @@ public sealed class QuestionImportController(
                 RowNumber = row.RowNumber, Category = categoryName, Skill = skillName,
                 Type = typeCode, Text = text, Points = row.Points, Difficulty = row.Difficulty,
                 Options = options, CorrectOption = row.CorrectOption, MatchingPairs = pairs,
+                RequireFourOptions = row.RequireFourOptions,
                 Errors = errors
             });
             if (errors.Count > 0)
@@ -404,6 +406,7 @@ public sealed class QuestionImportController(
                         Category = category,
                         Skill = skill,
                         Type = "MultipleChoice",
+                        RequireFourOptions = true,
                         Text = questionMatch.Groups[1].Value.Trim(),
                         Points = points,
                         Difficulty = difficulty
@@ -570,6 +573,7 @@ public sealed class ImportQuestionRow
     public string Difficulty { get; set; } = "Medium";
     public List<string> Options { get; set; } = new();
     public int? CorrectOption { get; set; }
+    public bool RequireFourOptions { get; set; }
     public List<ImportMatchingPair> MatchingPairs { get; set; } = new();
 }
 public sealed class ImportMatchingPair { public string LeftItem { get; set; } = ""; public string RightItem { get; set; } = ""; }
@@ -585,6 +589,7 @@ public sealed class ImportPreviewRow
     public string Difficulty { get; set; } = "";
     public List<string> Options { get; set; } = new();
     public int? CorrectOption { get; set; }
+    public bool RequireFourOptions { get; set; }
     public List<ImportMatchingPair> MatchingPairs { get; set; } = new();
     public List<string> Errors { get; set; } = new();
 }
