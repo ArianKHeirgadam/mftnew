@@ -327,8 +327,8 @@
       }
       const heading = $('body[data-active="results"] h1');
       const isStudentView = role === 'student';
+      const pendingManualCount = Number(result.pendingManualCount || 0);
       if (heading) {
-        const pendingManualCount = Number(result.pendingManualCount || 0);
         const scoreLabel = result.isPdfOnly && result.score == null
           ? 'پاسخنامه PDF در انتظار تصحیح استاد'
           : isStudentView && result.autoScore != null && !result.resultsPublished &&
