@@ -832,6 +832,23 @@ textarea:focus-visible,
   transition: border-color .2s, box-shadow .2s;
 }
 
+/* Keep native dropdown options readable in both themes. */
+select {
+  color: var(--text);
+  background-color: var(--surface);
+  color-scheme: light;
+}
+select option,
+select optgroup {
+  color: var(--text);
+  background-color: var(--surface);
+}
+select option:checked,
+select option:hover {
+  color: #fff;
+  background-color: var(--primary);
+}
+
 .input:focus,
 .select:focus,
 .textarea:focus {
