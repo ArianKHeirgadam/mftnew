@@ -223,7 +223,7 @@ public sealed class QuestionImportController(
         if (headerRow is null) return new();
         var headers = headerRow.CellsUsed().ToDictionary(c => NormalizeHeader(c.GetString()), c => c.Address.ColumnNumber);
         return sheet.RowsUsed().Where(r => r.RowNumber() > headerRow.RowNumber())
-            .Select(r => BuildRow(headers, key => r.Cell(headers.GetValueOrDefault(key)).GetFormattedString(), r.RowNumber()))
+            .Select(r => BuildRow(headers, key => headers.TryGetValue(key, out var column) ? r.Cell(column).GetFormattedString() : "", r.RowNumber()))
             .Where(HasContent).ToList();
     }
 
