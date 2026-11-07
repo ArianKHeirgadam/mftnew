@@ -50,6 +50,7 @@ const NAV_BY_ROLE = {
       section: "سامانه", items: [
         { key: "reports", label: "گزارش‌ها", href: "reports.html", icon: ICON.report },
         { key: "notifications", label: "اعلان‌ها", href: "notifications.html", icon: ICON.bell },
+        { key: "settings", label: "تنظیمات", href: "settings.html", icon: ICON.settings },
 
       ]
     },
@@ -75,7 +76,7 @@ const NAV_BY_ROLE = {
       section: "سامانه", items: [
         { key: "reports", label: "گزارش‌ها", href: "reports.html", icon: ICON.report },
         { key: "notifications", label: "اعلان‌ها", href: "notifications.html", icon: ICON.bell, badge: 2 },
-        { key: "settings", label: "تنظیمات", href: "settings.html", icon: ICON.settings },
+
       ]
     },
   ],
@@ -97,7 +98,7 @@ const NAV_BY_ROLE = {
     {
       section: "سامانه", items: [
         { key: "notifications", label: "اعلان‌ها", href: "notifications.html", icon: ICON.bell, badge: 3 },
-        { key: "settings", label: "تنظیمات", href: "settings.html", icon: ICON.settings },
+
       ]
     },
   ],
@@ -116,7 +117,7 @@ const NAV_BY_ROLE = {
     {
       section: "سامانه", items: [
         { key: "notifications", label: "اعلان‌ها", href: "notifications.html", icon: ICON.bell, badge: 1 },
-        { key: "settings", label: "تنظیمات", href: "settings.html", icon: ICON.settings },
+
       ]
     },
   ],
