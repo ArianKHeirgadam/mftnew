@@ -187,7 +187,7 @@
   const category=categoryFilter?.value||'';
   const difficulty=difficultyFilter?.value||'';
   const fv=folderFilter?.value||'__unfiled__';
-  const rows=questionRows.filter(q=>(fv==='__all__'||(fv==='__unfiled__'?!q.folderId:Number(q.folderId)===Number(fv)))&&
+  const rows=questionRows.filter(q=>(fv==='__all__'||(fv==='__unfiled__'?!q.folderId&&!q.importBatchId:Number(q.folderId)===Number(fv)))&&
    (!term||String(q.text||'').toLocaleLowerCase().includes(term))&&
    (!category||category==='همه دسته‌بندی‌ها'||q.categoryName===category)&&
    (!difficulty||difficulty==='همه سطوح دشواری'||difficultyLabel(q.difficultyLevel)===difficulty));
@@ -232,7 +232,7 @@
   const opts=questionFolders.map(x=>'<option value="'+x.id+'">'+esc(x.name)+'</option>').join('');
   document.getElementById('newQuestionFolderParent').innerHTML='<option value="">پوشه اصلی</option>'+opts;
   document.getElementById('bulkQuestionFolder').innerHTML='<option value="">انتقال به بدون پوشه</option>'+opts;
-  document.getElementById('questionFolderFilter').innerHTML='<option value="__unfiled__">سؤال‌های بدون پوشه</option><option value="__all__">همه سؤال‌ها</option>'+opts;
+  document.getElementById('questionFolderFilter').innerHTML='<option value="__unfiled__">سؤال‌های بدون پوشه مستقل</option><option value="__all__">همه سؤال‌ها</option>'+opts;
   document.getElementById('questionFolderCount').textContent=questionFolders.length.toLocaleString('fa-IR')+' پوشه';
   const children=new Map();questionFolders.forEach(x=>{const k=String(x.parentFolderId||'root');if(!children.has(k))children.set(k,[]);children.get(k).push(x);});
   const tree=(parent=null,depth=0)=>(children.get(String(parent||'root'))||[]).map(x=>'<article class="question-folder-card" style="margin-right:'+Math.min(depth*14,56)+'px"><b>📁 '+esc(x.name)+'</b><small>'+Number(x.questionCount||0).toLocaleString('fa-IR')+' سؤال · '+esc(x.ownerName||'')+'</small><div class="flex gap-8"><button class="btn btn-outline btn-sm" data-folder-filter="'+x.id+'">نمایش سؤال‌ها</button><button class="btn btn-outline btn-sm" data-folder-rename="'+x.id+'">تغییر نام</button><button class="btn btn-danger btn-sm" data-folder-delete="'+x.id+'">حذف</button></div></article>'+tree(x.id,depth+1)).join('');
