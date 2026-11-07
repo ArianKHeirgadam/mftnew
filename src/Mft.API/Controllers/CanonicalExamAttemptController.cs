@@ -243,7 +243,7 @@ public sealed class CanonicalExamAttemptController(
         var serverNow = DateTime.UtcNow;
         if (request.AutoSubmit && serverNow < deadline)
             return Conflict(new { message = "زمان آزمون طبق ساعت سرور هنوز به پایان نرسیده است؛ پاسخ‌ها ثبت نهایی نشدند.", deadline });
-        if (serverNow > deadline.AddSeconds(30))
+        if (!request.AutoSubmit && serverNow > deadline.AddSeconds(30))
             return Conflict(new { message = "مهلت آزمون به پایان رسیده است." });
 
         var essaySectionIds = await academic.ExamSections.AsNoTracking()
@@ -256,11 +256,11 @@ public sealed class CanonicalExamAttemptController(
             .Select(d => d.ExamSectionId).ToListAsync(ct);
         var missingQuestionPaperIds = essaySectionIds.Except(missingEssayPapers).ToArray();
         var missingAnswerIds = essaySectionIds.Except(missingEssayAnswers).ToArray();
-        if (missingQuestionPaperIds.Length > 0)
+        if (missingQuestionPaperIds.Length > 0 && !request.AutoSubmit)
             return Conflict(new { message = "فایل PDF صورت سؤال برای یک یا چند بخش تشریحی موجود نیست.", missingSectionIds = missingQuestionPaperIds });
         if (missingAnswerIds.Length > 0 && !request.AutoSubmit)
             return BadRequest(new { message = "برای ثبت نهایی، پاسخ PDF تمام بخش‌های تشریحی را بارگذاری کنید.", missingSectionIds = missingAnswerIds });
-        attempt.ManualReviewRequired = missingAnswerIds.Length > 0;
+        attempt.ManualReviewRequired = missingAnswerIds.Length > 0 || missingQuestionPaperIds.Length > 0;
         // At the deadline, auto-submit locks the attempt even if a PDF was omitted.
         // The manual grading workflow can then flag the missing section response.
 
