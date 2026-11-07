@@ -25,8 +25,7 @@ public sealed class CanonicalExamAttemptController(
             long token;
             do
             {
-                Span<byte> bytes = stackalloc byte[8];
-                RandomNumberGenerator.Fill(bytes);
+                var bytes = RandomNumberGenerator.GetBytes(8);
                 token = BitConverter.ToInt64(bytes) & long.MaxValue;
             } while (token == 0 || !usedTokens.Add(token));
             result.Add(new MatchingRightMapItem(pairId, token));
@@ -380,6 +379,7 @@ public sealed class CanonicalExamAttemptController(
         }
         var autoScore = ExamScoring.CalculateFinalTotal(
             questionScoresBySection.Values.Select(ExamScoring.CalculateSectionTotal));
+        attempt.AutoGradedScore = autoScore;
         if (pendingManual) attempt.GradingStatus = "PendingManual";
         attempt.SubmittedAt = DateTime.UtcNow;
         attempt.StatusId = pendingManual ? partial.Id : status.Id;
