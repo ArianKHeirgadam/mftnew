@@ -195,7 +195,22 @@
     if(progress)progress.style.width=(uploaded/essaySections.length*100)+'%';
   }
   function requestPayload() {
-    return questions.map(q=>({examQuestionId:q.examQuestionId,value:valueFor(q)}));
+    return questions.map(q=>{
+      const value=valueFor(q);
+      if(/matching/i.test(q.type)){
+        return {
+          examQuestionId:q.examQuestionId,
+          value:{pairs:(value.pairs||[])
+            .map(pair=>({
+              leftItemId:Number(pair.leftItemId ?? pair.leftItem?.id),
+              rightItemId:pair.rightItemId ?? pair.rightItem?.id
+            }))
+            .filter(pair=>Number.isSafeInteger(pair.leftItemId) && Number.isSafeInteger(Number(pair.rightItemId)))
+            .map(pair=>({...pair,rightItemId:Number(pair.rightItemId)}))}
+        };
+      }
+      return {examQuestionId:q.examQuestionId,value};
+    });
   }
   function changed() {
     updateProgress();
