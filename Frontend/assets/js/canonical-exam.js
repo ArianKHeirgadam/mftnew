@@ -16,7 +16,7 @@
   const fa = n => Number(n || 0).toLocaleString('fa-IR');
   const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   const toast = (m,t='info') => window.showToast?.(m,t);
-  let exam, sections=[], questions=[], answers=new Map(), current=0, deadline=0, remainingAtSyncMs=0, syncMonotonic=0, timer=null, saveTimer=null, saving=false, pending=false, finalizing=false, finished=false, uploadingPdf=false, uploadedPdf=false;
+  let exam, sections=[], essaySections=[], questions=[], answers=new Map(), current=0, deadline=0, remainingAtSyncMs=0, syncMonotonic=0, timer=null, saveTimer=null, saving=false, pending=false, finalizing=false, finished=false, uploadingPdf=false, uploadedPdf=false;
 
   function flatQuestions(data) {
     return (data.sections || []).flatMap(section => (section.questions || []).map(q => ({
@@ -105,6 +105,70 @@
     if(!nav)return;nav.replaceChildren();
     questions.forEach((q,i)=>{const b=document.createElement('button');b.type='button';b.className='exam-nav-btn';b.textContent=fa(i+1);b.addEventListener('click',()=>{current=i;render();});nav.append(b);});
   }
+  async function renderEssaySections() {
+    const area=document.getElementById('essaySectionArea');
+    const list=document.getElementById('essaySectionCards');
+    if(!area||!list||!essaySections.length)return;
+    area.hidden=false;
+    list.replaceChildren();
+    for(const section of essaySections){
+      const card=document.createElement('article');
+      card.className='card card-pad mt-16';
+      card.style.marginBottom='16px';
+      const heading=document.createElement('h4');
+      heading.textContent='بخش تشریحی '+fa(section.displayOrder||essaySections.indexOf(section)+1);
+      card.append(heading);
+      const paperName=document.createElement('p');
+      paperName.className='text-soft text-sm mt-8';
+      paperName.textContent=section.questionPaper?.originalFileName||'PDF صورت سؤال';
+      card.append(paperName);
+      const frame=document.createElement('iframe');
+      frame.title='PDF صورت سؤال بخش تشریحی';
+      frame.style.cssText='width:100%;height:520px;border:1px solid var(--border);border-radius:10px;background:#fff;margin-top:10px';
+      try{frame.src=await api.objectUrl('/exam-files/sections/'+encodeURIComponent(section.id)+'/question-paper?attemptId='+encodeURIComponent(attemptId));}
+      catch(error){paperName.textContent='دریافت PDF صورت سؤال ناموفق بود: '+(error.message||'خطای نامشخص');}
+      card.append(frame);
+      const uploadTitle=document.createElement('label');
+      uploadTitle.className='field mt-16';uploadTitle.textContent='فایل پاسخ این بخش (فقط PDF)';
+      const input=document.createElement('input');
+      input.type='file';input.accept='.pdf,application/pdf';input.className='input';input.style.width='100%';
+      uploadTitle.append(input);card.append(uploadTitle);
+      const status=document.createElement('p');status.className='text-soft text-sm mt-8';
+      status.textContent=section.studentAnswerPdf?.originalFileName?'پاسخ بارگذاری‌شده: '+section.studentAnswerPdf.originalFileName:'هنوز پاسخی برای این بخش بارگذاری نشده است.';
+      card.append(status);
+      if(section.studentAnswerPdf){
+        const download=document.createElement('a');download.className='btn btn-outline btn-sm mt-8';
+        download.textContent='دریافت PDF پاسخ بارگذاری‌شده';download.target='_blank';download.rel='noopener';
+        try{download.href=await api.objectUrl('/exam-files/sections/'+encodeURIComponent(section.id)+'/attempts/'+encodeURIComponent(attemptId)+'/answer');card.append(download);}catch{}
+      }
+      const button=document.createElement('button');button.type='button';button.className='btn btn-primary mt-12';
+      button.textContent=section.studentAnswerPdf?'جایگزینی PDF پاسخ':'بارگذاری PDF پاسخ';
+      button.addEventListener('click',async()=>{
+        const file=input.files?.[0];
+        if(!file){status.textContent='ابتدا فایل PDF پاسخ را انتخاب کنید.';return;}
+        if(!/\.pdf$/i.test(file.name)){status.textContent='فقط فایل با پسوند PDF پذیرفته می‌شود.';return;}
+        const form=new FormData();form.append('file',file);
+        uploadingPdf=true;button.disabled=true;status.textContent='در حال بارگذاری PDF پاسخ...';
+        try{
+          const result=await api.request('/exam-files/sections/'+encodeURIComponent(section.id)+'/attempts/'+encodeURIComponent(attemptId)+'/answer',{method:'POST',body:form});
+          section.studentAnswerPdf={originalFileName:result.fileName,fileSize:result.size,uploadedAt:result.uploadedAt};
+          status.textContent='بارگذاری شد: '+result.fileName;button.textContent='جایگزینی PDF پاسخ';input.value='';
+          const link=document.createElement('a');link.className='btn btn-outline btn-sm mt-8';link.textContent='دریافت PDF پاسخ بارگذاری‌شده';link.target='_blank';link.rel='noopener';
+          link.href=await api.objectUrl('/exam-files/sections/'+encodeURIComponent(section.id)+'/attempts/'+encodeURIComponent(attemptId)+'/answer');
+          card.insertBefore(link,button);updateEssayProgress();toast('PDF پاسخ این بخش بارگذاری شد.','ok');
+        }catch(error){status.textContent=error.message||'بارگذاری فایل ناموفق بود.';toast(status.textContent,'danger');}
+        finally{uploadingPdf=false;button.disabled=false;}
+      });
+      card.append(button);list.append(card);
+    }
+    updateEssayProgress();
+  }
+  function updateEssayProgress(){
+    if(!essaySections.length)return;
+    const uploaded=essaySections.filter(s=>!!s.studentAnswerPdf).length;
+    if(progressLabel)progressLabel.textContent='PDF پاسخ '+fa(uploaded)+' از '+fa(essaySections.length)+' بخش بارگذاری شده';
+    if(progress)progress.style.width=(uploaded/essaySections.length*100)+'%';
+  }
   function requestPayload() {
     return questions.map(q=>({examQuestionId:q.examQuestionId,value:valueFor(q)}));
   }
@@ -135,6 +199,7 @@
     if(finished||finalizing)return;
     if(uploadingPdf){toast('تا پایان بارگذاری فایل پاسخ صبر کنید.','warn');return;}
     if(exam?.isPdfOnly && !uploadedPdf && !auto){toast('برای ثبت نهایی، ابتدا فایل PDF پاسخ را بارگذاری کنید.','warn');studentPdfInput?.focus();return;}
+    if(!auto&&essaySections.some(section=>!section.studentAnswerPdf)){toast('برای ثبت نهایی، PDF پاسخ تمام بخش‌های تشریحی را بارگذاری کنید.','warn');return;}
     if(!auto&&!confirm('پس از ثبت نهایی، امکان شرکت مجدد در این آزمون وجود ندارد. پاسخ‌ها ثبت نهایی شوند؟'))return;
     finalizing=true;clearTimeout(saveTimer);clearInterval(timer);
     const button=document.getElementById('confirmFinishBtn');if(button){button.disabled=true;button.textContent='در حال ثبت...';}
@@ -186,7 +251,7 @@
   try{
     if(!api||!examId||!attemptId)throw new Error('شناسه آزمون یا تلاش معتبر نیست.');
     const data=await api.request(`/canonical/exams/${encodeURIComponent(examId)}/attempt/${encodeURIComponent(attemptId)}`);
-    exam={...data,examPdfAvailable:data.examPdfAvailable===true};sections=data.sections||[];questions=flatQuestions(data);
+    exam={...data,examPdfAvailable:data.examPdfAvailable===true};sections=data.sections||[];essaySections=sections.filter(section=>String(section.sectionType||'').toLowerCase()==='essay');questions=flatQuestions(data);
     const downloadButton=document.getElementById('downloadExamPdf');
     if(downloadButton)downloadButton.hidden=!exam.examPdfAvailable;
     const pdfViewer=document.getElementById('examPdfViewer');
@@ -210,6 +275,7 @@
     if(titleNode)titleNode.textContent=data.title||'آزمون آنلاین';
     const saved=data.savedAnswers||{};
     Object.entries(saved).forEach(([id,json])=>{try{answers.set(Number(id),JSON.parse(json));}catch{}});
+    await renderEssaySections();
     if(data.isPdfOnly){
       if(titleNode)titleNode.textContent=data.title||'آزمون PDFمحور';
       root.querySelectorAll('.badge, #flagQuestion, .option-row, .exam-layout .alert-warn, #examPrev, #examNext').forEach(node=>node.hidden=true);
@@ -220,9 +286,17 @@
       document.querySelector('.exam-nav-panel')?.remove();
       if(progressLabel)progressLabel.textContent='آزمون PDFمحور';
       if(progress)progress.style.width='100%';
-    }else{
-      if(!questions.length)throw new Error('برای این آزمون سؤالی تعریف نشده است.');
+    }else if(questions.length){
       renderNav();render();
+      if(essaySections.length)updateEssayProgress();
+    }else if(essaySections.length){
+      const heading=root.querySelector('h3');if(heading)heading.textContent='بخش‌های تشریحی آزمون';
+      root.querySelectorAll('.badge, #flagQuestion, #examPrev, #examNext').forEach(node=>node.hidden=true);
+      document.querySelector('.exam-nav-panel')?.remove();
+      if(numberLabel)numberLabel.textContent='بخش‌های تشریحی';
+      updateEssayProgress();
+    }else{
+      throw new Error('برای این آزمون سؤال یا بخش PDF تعریف نشده است.');
     }
     startClock();
   }catch(error){
