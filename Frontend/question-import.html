@@ -236,15 +236,30 @@
   }
 
   let wordLookupData = { categories: [], skills: [] };
+  const lookupValue = (item, ...keys) => {
+    for (const key of keys) {
+      const value = item?.[key] ?? item?.[key.charAt(0).toUpperCase() + key.slice(1)];
+      if (value !== undefined && value !== null) return value;
+    }
+    return undefined;
+  };
+  const lookupId = item => Number(lookupValue(item, 'id', 'skillId', 'categoryId'));
+  const skillCategoryId = item => Number(
+    lookupValue(item, 'examCategoryId', 'categoryId', 'examCategoryID') ??
+    lookupValue(item?.examCategory ?? item?.ExamCategory ?? item?.category ?? item?.Category, 'id', 'categoryId')
+  );
+
   function populateWordSkills(categoryId, selectedSkillId = 0) {
     const select = $('#wordSkill');
-    const skills = wordLookupData.skills.filter(item => Number(item.examCategoryId) === Number(categoryId));
+    const categoryKey = String(categoryId || '');
+    const skills = wordLookupData.skills.filter(item => skillCategoryId(item) === Number(categoryKey));
     select.innerHTML = '<option value="">انتخاب مهارت</option>' +
-      skills.map(item => '<option value="' + Number(item.id) + '">' + esc(item.name) + '</option>').join('');
-    select.disabled = !categoryId || skills.length === 0;
-    if (selectedSkillId && skills.some(item => Number(item.id) === Number(selectedSkillId)))
+      skills.map(item => '<option value="' + lookupId(item) + '">' +
+        esc(lookupValue(item, 'name', 'title') ?? 'مهارت بدون نام') + '</option>').join('');
+    select.disabled = !categoryKey || skills.length === 0;
+    if (selectedSkillId && skills.some(item => lookupId(item) === Number(selectedSkillId)))
       select.value = String(selectedSkillId);
-    if (categoryId && skills.length === 0)
+    if (categoryKey && skills.length === 0)
       select.innerHTML = '<option value="">برای این دسته‌بندی مهارتی ثبت نشده است</option>';
   }
 
@@ -258,11 +273,14 @@
         skills: Array.isArray(lookups?.skills) ? lookups.skills : []
       };
       categorySelect.innerHTML = '<option value="">انتخاب دسته‌بندی</option>' +
-        wordLookupData.categories.map(item => '<option value="' + Number(item.id) + '">' + esc(item.name) + '</option>').join('');
+        wordLookupData.categories.map(item => '<option value="' + lookupId(item) + '">' +
+          esc(lookupValue(item, 'name', 'title') ?? 'دسته‌بندی بدون نام') + '</option>').join('');
       skillSelect.innerHTML = '<option value="">ابتدا دسته‌بندی را انتخاب کنید</option>';
       skillSelect.disabled = true;
       if (!wordLookupData.categories.length)
         categorySelect.innerHTML = '<option value="">هیچ دسته‌بندی ثبت نشده است</option>';
+      else if (categorySelect.value)
+        populateWordSkills(categorySelect.value);
     } catch (error) {
       categorySelect.innerHTML = '<option value="">دریافت دسته‌بندی‌ها ناموفق بود</option>';
       skillSelect.innerHTML = '<option value="">دریافت مهارت‌ها ناموفق بود</option>';
@@ -272,7 +290,8 @@
   }
 
   $('#wordCategory').addEventListener('change', () => {
-    populateWordSkills($('#wordCategory').value);
+    const categoryId = $('#wordCategory').selectedOptions[0]?.value || '';
+    populateWordSkills(categoryId);
   });
   $('#toggleImportCategoryForm').addEventListener('click', () => {
     $('#importCategoryForm').hidden = !$('#importCategoryForm').hidden;
@@ -393,11 +412,13 @@
 
   $('#previewWord').addEventListener('click', () => {
     const file = $('#wordFile').files[0];
-    const categoryId = Number($('#wordCategory').value);
-    const skillId = Number($('#wordSkill').value);
+    const categoryId = $('#wordCategory').selectedOptions[0]?.value?.trim() || '';
+    const skillId = $('#wordSkill').selectedOptions[0]?.value?.trim() || '';
     const points = $('#wordPoints').value;
     if (!file) return message('ابتدا فایل Word با پسوند DOCX را انتخاب کنید.', 'error');
-    if (!categoryId || !skillId) return message('دسته‌بندی و مهارت را از فهرست انتخاب کنید.', 'error');
+    if (!categoryId || !skillId || !Number.isSafeInteger(Number(categoryId)) ||
+        !Number.isSafeInteger(Number(skillId)) || Number(categoryId) <= 0 || Number(skillId) <= 0)
+      return message('انتخاب دسته‌بندی و مهارت معتبر نیست؛ یک‌بار دسته‌بندی و سپس مهارت را دوباره انتخاب کنید.', 'error');
     if (!points || Number(points) <= 0 || Number(points) > 9999) return message('نمره باید بین ۱ تا ۹۹۹۹ باشد.', 'error');
     const data = new FormData();
     data.append('file', file);
