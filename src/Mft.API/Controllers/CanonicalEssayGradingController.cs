@@ -181,6 +181,10 @@ public sealed class CanonicalEssayGradingController(
         var (attempt, section) = loaded.Value;
         if (attempt.StatusId == 1 || attempt.SubmittedAt is null)
             return Conflict(new { message = "فقط پاسخنامه ثبت‌شده قابل تصحیح است." });
+        var examForGrade = await academic.Exams.AsNoTracking()
+            .FirstOrDefaultAsync(item => item.Id == attempt.ExamId, ct);
+        if (examForGrade?.ResultsPublished == true)
+            return Conflict(new { message = "پس از انتشار نتایج، امکان تغییر نمره وجود ندارد." });
 
         var maxScore = section.TotalPoints;
         if (!maxScore.HasValue)
