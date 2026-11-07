@@ -775,7 +775,7 @@
         const deptId = Number(selected?.dataset.departmentId || 0);
         const departmentCard = $('#deptChoices .choice-card').find(card => Number(card.dataset.id) === deptId);
         if (departmentCard) {
-          $('#deptChoices .choice-card').forEach(card => card.classList.toggle('selected', card === departmentCard));
+          $$('#deptChoices .choice-card').forEach(card => card.classList.toggle('selected', card === departmentCard));
           const preview = $('#prevDept');
           if (preview) preview.textContent = departmentCard.dataset.value || departmentCard.textContent.trim();
         }
@@ -836,9 +836,9 @@
       delete modal.dataset.editId;
       if (modal.id === 'teacherModal') modal.dataset.editRole = 'Teacher';
       if (modal.id === 'studentModal') modal.dataset.editRole = 'Student';
-      $('input, textarea', modal).forEach(field => { if (!['radio', 'checkbox', 'file'].includes(field.type)) field.value = ''; });
-      $('[data-username-field]', modal).forEach(field => { field.readOnly = false; });
-      $('input[type="password"]', modal).forEach(field => {
+      $$('input, textarea', modal).forEach(field => { if (!['radio', 'checkbox', 'file'].includes(field.type)) field.value = ''; });
+      $$('[data-username-field]', modal).forEach(field => { field.readOnly = false; });
+      $$('input[type="password"]', modal).forEach(field => {
         field.value = '';
         const wrapper = field.closest('.field');
         if (wrapper) wrapper.hidden = false;
@@ -1005,7 +1005,7 @@
       await loadExamWizard();
       const newCard = $$('#deptChoices .choice-card').find(card => card.dataset.id === created.id);
       if (newCard) {
-        $$('#deptChoices .choice-card').forEach(card => card.classList.toggle('selected', card === newCard));
+        $$$('#deptChoices .choice-card').forEach(card => card.classList.toggle('selected', card === newCard));
         $('#prevDept').textContent = newCard.dataset.value || newCard.textContent.trim();
       }
     }
