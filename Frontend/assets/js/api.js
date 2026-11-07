@@ -732,13 +732,20 @@
         if (bar) bar.style.width = Number.isFinite(percentage) ? Math.max(0, Math.min(100, percentage)) + '%' : '0%';
       };
 
-      // The current canonical class schema stores members, but has no seat-capacity
-      // field. Never present enrollment counts as a capacity-completion percentage.
-      const capacityValue = summary?.capacityCompletion ?? summary?.admissionCapacityCompletion;
+      // Department capacity is the sum of configured class capacities; filled seats
+      // are the current class memberships in those same classes.
+      const configuredClasses = Array.isArray(classes) ? classes.filter(item => Number(item.capacity) > 0) : [];
+      const totalCapacity = configuredClasses.reduce((sum, item) => sum + Number(item.capacity), 0);
+      const occupiedSeats = configuredClasses.reduce((sum, item) => sum + Number(item.memberCount || 0), 0);
+      const unconfiguredClasses = (Array.isArray(classes) ? classes.length : 0) - configuredClasses.length;
+      const capacityPercent = totalCapacity > 0 ? Math.min(100, occupiedSeats * 100 / totalCapacity) : NaN;
       setMetric('capacity',
-        Number.isFinite(Number(capacityValue)) ? faNumber(Number(capacityValue)) + '%' : 'تعریف نشده',
-        Number.isFinite(Number(capacityValue)) ? 'بر اساس ظرفیت ثبت‌شده دپارتمان' : 'برای کلاس‌ها/دپارتمان هنوز ظرفیت پذیرش در سامانه تعریف نشده است.',
-        Number.isFinite(Number(capacityValue)) ? Number(capacityValue) : NaN);
+        Number.isFinite(capacityPercent) ? faNumber(capacityPercent.toFixed(1)) + '%' : 'تعریف نشده',
+        totalCapacity > 0
+          ? faNumber(occupiedSeats) + ' از ' + faNumber(totalCapacity) + ' ظرفیت تکمیل‌شده' +
+            (unconfiguredClasses > 0 ? '؛ ظرفیت ' + faNumber(unconfiguredClasses) + ' کلاس هنوز ثبت نشده است.' : '')
+          : 'برای محاسبه، ظرفیت هر کلاس را در بخش مدیریت کلاس‌ها ثبت کنید.',
+        capacityPercent);
 
       const passRate = ownReport?.passRate;
       setMetric('passRate',
