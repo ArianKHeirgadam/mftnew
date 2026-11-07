@@ -64,6 +64,19 @@
           </div>
         </section>
       </div>
+
+      <section class="card card-pad" style="margin-top:18px">
+        <h3 style="margin-bottom:8px">ثبت‌نام دانشجو در کلاس</h3>
+        <p class="text-soft text-sm" style="margin-bottom:14px">این بخش برای افزودن سریع یک دانشجو به کلاس انتخاب‌شده است؛ اعضای قبلی کلاس حفظ می‌شوند.</p>
+        <div class="grid-2" style="align-items:end">
+          <div class="field">
+            <label for="singleStudentSelect">دانشجوی موردنظر</label>
+            <select class="select" id="singleStudentSelect" disabled><option value="">ابتدا یک کلاس انتخاب کنید</option></select>
+          </div>
+          <button class="btn btn-primary" id="addSingleStudent" disabled>ثبت دانشجو در کلاس</button>
+        </div>
+        <p id="singleEnrollmentMessage" class="text-soft text-sm" role="status" aria-live="polite"></p>
+      </section>
     </main>
   </div>
 </div>
@@ -110,6 +123,22 @@
     if ($('#classSelect').value) await loadClassMembers(Number($('#classSelect').value));
   }
 
+  function renderSingleStudentOptions() {
+    const select = $('#singleStudentSelect');
+    const button = $('#addSingleStudent');
+    if (!select || !button) return;
+    if (!currentClass) {
+      select.innerHTML = '<option value="">ابتدا یک کلاس انتخاب کنید</option>';
+      select.disabled = true; button.disabled = true; return;
+    }
+    const available = students.filter(student => !selectedIds.has(Number(student.id)));
+    select.innerHTML = '<option value="">انتخاب دانشجو</option>' + available.map(student =>
+      '<option value="' + student.id + '">' + esc(student.fullName) + ' — ' + esc(student.username) + '</option>').join('');
+    select.disabled = available.length === 0;
+    button.disabled = available.length === 0;
+    if (!available.length) select.innerHTML = '<option value="">همه دانشجویان موجود عضو این کلاس هستند</option>';
+  }
+
   async function loadClassMembers(id) {
     currentClass = classes.find(item => Number(item.id) === id) || null;
     if (!currentClass) return;
@@ -124,6 +153,7 @@
       ' — ' + selectedIds.size + ' عضو';
     $('#saveMembers').disabled = false;
     renderStudents();
+    renderSingleStudentOptions();
   }
 
   async function initialize() {
@@ -163,7 +193,7 @@
       try { await loadClassMembers(Number($('#classSelect').value)); }
       catch (error) { notify(error.message, 'danger'); }
     } else {
-      currentClass = null; students = [];
+      currentClass = null; students = []; selectedIds = new Set(); renderSingleStudentOptions();
       $('#classStudents').innerHTML = '<p class="text-soft">ابتدا یک کلاس انتخاب کنید.</p>';
       $('#classSummary').textContent = 'کلاسی انتخاب نشده است.';
       $('#saveMembers').disabled = true; updateCounts();
@@ -176,6 +206,7 @@
     const id = Number(row.dataset.studentId);
     if (event.target.checked) selectedIds.add(id); else selectedIds.delete(id);
     updateCounts();
+    renderSingleStudentOptions();
   });
 
   $('#selectAllStudents').addEventListener('change', event => {
@@ -185,9 +216,32 @@
       row.querySelector('input').checked = event.target.checked;
     }
     updateCounts();
+    renderSingleStudentOptions();
   });
 
   $('#studentSearch').addEventListener('input', renderStudents);
+
+  $('#addSingleStudent').addEventListener('click', async () => {
+    if (!currentClass) return;
+    const studentId = Number($('#singleStudentSelect').value || 0);
+    if (!studentId || selectedIds.has(studentId)) return notify('یک دانشجوی جدید انتخاب کنید.', 'warn');
+    $('#addSingleStudent').disabled = true;
+    $('#singleEnrollmentMessage').textContent = 'در حال ثبت دانشجو...';
+    try {
+      const nextIds = [...selectedIds, studentId];
+      await api().request('/canonical/classes/' + currentClass.id + '/members', {
+        method: 'PUT', body: JSON.stringify({ studentIds: nextIds })
+      });
+      await loadClasses(currentClass.id);
+      $('#singleEnrollmentMessage').textContent = 'دانشجو با موفقیت در کلاس ثبت‌نام شد.';
+      notify('ثبت‌نام دانشجو در کلاس انجام شد.', 'ok');
+    } catch (error) {
+      $('#singleEnrollmentMessage').textContent = error.message || 'ثبت‌نام ناموفق بود.';
+      notify(error.message || 'ثبت‌نام دانشجو ناموفق بود.', 'danger');
+    } finally {
+      renderSingleStudentOptions();
+    }
+  });
 
   $('#saveMembers').addEventListener('click', async () => {
     if (!currentClass) return;
