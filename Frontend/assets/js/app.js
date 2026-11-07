@@ -137,6 +137,15 @@ function getMftSessionUser() {
   }
 }
 
+function getMftDisplayName(user) {
+  const fullName = String(user?.fullName || user?.displayName || '').trim();
+  const firstLast = [user?.firstName, user?.lastName].map(x => String(x || '').trim()).filter(Boolean).join(' ');
+  return fullName || firstLast || String(user?.username || 'کاربر').trim();
+}
+function escapeMftText(value) {
+  return String(value ?? '').replace(/[&<>"']/g, ch => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' })[ch]);
+}
+
 function renderSidebar() {
   const root = document.getElementById("sidebar-root");
   if (!root) return;
@@ -231,7 +240,7 @@ function renderTopbar() {
         <div class="dropdown">
           <div class="profile-chip" data-dropdown-toggle="profileDrop" style="cursor:pointer">
             <div class="mohr-avatar" style="width:36px; height:36px;"><span class="initials">${role === "superadmin" ? "مک" : role === "department" ? "مد" : role === "teacher" ? "استا" : "دان"}</span></div>
-            <div class="who"><b>${storedUser?.fullName || storedUser?.username || (role === "superadmin" ? "مدیر سامانه" : role === "department" ? "مدیر دپارتمان" : role === "teacher" ? "استاد" : "دانشجو")}</b><span>${ROLE_LABEL[role] || "کاربر"}</span></div>
+            <div class="who"><b>${escapeMftText(getMftDisplayName(storedUser))}</b><span>${ROLE_LABEL[role] || "کاربر"}</span></div>
           </div>
           <div class="dropdown-menu" id="profileDrop">
             <a href="profile.html">${ICON.profile} پروفایل من</a>
@@ -243,6 +252,7 @@ function renderTopbar() {
       </div>
     </header>
   `;
+  document.querySelectorAll("[data-current-user-name]").forEach(node => { node.textContent = getMftDisplayName(storedUser); });
   document.getElementById("menuToggle")?.addEventListener("click", openMobileSidebar);
 }
 
