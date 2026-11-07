@@ -337,7 +337,7 @@
           : isStudentView && !result.resultsPublished && hasHiddenManualScore && result.autoScore == null
             ? (pendingManualCount > 0 ? 'بخش تشریحی PDF در انتظار تصحیح استاد است' : 'تصحیح بخش تشریحی انجام شده؛ نمره نهایی پس از انتشار رسمی نمایش داده می‌شود')
             : isStudentView && result.autoScore != null && !result.resultsPublished && hasHiddenManualScore
-              ? `نمره خودکار تستی و وصل‌کردنی: ${faNumber(result.autoScore)} از ${faNumber(result.autoMaxScore ?? result.maxScore)} — ${pendingManualCount > 0 ? `${faNumber(pendingManualCount)} بخش تشریحی در انتظار تصحیح` : 'نمره نهایی پس از انتشار رسمی استاد'}`
+              ? `نمره خودکار تستی و وصل‌کردنی: ${faNumber(scoreOutOf100(result.autoScore, result.autoMaxScore ?? result.maxScore))} از ۱۰۰ — ${pendingManualCount > 0 ? `${faNumber(pendingManualCount)} بخش تشریحی در انتظار تصحیح` : 'نمره نهایی پس از انتشار رسمی استاد'}`
               : result.score != null
               ? `${faNumber(scoreOutOf100(result.score, result.maxScore))} از ۱۰۰`
               : result.autoScore != null
