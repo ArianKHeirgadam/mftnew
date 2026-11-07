@@ -51,7 +51,8 @@ public sealed class CanonicalResultsController(
                 x.Attempt.StudentUserId, x.Attempt.StartedAt, x.Attempt.SubmittedAt,
                 x.Attempt.FinalScore, x.Attempt.AutoGradedScore, x.Attempt.StatusId,
                 IsPdfOnly = !academic.ExamSections.Any(section => section.ExamId == x.Exam.Id) &&
-                    academic.ExamDocuments.Any(document => document.ExamId == x.Exam.Id),
+                    (academic.ExamDocuments.Any(document => document.ExamId == x.Exam.Id) ||
+                     academic.ExamSubmissionDocuments.Any(document => document.AttemptId == x.Attempt.Id)),
                 x.Exam.ResultsPublished,
                 HasAutoGradedAnswers = academic.StudentAnswers.Any(answer => answer.ExamAttemptId == x.Attempt.Id && answer.IsAutoGraded)
             }).ToListAsync(ct);
@@ -112,9 +113,12 @@ public sealed class CanonicalResultsController(
         var matching = await academic.MatchingPairs.AsNoTracking().Where(x => questionIds.Contains(x.QuestionId))
             .OrderBy(x => x.DisplayOrder).ToListAsync(ct);
         var hasExamPdf = await academic.ExamDocuments.AnyAsync(x => x.ExamId == exam.Id, ct);
-        var isPdfOnly = answers.Count == 0 && !await academic.ExamSections.AnyAsync(x => x.ExamId == exam.Id, ct) && hasExamPdf;
+        var hasSections = await academic.ExamSections.AnyAsync(x => x.ExamId == exam.Id, ct);
         var submissionDocument = await academic.ExamSubmissionDocuments.AsNoTracking().Where(x => x.AttemptId == attemptId)
             .Select(x => new { x.OriginalFileName, x.FileSize, x.UploadedAt }).FirstOrDefaultAsync(ct);
+        // A sectionless attempt with a submitted PDF is PDF-only even when the
+        // exam-paper metadata was not retained by an older upload workflow.
+        var isPdfOnly = answers.Count == 0 && !hasSections && (hasExamPdf || submissionDocument is not null);
         var pdfOnlyGrade = isPdfOnly
             ? await academic.ExamAttemptManualGrades.AsNoTracking()
                 .Where(x => x.AttemptId == attemptId)
@@ -232,7 +236,8 @@ public sealed class CanonicalResultsController(
         if (exam.ResultsPublished) return Conflict(new { message = "برای تغییر نمره، ابتدا انتشار نتایج را لغو کنید." });
         if (attempt.StatusId == 1) return BadRequest(new { message = "دانشجو هنوز آزمون را ثبت نهایی نکرده است." });
         var isPdfOnly = !await academic.ExamSections.AnyAsync(x => x.ExamId == exam.Id, ct) &&
-            await academic.ExamDocuments.AnyAsync(x => x.ExamId == exam.Id, ct);
+            (await academic.ExamDocuments.AnyAsync(x => x.ExamId == exam.Id, ct) ||
+             await academic.ExamSubmissionDocuments.AnyAsync(x => x.AttemptId == attemptId, ct));
         if (!isPdfOnly) return BadRequest(new { message = "این تلاش متعلق به آزمون PDFمحور نیست." });
         if (!await academic.ExamSubmissionDocuments.AnyAsync(x => x.AttemptId == attemptId, ct))
             return BadRequest(new { message = "فایل پاسخ دانشجو ثبت نشده است." });
