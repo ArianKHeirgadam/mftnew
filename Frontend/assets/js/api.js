@@ -583,14 +583,29 @@
     const header = $('body[data-active="results"] table thead tr');
     if (header) header.innerHTML = '<th>#</th><th>آزمون</th><th>دانشجو</th><th>وضعیت</th><th>نمره</th><th>انتشار</th>';
     const manageableRole = ['teacher', 'department', 'superadmin'].includes(role);
+    const attemptsByExam = new Map();
+    for (const attempt of rows) {
+      const key = String(attempt.examId);
+      if (!attemptsByExam.has(key)) attemptsByExam.set(key, []);
+      attemptsByExam.get(key).push(attempt);
+    }
     const firstExamRow = new Set();
     renderRows('body[data-active="results"] table tbody', rows, row => {
-      const firstForExam = !firstExamRow.has(String(row.examId));
-      firstExamRow.add(String(row.examId));
+      const examKey = String(row.examId);
+      const firstForExam = !firstExamRow.has(examKey);
+      firstExamRow.add(examKey);
+      const examAttempts = attemptsByExam.get(examKey) || [];
+      const canPublishExam = examAttempts.length > 0 && examAttempts.every(attempt =>
+        attempt.status !== 'InProgress' &&
+        (attempt.isPdfOnly
+          ? attempt.status === 'FullyGraded'
+          : ['Submitted', 'FullyGraded'].includes(attempt.status)));
       const publicationAction = !manageableRole ? '—' : row.resultsPublished
         ? '<span class="badge badge-ok">منتشر شده</span>'
         : (firstForExam
-          ? `<button type="button" class="btn btn-primary btn-sm" data-publish-exam="${row.examId}">انتشار نتایج این آزمون</button>`
+          ? (canPublishExam
+            ? `<button type="button" class="btn btn-primary btn-sm" data-publish-exam="${row.examId}">انتشار نتایج این آزمون</button>`
+            : '<span class="text-soft text-sm">پس از پایان آزمون‌ها و تکمیل تصحیح قابل انتشار است</span>')
           : '<span class="text-soft text-sm">—</span>');
       return `<tr>
       <td><a href="results.html?attemptId=${encodeURIComponent(row.id)}">${escapeHtml(String(row.id).slice(0, 8))}</a></td><td>${escapeHtml(row.examTitle)}</td><td>${escapeHtml(row.studentName || '—')}<div class="text-soft text-sm">شماره دانشجویی: ${escapeHtml(row.studentNumber || 'ثبت نشده')}</div></td>
