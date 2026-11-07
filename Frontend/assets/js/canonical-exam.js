@@ -126,7 +126,7 @@
   async function submit(auto=false){
     if(finished||finalizing)return;
     if(uploadingPdf){toast('تا پایان بارگذاری فایل پاسخ صبر کنید.','warn');return;}
-    if(exam?.examPdfAvailable && !uploadedPdf){toast('برای این آزمون ابتدا فایل PDF پاسخ‌نامه را بارگذاری کنید.','warn');studentPdfInput?.focus();return;}
+    if(exam?.examPdfAvailable && !uploadedPdf && !auto){toast('برای این آزمون ابتدا فایل PDF پاسخ‌نامه را بارگذاری کنید.','warn');studentPdfInput?.focus();return;}
     if(!auto&&!confirm('پس از ثبت نهایی، امکان شرکت مجدد در این آزمون وجود ندارد. پاسخ‌ها ثبت نهایی شوند؟'))return;
     finalizing=true;clearTimeout(saveTimer);clearInterval(timer);
     const button=document.getElementById('confirmFinishBtn');if(button){button.disabled=true;button.textContent='در حال ثبت...';}
