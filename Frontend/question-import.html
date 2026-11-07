@@ -53,6 +53,10 @@
             <input class="input" id="importBatchTitle" maxlength="200" placeholder="مثلاً امتحان شنبه سال ۱۴۰۲" required>
             <small class="text-soft">تمام سؤال‌های این نوبت ورود گروهی با این عنوان در یک پوشه جدا ذخیره می‌شوند.</small>
           </div>
+          <div class="flex gap-8 mt-12" style="align-items:center;flex-wrap:wrap">
+            <button type="button" class="btn btn-outline btn-sm" id="openImportSkillModal">+ تعریف مهارت جدید</button>
+            <small class="text-soft">مهارت را ابتدا اینجا تعریف کنید و سپس نام دقیق آن را در ستون Skill فایل Excel وارد کنید.</small>
+          </div>
           <div class="import-tabs">
             <button type="button" class="import-tab active" data-import-tab="file">بارگذاری Excel / CSV</button>
             <button type="button" class="import-tab" data-import-tab="paste">Paste از Excel</button>
@@ -116,6 +120,31 @@
     </main>
   </div>
 </div>
+<div class="modal-overlay" id="importSkillModal" aria-hidden="true">
+  <div class="modal-box" role="dialog" aria-modal="true" aria-labelledby="importSkillModalTitle">
+    <div class="modal-head">
+      <h3 id="importSkillModalTitle">تعریف مهارت جدید</h3>
+      <button type="button" class="icon-btn" id="closeImportSkillModal" aria-label="بستن">×</button>
+    </div>
+    <div class="modal-body">
+      <div class="field">
+        <label for="importSkillCategory">دسته‌بندی مهارت</label>
+        <select class="select" id="importSkillCategory">
+          <option value="">در حال دریافت دسته‌بندی‌ها...</option>
+        </select>
+      </div>
+      <div class="field mt-16">
+        <label for="importSkillName">نام مهارت</label>
+        <input class="input" id="importSkillName" maxlength="100" placeholder="نام مهارت را وارد کنید">
+      </div>
+      <p class="text-soft text-sm mt-8" id="importSkillStatus" aria-live="polite"></p>
+    </div>
+    <div class="modal-foot">
+      <button type="button" class="btn btn-primary" id="saveImportSkill">ذخیره مهارت</button>
+      <button type="button" class="btn btn-outline" id="cancelImportSkill">انصراف</button>
+    </div>
+  </div>
+</div>
 <script src="assets/js/theme.js"></script>
 <script src="assets/js/app.js"></script>
 <script src="assets/js/api.js"></script>
@@ -131,6 +160,58 @@
   };
   let previewRows = [];
   const template = 'Category\tSkill\tType\tText\tPoints\tDifficulty\tOption1\tOption2\tOption3\tOption4\tCorrectOption\tLeft1\tRight1\tLeft2\tRight2';
+
+  const skillModal = $('#importSkillModal');
+  const closeSkillModal = () => {
+    skillModal.classList.remove('show');
+    skillModal.setAttribute('aria-hidden', 'true');
+  };
+  async function loadSkillCategories() {
+    try {
+      const lookups = await api.request('/questions/lookups');
+      const categories = Array.isArray(lookups?.categories) ? lookups.categories : [];
+      $('#importSkillCategory').innerHTML = '<option value="">انتخاب دسته‌بندی</option>' +
+        categories.map(category => '<option value="' + Number(category.id) + '">' + esc(category.name) + '</option>').join('');
+      if (!categories.length) $('#importSkillStatus').textContent = 'ابتدا باید یک دسته‌بندی آزمون در بانک اطلاعاتی وجود داشته باشد.';
+    } catch (error) {
+      $('#importSkillCategory').innerHTML = '<option value="">دریافت دسته‌بندی ناموفق بود</option>';
+      $('#importSkillStatus').textContent = error.message || 'دریافت دسته‌بندی‌ها ناموفق بود.';
+    }
+  }
+  $('#openImportSkillModal').addEventListener('click', () => {
+    $('#importSkillName').value = '';
+    $('#importSkillStatus').textContent = '';
+    skillModal.classList.add('show');
+    skillModal.setAttribute('aria-hidden', 'false');
+    $('#importSkillName').focus();
+    loadSkillCategories();
+  });
+  $('#closeImportSkillModal').addEventListener('click', closeSkillModal);
+  $('#cancelImportSkill').addEventListener('click', closeSkillModal);
+  skillModal.addEventListener('click', event => { if (event.target === skillModal) closeSkillModal(); });
+  $('#saveImportSkill').addEventListener('click', async () => {
+    const name = $('#importSkillName').value.trim();
+    const examCategoryId = Number($('#importSkillCategory').value);
+    if (!examCategoryId) return $('#importSkillStatus').textContent = 'دسته‌بندی را انتخاب کنید.';
+    if (!name) return $('#importSkillStatus').textContent = 'نام مهارت را وارد کنید.';
+    const button = $('#saveImportSkill');
+    button.disabled = true;
+    $('#importSkillStatus').textContent = 'در حال ذخیره مهارت...';
+    try {
+      const created = await api.request('/questions/lookups/skills', {
+        method: 'POST',
+        body: JSON.stringify({ name, examCategoryId })
+      });
+      $('#importSkillStatus').textContent = 'مهارت «' + (created.name || name) + '» با موفقیت ذخیره شد. حالا همین نام را در ستون Skill فایل وارد کنید.';
+      message('مهارت جدید در دسته‌بندی انتخاب‌شده ذخیره شد.', 'success');
+      setTimeout(closeSkillModal, 1100);
+    } catch (error) {
+      $('#importSkillStatus').textContent = error.message || 'ذخیره مهارت ناموفق بود.';
+    } finally {
+      button.disabled = false;
+    }
+  });
+  loadSkillCategories();
 
   document.querySelectorAll('[data-import-tab]').forEach(button => button.addEventListener('click', () => {
     document.querySelectorAll('[data-import-tab]').forEach(x => x.classList.toggle('active', x === button));
