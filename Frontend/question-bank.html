@@ -7,6 +7,18 @@
 <link rel="stylesheet" href="assets/css/style.css">
 <link rel="stylesheet" href="assets/css/responsive.css">
 <link rel="stylesheet" href="assets/css/dark.css">
+<style>
+  .taxonomy-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px;align-items:stretch}
+  .taxonomy-card{min-width:0;padding:16px;border:1px solid var(--border);border-radius:14px;background:var(--surface)}
+  .taxonomy-card-head{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:14px}
+  .taxonomy-card-head b{font-size:14px}
+  .taxonomy-card-head span{font-size:11px}
+  .taxonomy-inline-field{display:flex;align-items:end;gap:10px}
+  .taxonomy-inline-field .field{flex:1;min-width:0;margin:0}
+  .taxonomy-inline-field>.btn{flex-shrink:0;min-height:42px;margin-bottom:0}
+  .taxonomy-card>.field{margin-bottom:12px}
+  @media(max-width:760px){.taxonomy-grid{grid-template-columns:1fr}.taxonomy-inline-field{align-items:stretch;flex-direction:column}.taxonomy-inline-field>.btn{width:100%}.taxonomy-card-head{align-items:flex-start;flex-direction:column;gap:3px}}
+</style>
 </head>
 <body data-role="teacher" data-active="bank">
 <div class="app-shell">
@@ -29,13 +41,23 @@
       <section class="card card-pad" id="taxonomyManagement" hidden style="margin-bottom:18px">
         <h3 style="margin-bottom:12px">مدیریت دسته‌بندی‌ها و مهارت‌ها</h3>
         <p class="text-soft text-sm" style="margin-bottom:14px">ابتدا دسته‌بندی بسازید و سپس مهارت‌های مربوط به آن را تعریف کنید. این اطلاعات در فرم ثبت سؤال استفاده می‌شوند.</p>
-        <div class="grid-2" style="align-items:end">
-          <div class="field"><label for="newCategoryName">دسته‌بندی جدید</label><input class="input" id="newCategoryName" maxlength="150" placeholder="مثلاً برنامه‌نویسی"></div>
-          <button class="btn btn-outline" id="createCategory">ثبت دسته‌بندی</button>
-          <div class="field"><label for="newSkillCategory">دسته‌بندی مهارت</label><select class="select" id="newSkillCategory"><option value="">ابتدا دسته‌بندی بسازید</option></select></div>
-          <div class="field"><label for="newSkillName">نام مهارت / سرفصل</label><input class="input" id="newSkillName" maxlength="100" placeholder="مثلاً ساختمان داده"></div>
+        <div class="taxonomy-grid">
+          <div class="taxonomy-card">
+            <div class="taxonomy-card-head"><b>ایجاد دسته‌بندی</b><span class="text-soft">گروه اصلی سؤال‌ها</span></div>
+            <div class="taxonomy-inline-field">
+              <div class="field"><label for="newCategoryName">نام دسته‌بندی جدید</label><input class="input" id="newCategoryName" maxlength="150" placeholder="مثلاً برنامه‌نویسی"></div>
+              <button class="btn btn-outline" id="createCategory">ثبت دسته‌بندی</button>
+            </div>
+          </div>
+          <div class="taxonomy-card">
+            <div class="taxonomy-card-head"><b>ایجاد مهارت یا سرفصل</b><span class="text-soft">وابسته به یک دسته‌بندی</span></div>
+            <div class="field"><label for="newSkillCategory">دسته‌بندی مربوطه</label><select class="select" id="newSkillCategory"><option value="">ابتدا دسته‌بندی بسازید</option></select></div>
+            <div class="taxonomy-inline-field">
+              <div class="field"><label for="newSkillName">نام مهارت / سرفصل</label><input class="input" id="newSkillName" maxlength="100" placeholder="مثلاً ساختمان داده"></div>
+              <button class="btn btn-primary" id="createSkill">ثبت مهارت</button>
+            </div>
+          </div>
         </div>
-        <button class="btn btn-primary" id="createSkill">ثبت مهارت</button>
       </section>
 
       <div class="tabs" data-tabs>
