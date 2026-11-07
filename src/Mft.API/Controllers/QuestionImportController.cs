@@ -63,8 +63,8 @@ public sealed class QuestionImportController(
     [RequestSizeLimit(MaxFileBytes)]
     public async Task<IActionResult> PreviewWord(
         [FromForm] IFormFile? file,
-        [FromForm] string? category,
-        [FromForm] string? skill,
+        [FromForm] long? categoryId,
+        [FromForm] long? skillId,
         [FromForm] string? difficulty,
         [FromForm] decimal? points,
         CancellationToken ct)
@@ -75,8 +75,16 @@ public sealed class QuestionImportController(
             return BadRequest(new { message = "حداکثر حجم فایل ۵ مگابایت است." });
         if (!Path.GetExtension(file.FileName).Equals(".docx", StringComparison.OrdinalIgnoreCase))
             return BadRequest(new { message = "فقط فایل Word با پسوند .docx پذیرفته می‌شود؛ فایل‌های .doc پشتیبانی نمی‌شوند." });
-        if (string.IsNullOrWhiteSpace(category) || string.IsNullOrWhiteSpace(skill))
-            return BadRequest(new { message = "دسته‌بندی و مهارت را برای تمام سؤال‌های فایل Word مشخص کنید." });
+        if (!categoryId.HasValue || categoryId.Value <= 0 || !skillId.HasValue || skillId.Value <= 0)
+            return BadRequest(new { message = "دسته‌بندی و مهارت را از فهرست انتخاب کنید." });
+
+        var selectedCategory = await academic.ExamCategories.AsNoTracking()
+            .FirstOrDefaultAsync(x => x.Id == categoryId.Value, ct);
+        var selectedSkill = await academic.Skills.AsNoTracking()
+            .FirstOrDefaultAsync(x => x.Id == skillId.Value, ct);
+        if (selectedCategory is null || selectedSkill is null ||
+            selectedSkill.ExamCategoryId != selectedCategory.Id)
+            return BadRequest(new { message = "مهارت انتخاب‌شده متعلق به دسته‌بندی انتخاب‌شده نیست یا دیگر وجود ندارد. فهرست را تازه‌سازی و دوباره انتخاب کنید." });
 
         try
         {
@@ -99,7 +107,9 @@ public sealed class QuestionImportController(
             }
 
             var paragraphs = ReadWordParagraphs(document);
-            var rows = ParseWordQuestions(paragraphs, category.Trim(), skill.Trim(),
+            // Use the canonical names loaded by ID from the database; never rely on
+            // manually typed labels for Word imports.
+            var rows = ParseWordQuestions(paragraphs, selectedCategory.Name, selectedSkill.Name,
                 string.IsNullOrWhiteSpace(difficulty) ? "Medium" : difficulty.Trim(),
                 points.GetValueOrDefault(1));
             return await BuildPreview(rows, ct);
@@ -268,11 +278,17 @@ public sealed class QuestionImportController(
             var skillName = row.Skill?.Trim() ?? "";
             var categoryName = row.Category?.Trim() ?? "";
             var typeCode = NormalizeType(row.Type);
-            var skillMatches = skills.Where(s => string.Equals(s.Name.Trim(), skillName, StringComparison.OrdinalIgnoreCase));
+            var normalizedSkillName = NormalizeTaxonomyName(skillName);
+            var normalizedCategoryName = NormalizeTaxonomyName(categoryName);
+            var skillMatches = skills.Where(s =>
+                NormalizeTaxonomyName(s.Name) == normalizedSkillName);
             if (!string.IsNullOrWhiteSpace(categoryName))
             {
-                var category = categories.FirstOrDefault(c => string.Equals(c.Name.Trim(), categoryName, StringComparison.OrdinalIgnoreCase));
-                skillMatches = category is null ? Enumerable.Empty<CanonicalSkill>() : skillMatches.Where(s => s.ExamCategoryId == category.Id);
+                var category = categories.FirstOrDefault(c =>
+                    NormalizeTaxonomyName(c.Name) == normalizedCategoryName);
+                skillMatches = category is null
+                    ? Enumerable.Empty<CanonicalSkill>()
+                    : skillMatches.Where(s => s.ExamCategoryId == category.Id);
             }
             var matchedSkills = skillMatches.Take(2).ToList();
             if (matchedSkills.Count != 1) errors.Add(matchedSkills.Count == 0 ? "مهارت پیدا نشد؛ نام مهارت را دقیق وارد کنید." : "نام مهارت تکراری است؛ ستون Category را هم تکمیل کنید.");
@@ -547,6 +563,25 @@ public sealed class QuestionImportController(
 
     private static string Normalize(string value) =>
         string.Join(' ', (value ?? "").Trim().Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries)).ToLowerInvariant();
+
+    // Persian/Arabic keyboard variants and invisible formatting characters were
+    // causing valid taxonomy names to fail exact string matching.
+    private static string NormalizeTaxonomyName(string? value)
+    {
+        var normalized = (value ?? "").Normalize(NormalizationForm.FormKC)
+            .Replace('ي', 'ی')
+            .Replace('ى', 'ی')
+            .Replace('ك', 'ک')
+            .Replace("\u0640", "")
+            .Replace("\u200c", " ")
+            .Replace("\u200f", "")
+            .Replace("\u200e", "");
+
+        normalized = Regex.Replace(normalized, @"[\\u064B-\\u065F\\u0670]", "");
+        return string.Join(' ', normalized.Trim()
+            .Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries))
+            .ToLowerInvariant();
+    }
 
     private sealed class ValidationResult
     {
