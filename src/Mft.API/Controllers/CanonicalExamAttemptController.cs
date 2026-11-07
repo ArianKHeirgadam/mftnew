@@ -1,9 +1,11 @@
 using System.Security.Claims;
+using System.Security.Cryptography;
 using System.Text.Json;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Mft.Infrastructure.Persistence;
+using Mft.Domain.Exams;
 
 namespace Mft.API.Controllers;
 
@@ -14,6 +16,24 @@ public sealed class CanonicalExamAttemptController(
     CanonicalAcademicDbContext academic,
     CanonicalIdentityDbContext identity) : ControllerBase
 {
+    private static List<MatchingRightMapItem> CreateMatchingRightMap(IReadOnlyCollection<long> pairIds)
+    {
+        var result = new List<MatchingRightMapItem>(pairIds.Count);
+        var usedTokens = new HashSet<long>();
+        foreach (var pairId in pairIds)
+        {
+            long token;
+            do
+            {
+                Span<byte> bytes = stackalloc byte[8];
+                RandomNumberGenerator.Fill(bytes);
+                token = BitConverter.ToInt64(bytes) & long.MaxValue;
+            } while (token == 0 || !usedTokens.Add(token));
+            result.Add(new MatchingRightMapItem(pairId, token));
+        }
+        return result.OrderBy(_ => RandomNumberGenerator.GetInt32(int.MaxValue)).ToList();
+    }
+
     private long? StudentId => long.TryParse(User.FindFirstValue(ClaimTypes.NameIdentifier), out var id) ? id : null;
     private long? DepartmentId => long.TryParse(User.FindFirstValue("departmentId"), out var id) ? id : null;
 
@@ -46,12 +66,38 @@ public sealed class CanonicalExamAttemptController(
         var attempt = new CanonicalExamAttempt {
             ExamId = examId, StudentUserId = StudentId.Value, StartedAt = now, StatusId = inProgress.Id
         };
+        await using var startTransaction = await academic.Database.BeginTransactionAsync(ct);
         academic.ExamAttempts.Add(attempt);
-        try { await academic.SaveChangesAsync(ct); }
+        try
+        {
+            await academic.SaveChangesAsync(ct);
+            var matchingQuestions = await academic.ExamQuestions.AsNoTracking()
+                .Where(eq => academic.ExamSections.Any(s => s.Id == eq.ExamSectionId && s.ExamId == examId) &&
+                    academic.Questions.Any(q => q.Id == eq.QuestionId &&
+                        academic.QuestionTypes.Any(t => t.Id == q.QuestionTypeId && t.Code == "Matching")))
+                .Select(eq => new { eq.Id, eq.DisplayOrder, eq.QuestionId })
+                .ToListAsync(ct);
+            foreach (var question in matchingQuestions)
+            {
+                var pairs = await academic.MatchingPairs.AsNoTracking()
+                    .Where(p => p.QuestionId == question.QuestionId)
+                    .Select(p => p.Id).ToListAsync(ct);
+                var shuffledMap = CreateMatchingRightMap(pairs);
+                academic.ExamAttemptQuestionOrders.Add(new CanonicalExamAttemptQuestionOrder
+                {
+                    ExamAttemptId = attempt.Id,
+                    ExamQuestionId = question.Id,
+                    QuestionOrder = question.DisplayOrder,
+                    MatchingRightOrderJson = JsonSerializer.Serialize(shuffledMap)
+                });
+            }
+            await academic.SaveChangesAsync(ct);
+            await startTransaction.CommitAsync(ct);
+        }
         catch (DbUpdateException)
         {
-            // The unique (ExamId, StudentUserId) index is the final concurrency-safe one-attempt guarantee.
-            academic.Entry(attempt).State = EntityState.Detached;
+            await startTransaction.RollbackAsync(ct);
+            academic.ChangeTracker.Clear();
             var prior = await academic.ExamAttempts.AsNoTracking().FirstOrDefaultAsync(x => x.ExamId == examId && x.StudentUserId == StudentId, ct);
             if (prior is not null)
                 return Conflict(new { message = "برای این آزمون قبلاً تلاش ثبت شده است و امکان شرکت مجدد وجود ندارد.", attemptId = prior.Id, statusId = prior.StatusId });
@@ -89,10 +135,33 @@ public sealed class CanonicalExamAttemptController(
                         Points = academic.Questions.Where(q => q.Id == eq.QuestionId).Select(q => eq.PointsOverride ?? q.Points).FirstOrDefault(),
                         QuestionType = academic.QuestionTypes.Where(t => t.Id == academic.Questions.Where(q => q.Id == eq.QuestionId).Select(q => q.QuestionTypeId).FirstOrDefault()).Select(t => t.Code).FirstOrDefault(),
                         Options = academic.MultipleChoiceOptions.Where(o => o.QuestionId == eq.QuestionId).OrderBy(o => o.DisplayOrder).Select(o => new { o.Id, o.OptionText, o.DisplayOrder }).ToList(),
-                        MatchingLeftItems = academic.MatchingPairs.Where(p => p.QuestionId == eq.QuestionId).OrderBy(p => p.DisplayOrder).Select(p => p.LeftItem).ToList(),
-                        MatchingRightItems = academic.MatchingPairs.Where(p => p.QuestionId == eq.QuestionId).OrderBy(p => p.DisplayOrder).Select(p => p.RightItem).ToList()
+                        MatchingPairs = academic.MatchingPairs.Where(p => p.QuestionId == eq.QuestionId)
+                            .OrderBy(p => p.DisplayOrder).Select(p => new { p.Id, p.LeftItem, p.RightItem }).ToList()
                     }).ToList()
             }).ToListAsync(ct);
+        var orderRows = await academic.ExamAttemptQuestionOrders.AsNoTracking()
+            .Where(x => x.ExamAttemptId == attemptId && x.MatchingRightOrderJson != null)
+            .ToDictionaryAsync(x => x.ExamQuestionId, x => x.MatchingRightOrderJson!, ct);
+        var sectionsForResponse = sections.Select(section => new
+        {
+            section.Id, section.SkillId, section.DurationMinutes, section.DisplayOrder, section.WeightPercent,
+            section.SectionType, section.TotalPoints, section.QuestionPaper, section.StudentAnswerPdf,
+            Questions = section.Questions.Select(question =>
+            {
+                var rightMap = orderRows.TryGetValue(question.ExamQuestionId, out var json)
+                    ? JsonSerializer.Deserialize<List<MatchingRightMapItem>>(json) ?? new List<MatchingRightMapItem>()
+                    : new List<MatchingRightMapItem>();
+                var pairById = question.MatchingPairs.ToDictionary(p => p.Id);
+                return new
+                {
+                    question.ExamQuestionId, question.DisplayOrder, question.QuestionId, question.Text,
+                    question.Points, question.QuestionType, question.Options,
+                    MatchingLeftItems = question.MatchingPairs.Select(p => new { Id = p.Id, Text = p.LeftItem }).ToList(),
+                    MatchingRightItems = rightMap.Where(m => pairById.ContainsKey(m.PairId))
+                        .Select(m => new { Id = m.TokenId, Text = pairById[m.PairId].RightItem }).ToList()
+                };
+            }).ToList()
+        }).ToList();
         var saved = await academic.StudentAnswers.AsNoTracking().Where(x => x.ExamAttemptId == attemptId)
             .ToDictionaryAsync(x => x.ExamQuestionId, x => x.AnswerJson, ct);
         var examPdf = await academic.ExamDocuments.AsNoTracking().Where(x => x.ExamId == examId)
@@ -100,7 +169,7 @@ public sealed class CanonicalExamAttemptController(
         var isPdfOnly = sections.Count == 0 && examPdf is not null;
         return Ok(new { attempt.Id, StartedAtUtc = DateTime.SpecifyKind(attempt.StartedAt, DateTimeKind.Utc), Deadline = deadline,
             ServerNowUtc = DateTime.UtcNow, IsPdfOnly = isPdfOnly, ExamPdfAvailable = examPdf is not null,
-            ExamPdfFileName = examPdf?.OriginalFileName, Sections = sections, SavedAnswers = saved });
+            ExamPdfFileName = examPdf?.OriginalFileName, Sections = sectionsForResponse, SavedAnswers = saved });
     }
 
     [HttpPut("{attemptId:long}/answers")]
@@ -173,8 +242,11 @@ public sealed class CanonicalExamAttemptController(
         var examQuestions = await academic.ExamQuestions.AsNoTracking()
             .Where(x => academic.ExamSections.Any(s => s.Id == x.ExamSectionId && s.ExamId == examId))
             .Select(x => new {
-                x.Id, x.QuestionId, Points = x.PointsOverride ?? academic.Questions.Where(q => q.Id == x.QuestionId).Select(q => q.Points).FirstOrDefault(),
-                TypeCode = academic.QuestionTypes.Where(t => t.Id == academic.Questions.Where(q => q.Id == x.QuestionId).Select(q => q.QuestionTypeId).FirstOrDefault()).Select(t => t.Code).FirstOrDefault()
+                x.Id, x.QuestionId, x.ExamSectionId,
+                Points = x.PointsOverride ?? academic.Questions.Where(q => q.Id == x.QuestionId).Select(q => q.Points).FirstOrDefault(),
+                TypeCode = academic.QuestionTypes.Where(t => t.Id == academic.Questions.Where(q => q.Id == x.QuestionId).Select(q => q.QuestionTypeId).FirstOrDefault()).Select(t => t.Code).FirstOrDefault(),
+                NegativeMarkingEnabled = academic.ExamSections.Where(s => s.Id == x.ExamSectionId).Select(s => s.NegativeMarkingEnabled).FirstOrDefault(),
+                NegativeMarkingPoints = academic.ExamSections.Where(s => s.Id == x.ExamSectionId).Select(s => s.NegativeMarkingPoints).FirstOrDefault()
             }).ToListAsync(ct);
         var hasExamPdfForSubmission = await academic.ExamDocuments.AnyAsync(x => x.ExamId == examId, ct);
         var hasSubmissionPdfForExam = await academic.ExamSubmissionDocuments.AnyAsync(x => x.AttemptId == attemptId, ct);
@@ -212,7 +284,7 @@ public sealed class CanonicalExamAttemptController(
         if (status is null || partial is null)
             return StatusCode(500, new { message = "وضعیت‌های Submitted و PartiallyGraded باید در جدول مرجع تعریف شده باشند." });
 
-        decimal autoScore = 0;
+        var questionScoresBySection = new Dictionary<long, List<decimal>>();
         var pendingManual = essaySectionIds.Count > 0;
         foreach (var q in examQuestions)
         {
@@ -224,35 +296,45 @@ public sealed class CanonicalExamAttemptController(
             if (string.Equals(q.TypeCode, "MultipleChoice", StringComparison.OrdinalIgnoreCase))
             {
                 long optionId = 0;
-                var hasSelection = answer.Value.TryGetProperty("selectedOptionId", out var optionNode) &&
+                var hasSelection = answer.Value.ValueKind == JsonValueKind.Object &&
+                    answer.Value.TryGetProperty("selectedOptionId", out var optionNode) &&
                     optionNode.ValueKind == JsonValueKind.Number && optionNode.TryGetInt64(out optionId);
+                var isCorrect = false;
                 if (hasSelection)
                 {
                     var option = await academic.MultipleChoiceOptions.AsNoTracking()
                         .FirstOrDefaultAsync(x => x.Id == optionId && x.QuestionId == q.QuestionId, ct);
                     if (option is null) return BadRequest(new { message = "گزینه انتخاب‌شده متعلق به این سؤال نیست." });
-                    var correct = await academic.MultipleChoiceOptions.AsNoTracking()
-                        .AnyAsync(x => x.QuestionId == q.QuestionId && x.IsCorrect && x.Id == optionId, ct);
-                    score = correct ? q.Points : 0m;
+                    isCorrect = option.IsCorrect;
                 }
-                else score = 0m;
+                score = ExamScoring.CalculateMultipleChoice(q.Points, hasSelection, isCorrect,
+                    q.NegativeMarkingEnabled, q.NegativeMarkingPoints);
                 auto = true;
             }
             else if (string.Equals(q.TypeCode, "Matching", StringComparison.OrdinalIgnoreCase))
             {
-                var expected = await academic.MatchingPairs.AsNoTracking().Where(x => x.QuestionId == q.QuestionId)
-                    .Select(x => new { x.LeftItem, x.RightItem }).ToListAsync(ct);
-                var submitted = new List<(string LeftItem, string RightItem)>();
-                if (answer.Value.TryGetProperty("pairs", out var pairs) && pairs.ValueKind == JsonValueKind.Array)
-                    submitted = pairs.EnumerateArray().Select(x => (
-                        x.TryGetProperty("leftItem", out var left) ? left.GetString() ?? "" : "",
-                        x.TryGetProperty("rightItem", out var right) ? right.GetString() ?? "" : ""
-                    )).ToList();
-                if (submitted.Select(x => x.LeftItem).Distinct().Count() != submitted.Count ||
-                    submitted.Any(x => !expected.Any(e => e.LeftItem == x.LeftItem)))
-                    return BadRequest(new { message = "ساختار جفت‌های ارسالی صحیح نیست." });
-                var correctCount = expected.Count(e => submitted.Any(s => s.LeftItem == e.LeftItem && s.RightItem == e.RightItem));
-                score = expected.Count == 0 ? 0m : Math.Round(q.Points * correctCount / expected.Count, 2);
+                var orderJson = await academic.ExamAttemptQuestionOrders.AsNoTracking()
+                    .Where(x => x.ExamAttemptId == attemptId && x.ExamQuestionId == q.Id)
+                    .Select(x => x.MatchingRightOrderJson).SingleOrDefaultAsync(ct);
+                if (string.IsNullOrWhiteSpace(orderJson))
+                    return Conflict(new { message = "ترتیب اختصاصی گزینه‌های وصل‌کردنی برای این تلاش موجود نیست؛ این تلاش قدیمی یا ناقص است و برای جلوگیری از تغییر داده‌های تاریخی ثبت نمی‌شود." });
+                var rightMap = JsonSerializer.Deserialize<List<MatchingRightMapItem>>(orderJson) ?? new List<MatchingRightMapItem>();
+                var correctMap = rightMap.ToDictionary(x => x.PairId, x => x.TokenId);
+                var submitted = new List<MatchingPairSelection>();
+                if (answer.Value.ValueKind == JsonValueKind.Object &&
+                    answer.Value.TryGetProperty("pairs", out var pairs) && pairs.ValueKind == JsonValueKind.Array)
+                {
+                    foreach (var pair in pairs.EnumerateArray())
+                    {
+                        if (pair.ValueKind != JsonValueKind.Object ||
+                            !pair.TryGetProperty("leftItemId", out var left) || !left.TryGetInt64(out var leftId) ||
+                            !pair.TryGetProperty("rightItemId", out var right) || !right.TryGetInt64(out var rightId))
+                            return BadRequest(new { message = "ساختار شناسه‌های جفت وصل‌کردنی معتبر نیست." });
+                        submitted.Add(new MatchingPairSelection(leftId, rightId));
+                    }
+                }
+                try { score = ExamScoring.CalculateMatching(q.Points, correctMap, submitted); }
+                catch (ArgumentException) { return BadRequest(new { message = "شناسه تکراری یا نامعتبر در پاسخ وصل‌کردنی وجود دارد." }); }
                 auto = true;
             }
             else if (string.Equals(q.TypeCode, "Essay", StringComparison.OrdinalIgnoreCase))
@@ -263,22 +345,29 @@ public sealed class CanonicalExamAttemptController(
             }
             else return BadRequest(new { message = "نوع سؤال پشتیبانی نمی‌شود." });
 
-            if (auto) autoScore += score ?? 0;
+            if (auto)
+            {
+                if (!questionScoresBySection.TryGetValue(q.ExamSectionId, out var sectionScores))
+                    questionScoresBySection[q.ExamSectionId] = sectionScores = new List<decimal>();
+                sectionScores.Add(score ?? 0m);
+            }
             if (await academic.StudentAnswers.FirstOrDefaultAsync(x => x.ExamAttemptId == attempt.Id && x.ExamQuestionId == q.Id, ct) is { } existingAnswer)
             {
                 existingAnswer.AnswerJson = json;
                 existingAnswer.IsAutoGraded = auto;
                 existingAnswer.Score = score;
+                existingAnswer.AutoScore = auto ? score : null;
             }
             else
             {
                 academic.StudentAnswers.Add(new CanonicalStudentAnswer {
                     ExamAttemptId = attempt.Id, ExamQuestionId = q.Id, AnswerJson = json,
-                    IsAutoGraded = auto, Score = score
+                    IsAutoGraded = auto, Score = score, AutoScore = auto ? score : null
                 });
             }
         }
-        attempt.AutoGradedScore = autoScore;
+        var autoScore = ExamScoring.CalculateFinalTotal(
+            questionScoresBySection.Values.Select(ExamScoring.CalculateSectionTotal));
         if (pendingManual) attempt.GradingStatus = "PendingManual";
         attempt.SubmittedAt = DateTime.UtcNow;
         attempt.StatusId = pendingManual ? partial.Id : status.Id;
@@ -303,3 +392,5 @@ public sealed class SaveAttemptAnswersRequest
 {
     public List<CanonicalSubmittedAnswer> Answers { get; set; } = new();
 }
+
+public sealed record MatchingRightMapItem(long PairId, long TokenId);
