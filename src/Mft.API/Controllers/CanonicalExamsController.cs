@@ -258,7 +258,9 @@ public sealed class CanonicalExamsController(
                 ExamId = examId, SkillId = input.SkillId,
                 DurationMinutes = input.DurationMinutes, DisplayOrder = i + 1,
                 WeightPercent = input.WeightPercent,
-                SectionType = string.IsNullOrWhiteSpace(input.SectionType) ? "Online" : input.SectionType.Trim()
+                SectionType = string.IsNullOrWhiteSpace(input.SectionType) ? "Online" : input.SectionType.Trim(),
+                TotalPoints = input.TotalPoints ??
+                    (string.Equals(input.SectionType, "Essay", StringComparison.OrdinalIgnoreCase) ? 100m : null)
             };
             academic.ExamSections.Add(section);
             await academic.SaveChangesAsync(ct);
@@ -302,6 +304,7 @@ public sealed class ExamSectionInput
     public int DurationMinutes { get; set; }
     public decimal WeightPercent { get; set; }
     public string? SectionType { get; set; }
+    public decimal? TotalPoints { get; set; }
     public List<long> QuestionIds { get; set; } = new();
 }
 
