@@ -321,7 +321,10 @@ public sealed class CanonicalResultsController(
                     });
 
                 var attemptAnswers = answers.Where(x => x.ExamAttemptId == attempt.Id).ToList();
-                var autoScore = attemptAnswers.Where(x => x.IsAutoGraded).Sum(x => x.Score ?? 0m);
+                // Submit already applies the section-level floor and negative-marking rules.
+                // Preserve that canonical automatic total instead of re-summing raw answers.
+                var autoScore = attempt.AutoGradedScore ??
+                    attemptAnswers.Where(x => x.IsAutoGraded).Sum(x => x.Score ?? 0m);
                 var manuallyGradedQuestionScore = attemptAnswers
                     .Where(x => !x.IsAutoGraded).Sum(x => x.Score ?? 0m);
                 var manuallyGradedSectionScore = sectionGrades
@@ -330,7 +333,7 @@ public sealed class CanonicalResultsController(
                 attempt.ManualGradedScore = decimal.Round(
                     manuallyGradedQuestionScore + manuallyGradedSectionScore, 2, MidpointRounding.AwayFromZero);
                 attempt.FinalScore = decimal.Round(
-                    attempt.AutoGradedScore.Value + attempt.ManualGradedScore.Value, 2, MidpointRounding.AwayFromZero);
+                    autoScore + attempt.ManualGradedScore.Value, 2, MidpointRounding.AwayFromZero);
                 attempt.GradingStatus = "Final";
                 attempt.StatusId = 4;
             }
