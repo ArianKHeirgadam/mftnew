@@ -327,15 +327,17 @@
       }
       const heading = $('body[data-active="results"] h1');
       if (heading) {
+        const isStudentView = role === 'student';
+        const pendingManualCount = Number(result.pendingManualCount || 0);
         const scoreLabel = result.isPdfOnly && result.score == null
           ? 'پاسخنامه PDF در انتظار تصحیح استاد'
-          : result.status === 'PartiallyGraded' && result.autoScore != null
-            ? `نمره موقت تستی ${faNumber(result.autoScore)} — ${faNumber(result.pendingManualCount)} سؤال تشریحی در انتظار تصحیح`
+          : isStudentView && result.autoScore != null && !result.resultsPublished
+            ? `نمره خودکار تستی و وصل‌کردنی: ${faNumber(result.autoScore)} از ${faNumber(result.maxScore)} — ${pendingManualCount > 0 ? `${faNumber(pendingManualCount)} بخش تشریحی در انتظار تصحیح` : 'نمره نهایی پس از انتشار رسمی استاد'}`
             : result.score != null
-            ? `${faNumber(result.score)} از ${faNumber(result.maxScore)}`
-            : result.autoScore != null
-              ? `نمره تستی ${faNumber(result.autoScore)} از ${faNumber(result.maxScore)}`
-              : (result.resultsPublished ? 'در انتظار تکمیل تصحیح' : 'هنوز نمره‌ای ثبت نشده');
+              ? `${faNumber(result.score)} از ${faNumber(result.maxScore)}`
+              : result.autoScore != null
+                ? `نمره خودکار: ${faNumber(result.autoScore)} از ${faNumber(result.maxScore)}`
+                : (result.resultsPublished ? 'در انتظار تکمیل تصحیح' : 'هنوز نمره‌ای ثبت نشده');
         heading.textContent = `نتیجه آزمون: ${result.exam} — ${scoreLabel}`;
         const studentInfo = $('#resultStudentInfo');
         if (studentInfo) { studentInfo.hidden = !['teacher','department','superadmin'].includes(role); studentInfo.textContent = 'دانشجو: ' + (result.studentName || '—') + ' | شماره دانشجویی: ' + (result.studentNumber || 'ثبت نشده'); }
