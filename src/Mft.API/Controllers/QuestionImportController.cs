@@ -577,7 +577,7 @@ public sealed class QuestionImportController(
             .Replace("\u200f", "")
             .Replace("\u200e", "");
 
-        normalized = Regex.Replace(normalized, @"[\\u064B-\\u065F\\u0670]", "");
+        normalized = Regex.Replace(normalized, @"[ً-ٰٟ]", "");
         return string.Join(' ', normalized.Trim()
             .Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries))
             .ToLowerInvariant();
