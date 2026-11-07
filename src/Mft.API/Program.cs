@@ -7,6 +7,7 @@ using Mft.Application.Abstractions;
 using Mft.Domain.Entities;
 using Mft.Domain;
 using Mft.Infrastructure.Persistence;
+using Mft.API.Controllers;
 using Mft.Infrastructure.Services;
 
 var builder = WebApplication.CreateBuilder(args);
