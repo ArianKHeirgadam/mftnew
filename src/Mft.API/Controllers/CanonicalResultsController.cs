@@ -31,9 +31,8 @@ public sealed class CanonicalResultsController(
 
         if (isStudent)
             query = query.Where(x => x.Attempt.StudentUserId == CurrentUserId &&
-                ((academic.ExamSections.Any(section => section.ExamId == x.Exam.Id) &&
-                  (x.Attempt.StatusId == 2 || x.Attempt.StatusId == 3)) ||
-                 (x.Exam.ResultsPublished && x.Attempt.StatusId == 4)));
+                (academic.ExamSections.Any(section => section.ExamId == x.Exam.Id) &&
+                 (x.Attempt.StatusId == 2 || x.Attempt.StatusId == 3 || x.Attempt.StatusId == 4)));
         else if (User.IsInRole("Teacher"))
             query = query.Where(x => x.Exam.CreatedByUserId == CurrentUserId ||
                 (x.Exam.ClassId.HasValue && academic.ClassTeachers.Any(t =>
@@ -67,7 +66,7 @@ public sealed class CanonicalResultsController(
             studentNumber = studentDetails.GetValueOrDefault(x.StudentUserId)?.Username,
             startedAt = x.StartedAt, submittedAt = x.SubmittedAt,
             score = isStudent
-                ? (x.StatusId == 4 ? (x.ResultsPublished ? x.FinalScore : null) :
+                ? (x.ResultsPublished && x.StatusId == 4 ? x.FinalScore :
                     (x.HasAutoGradedAnswers ? x.AutoGradedScore : null))
                 : x.FinalScore ?? x.AutoGradedScore,
             status = StatusCodeName(x.StatusId),
@@ -88,8 +87,8 @@ public sealed class CanonicalResultsController(
         if (exam is null) return NotFound();
         var isStudent = User.IsInRole("Student");
         if (isStudent && (attempt.StudentUserId != CurrentUserId ||
-            !((await academic.ExamSections.AnyAsync(x => x.ExamId == exam.Id, ct) && (attempt.StatusId == 2 || attempt.StatusId == 3)) ||
-              (exam.ResultsPublished && attempt.StatusId == 4))))
+            !(await academic.ExamSections.AnyAsync(x => x.ExamId == exam.Id, ct) &&
+              (attempt.StatusId == 2 || attempt.StatusId == 3 || attempt.StatusId == 4))))
             return NotFound();
         if (!isStudent && !await CanManage(exam, ct)) return Forbid();
 
@@ -174,12 +173,12 @@ public sealed class CanonicalResultsController(
             },
             score = isPdfOnly
                 ? (isStudent && !exam.ResultsPublished ? null : attempt.FinalScore)
-                : (isStudent && (attempt.StatusId == 2 || attempt.StatusId == 3)
+                : (isStudent && !exam.ResultsPublished
                     ? (hasAutoGradedAnswers ? attempt.AutoGradedScore : null)
                     : (exam.ResultsPublished ? attempt.FinalScore : null)),
-            autoScore = isStudent && (attempt.StatusId == 2 || attempt.StatusId == 3)
+            autoScore = isStudent && !exam.ResultsPublished
                 ? (hasAutoGradedAnswers ? attempt.AutoGradedScore : null)
-                : (isStudent && !exam.ResultsPublished ? null : attempt.AutoGradedScore),
+                : attempt.AutoGradedScore,
             maxScore, pendingManualCount = pending,
             status = exam.ResultsPublished ? StatusCodeName(attempt.StatusId) : "AwaitingPublication",
             resultsPublished = exam.ResultsPublished,
