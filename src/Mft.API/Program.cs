@@ -245,7 +245,6 @@ using (var scope = app.Services.CreateScope())
             await db.SaveChangesAsync();
         }
     }
-}
 
     // Explicit, development-only recovery for an existing canonical SuperAdmin.
     // Supply both settings through .NET User Secrets; never commit the password.
@@ -274,5 +273,6 @@ using (var scope = app.Services.CreateScope())
             "Development-only password reset applied for canonical SuperAdmin '{Username}'. Disable Bootstrap:ResetExistingSuperAdminPassword now.",
             resetUsername);
     }
+}
 
 app.Run();
