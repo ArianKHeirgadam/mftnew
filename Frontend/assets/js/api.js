@@ -228,7 +228,7 @@
 
   async function loadQuestions() {
     if (!$('body[data-active="bank"]')) return;
-    const search = $('main .table-toolbar .search-box input')?.value.trim();
+    const search = $('main .table-toolbar .search-box input')?.value.trim() || new URLSearchParams(location.search).get('search') || '';
     const rows = await request(`/questions${search ? `?search=${encodeURIComponent(search)}` : ''}`);
     const typeNames = { MultipleChoice: 'چهارگزینه‌ای', Essay: 'تشریحی', Matching: 'وصل‌کردنی' };
     const difficultyNames = { 1: 'آسان', 2: 'متوسط', 3: 'سخت' };
