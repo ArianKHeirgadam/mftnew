@@ -353,11 +353,18 @@
         } else body.innerHTML = result.answers.length ? result.answers.map((answer, index) => {
           const isEssay = ['Essay', 'Text'].includes(String(answer.questionType || '').trim());
           const canEditGrade = canGrade && isEssay && !result.resultsPublished;
+          const questionTitle = escapeHtml(answer.question || `سؤال ${answer.questionId}`);
+          if (canGrade && !isEssay) {
+            const autoScoreText = answer.isAutoGraded
+              ? `تصحیح خودکار سیستم: ${faNumber(answer.awardedScore ?? 0)} از ${faNumber(answer.maxScore || 0)}`
+              : 'در انتظار پردازش خودکار';
+            return `<tr><td>${faNumber(index + 1)}</td><td>${questionTitle}</td><td colspan="2" class="text-soft">پاسخ تستی توسط سیستم بررسی شده؛ پاسخ دانشجو برای تصحیح دستی نمایش داده نمی‌شود.</td><td>${autoScoreText}</td></tr>`;
+          }
           const gradeControl = canEditGrade
             ? `<div class="flex gap-8 mt-8"><input class="input" type="number" min="0" max="${Number(answer.maxScore || 0)}" step="0.01" value="${Number(answer.awardedScore || 0)}" data-grade-score style="max-width:100px" aria-label="نمره خام سؤال"><button class="btn btn-primary btn-sm" data-grade-answer="${answer.examQuestionId}">ثبت نمره</button></div><small class="text-soft">حداکثر نمره خام: ${faNumber(answer.maxScore || 0)}</small>`
             : (isEssay ? (answer.isManuallyGraded ? 'تصحیح شده' : 'در انتظار تصحیح تشریحی') : (answer.isAutoGraded ? 'تصحیح خودکار شده' : '—'));
           return `<tr>
-            <td>${faNumber(index + 1)}</td><td>${escapeHtml(answer.question || `سؤال ${answer.questionId}`)}</td>
+            <td>${faNumber(index + 1)}</td><td>${questionTitle}</td>
             <td>${escapeHtml(typeof answer.answer === 'string' ? answer.answer : answer.answer?.text ?? JSON.stringify(answer.answer ?? 'بدون پاسخ'))}</td><td>${escapeHtml(Array.isArray(answer.correctAnswer) ? answer.correctAnswer.map(x => x.optionText || `${x.leftItem || ''}: ${x.rightItem || ''}`).join('، ') : answer.correctAnswer || '—')}</td>
             <td>${gradeControl}</td></tr>`;
         }).join('') : '<tr><td colspan="5">پاسخی ثبت نشده است.</td></tr>';
