@@ -15,6 +15,6 @@
     </PackageReference>
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="..\Mft.Domain\Mft.Domain.csproj" />
+    <ProjectReference Include="..\..\src\Mft.Domain\Mft.Domain.csproj" />
   </ItemGroup>
 </Project>
