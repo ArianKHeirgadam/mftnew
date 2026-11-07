@@ -92,7 +92,7 @@ public sealed class CanonicalExamsController(
             Title = request.Title.Trim(), ExamCategoryId = request.ExamCategoryId,
             DepartmentId = departmentId.Value, ClassId = request.ClassId, CreatedByUserId = CurrentUserId.Value,
             StartAt = request.StartAt, EndAt = request.EndAt,
-            DurationMinutes = request.DurationMinutes, IsPublished = request.PdfOnly ? false : request.IsPublished
+            DurationMinutes = request.DurationMinutes, MaxPdfFileSizeBytes = request.MaxPdfFileSizeBytes, IsPublished = request.PdfOnly ? false : request.IsPublished
         };
         academic.Exams.Add(exam);
         await academic.SaveChangesAsync(ct);
@@ -117,6 +117,7 @@ public sealed class CanonicalExamsController(
         exam.StartAt = request.StartAt;
         exam.EndAt = request.EndAt;
         exam.DurationMinutes = request.DurationMinutes;
+        exam.MaxPdfFileSizeBytes = request.MaxPdfFileSizeBytes;
         exam.IsPublished = request.IsPublished;
         await academic.SaveChangesAsync(ct);
         await ReplaceSections(id, request.Sections, ct);
@@ -200,6 +201,9 @@ public sealed class CanonicalExamsController(
             (r.PdfOnly ? r.Sections.Count != 0 : r.Sections.Count == 0) ||
             r.Sections.SelectMany(x => x.QuestionIds).Distinct().Count() != r.Sections.Sum(x => x.QuestionIds.Count))
             return BadRequest(new { message = "عنوان، زمان‌بندی، مدت آزمون و فهرست بخش‌ها/سؤال‌ها معتبر نیست." });
+        if (r.MaxPdfFileSizeBytes.HasValue &&
+            (r.MaxPdfFileSizeBytes.Value < 1024 * 1024 || r.MaxPdfFileSizeBytes.Value > 100L * 1024 * 1024))
+            return BadRequest(new { message = "حداکثر حجم PDF باید بین ۱ تا ۱۰۰ مگابایت باشد." });
         if (!await academic.ExamCategories.AnyAsync(x => x.Id == r.ExamCategoryId, ct))
             return BadRequest(new { message = "دسته‌بندی آزمون معتبر نیست." });
         if (!departmentId.HasValue || !await academic.Classes.AnyAsync(x =>
@@ -222,6 +226,9 @@ public sealed class CanonicalExamsController(
             .SelectMany(x => x.QuestionIds).Distinct().ToArray();
         if (await academic.Questions.CountAsync(x => questionIds.Contains(x.Id) && skillIds.Contains(x.SkillId), ct) != questionIds.Length)
             return BadRequest(new { message = "یک یا چند سؤال معتبر نیست یا با مهارت بخش آزمون تطابق ندارد." });
+        if (await academic.Questions.AnyAsync(q => questionIds.Contains(q.Id) &&
+            academic.QuestionTypes.Any(t => t.Id == q.QuestionTypeId && t.Code == "Essay"), ct))
+            return BadRequest(new { message = "سؤال Essay متنی در آزمون جدید قابل افزودن نیست؛ برای بخش تشریحی از PDF استفاده کنید." });
         if (User.IsInRole("Teacher") && await academic.Questions.AnyAsync(x => questionIds.Contains(x.Id) && x.CreatedByUserId != CurrentUserId, ct))
             return BadRequest(new { message = "فقط سؤال‌های ثبت‌شده توسط خودتان قابل استفاده هستند." });
         if (User.IsInRole("Department"))
@@ -283,6 +290,7 @@ public sealed class ExamUpsert
     public DateTime StartAt { get; set; }
     public DateTime EndAt { get; set; }
     public int DurationMinutes { get; set; }
+    public long? MaxPdfFileSizeBytes { get; set; }
     public bool IsPublished { get; set; }
     public bool PdfOnly { get; set; }
     public List<ExamSectionInput> Sections { get; set; } = new();
