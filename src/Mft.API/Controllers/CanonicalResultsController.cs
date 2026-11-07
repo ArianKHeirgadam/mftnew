@@ -260,8 +260,12 @@ public sealed class CanonicalResultsController(
         if (exam is null) return NotFound();
         if (!await CanManage(exam, ct)) return Forbid();
         var attempts = await academic.ExamAttempts.Where(x => x.ExamId == examId).ToListAsync(ct);
-        var isPdfOnly = !await academic.ExamSections.AnyAsync(x => x.ExamId == examId, ct) &&
-            await academic.ExamDocuments.AnyAsync(x => x.ExamId == examId, ct);
+        var hasExamSections = await academic.ExamSections.AnyAsync(x => x.ExamId == examId, ct);
+        var hasExamPaper = await academic.ExamDocuments.AnyAsync(x => x.ExamId == examId, ct);
+        var attemptIdsForPdf = attempts.Select(x => x.Id).ToArray();
+        var hasSubmittedPdf = attemptIdsForPdf.Length > 0 &&
+            await academic.ExamSubmissionDocuments.AnyAsync(x => attemptIdsForPdf.Contains(x.AttemptId), ct);
+        var isPdfOnly = !hasExamSections && (hasExamPaper || hasSubmittedPdf);
         if (isPdfOnly && attempts.Any(x => x.StatusId != 4))
             return BadRequest(new { message = "برای انتشار نتایج آزمون PDFمحور، باید فایل تمام دانشجویان تصحیح و نمره‌گذاری شده باشد." });
         if (attempts.Any(x => x.StatusId == 1))
