@@ -18,7 +18,7 @@
 .exam-form-grid .field{margin:0}.exam-form-grid .wide{grid-column:1/-1}
 .question-tools{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin:14px 0}
 .question-tools .input{flex:1;min-width:220px}
-.exam-import-folders{display:grid;gap:14px;margin:14px 0}.exam-import-folder-group{display:grid;gap:8px}.exam-import-folder-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:10px}.exam-import-folder{border:1px solid var(--border);border-radius:12px;background:var(--surface);padding:12px;text-align:right;cursor:pointer;color:var(--text);display:grid;gap:6px}.exam-import-folder.active{border-color:var(--primary);background:var(--surface-2);box-shadow:inset 0 0 0 1px var(--primary)}.exam-import-folder small{color:var(--text-soft)}.question-list{max-height:480px;overflow:auto;display:grid;gap:8px}
+.exam-import-folders{display:grid;gap:14px;margin:14px 0}.exam-import-folder-group{display:grid;gap:8px}.exam-import-folder-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:10px}.exam-import-folder{border:1px solid var(--border);border-radius:12px;background:var(--surface);padding:12px;text-align:right;cursor:pointer;color:var(--text);display:grid;gap:6px}.exam-import-folder.active{border-color:var(--primary);background:var(--surface-2);box-shadow:inset 0 0 0 1px var(--primary)}.exam-import-folder small{color:var(--text-soft)}.question-list{max-height:480px;overflow:auto;display:grid;gap:8px}.question-group-title{font-weight:800;padding:10px 12px;margin-top:8px;border-bottom:1px solid var(--border);color:var(--text)}
 .question-row{display:flex;align-items:flex-start;gap:12px;padding:13px;border:1px solid var(--border);border-radius:12px;background:var(--surface);cursor:pointer}
 .question-row:has(input:checked){border-color:var(--primary);background:color-mix(in srgb,var(--primary) 7%,var(--surface))}
 .question-row input{margin-top:5px;accent-color:var(--primary)}
@@ -60,7 +60,7 @@
       <a class="btn btn-outline btn-sm" href="question-bank.html" target="_blank" rel="noopener">+ تعریف سؤال جدید در بانک</a>
      </div>
      <div class="exam-import-folders" id="examImportFolders"><div class="question-empty">در حال دریافت پوشه‌های سؤال...</div></div>
-     <p class="text-soft text-sm" id="examSelectedFolderHint">برای مشاهده سؤال‌ها، یکی از پوشه‌های موجود را انتخاب کنید. در این مرحله امکان ساخت پوشه وجود ندارد.</p>
+     <p class="text-soft text-sm" id="examSelectedFolderHint">سؤال‌های بدون پوشه در فهرست پایین نمایش داده می‌شوند. با انتخاب یک پوشه، سؤال‌های همان پوشه هم به فهرست اضافه می‌شوند؛ در این مرحله امکان ساخت پوشه وجود ندارد.</p>
      <div class="question-tools">
       <input class="input" id="questionSearch" type="search" placeholder="جستجو در سؤال‌ها...">
       <span class="badge badge-muted" id="questionCount">۰ سؤال انتخاب‌شده</span>
@@ -112,9 +112,9 @@
  function renderQuestions(){
   const categoryId=Number($('examCategory').value||0),term=$('questionSearch').value.trim().toLocaleLowerCase();
   const skillIds=new Set(lookups.skills.filter(s=>Number(s.examCategoryId)===categoryId).map(s=>Number(s.id)));
-  const rows=questions.filter(q=>selectedBatchId!==null&&Number(q.importBatchId)===Number(selectedBatchId)&&skillIds.has(Number(q.skillId))&&!/essay/i.test(String(q.questionTypeCode||q.questionType||''))&&(!term||String(q.text||'').toLocaleLowerCase().includes(term)));
+  const visibleBatchQuestions=questions.filter(q=>q.importBatchId==null||(selectedBatchId!==null&&Number(q.importBatchId)===Number(selectedBatchId)));\n  const eligible=visibleBatchQuestions.filter(q=>skillIds.has(Number(q.skillId))&&!/essay/i.test(String(q.questionTypeCode||q.questionType||''))&&(!term||String(q.text||'').toLocaleLowerCase().includes(term)));\n  const unfiledRows=eligible.filter(q=>q.importBatchId==null);\n  const folderRows=eligible.filter(q=>q.importBatchId!=null);
   $('questionCount').textContent=selectedIds.size+' سؤال انتخاب‌شده';
-  $('questionList').innerHTML=rows.length?rows.map(q=>'<label class="question-row"><input type="checkbox" value="'+Number(q.id)+'" '+(selectedIds.has(String(q.id))?'checked':'')+'><span class="qtext">'+escapeHtml(q.text)+'</span><span class="badge badge-info">'+escapeHtml(typeNames[q.questionTypeCode]||q.questionTypeName||'سؤال')+'</span></label>').join(''):'<div class="question-empty">'+(categoryId?'برای این دسته‌بندی سؤال آنلاین قابل انتخابی پیدا نشد. سؤال‌های تشریحی متنی قدیمی در آزمون جدید قابل افزودن نیستند؛ برای Essay از بخش PDF تشریحی استفاده کنید.':'ابتدا یک پوشه از سؤال‌های استاد را انتخاب کنید و سپس دسته‌بندی آزمون را مشخص کنید.')+'</div>';
+  const renderRows=rows=>rows.map(q=>'<label class="question-row"><input type="checkbox" value="'+Number(q.id)+'" '+(selectedIds.has(String(q.id))?'checked':'')+'><span class="qtext">'+escapeHtml(q.text)+'</span><span class="badge badge-info">'+escapeHtml(typeNames[q.questionTypeCode]||q.questionTypeName||'سؤال')+'</span></label>').join('');\n  const sections=[];\n  if(unfiledRows.length)sections.push('<div class="question-group-title">سؤال‌های بدون پوشه</div>'+renderRows(unfiledRows));\n  if(folderRows.length){const folder=importBatches.find(batch=>Number(batch.id)===Number(selectedBatchId));sections.push('<div class="question-group-title">سؤال‌های پوشه '+escapeHtml(folder?.title||'انتخاب‌شده')+'</div>'+renderRows(folderRows));}\n  $('questionList').innerHTML=sections.length?sections.join(''):'<div class="question-empty">'+(categoryId?'برای این دسته‌بندی سؤال آنلاین قابل انتخابی پیدا نشد. سؤال‌های تشریحی متنی قدیمی در آزمون جدید قابل افزودن نیستند؛ برای Essay از بخش PDF تشریحی استفاده کنید.':'ابتدا دسته‌بندی آزمون را مشخص کنید؛ سؤال‌های بدون پوشه پس از انتخاب دسته‌بندی در اینجا نمایش داده می‌شوند.')+'</div>';
  }
  async function loadData(){
   const [l,q,classes,batches]=await Promise.all([api.request('/questions/lookups'),api.request('/questions'),api.request('/canonical/classes'),api.request('/questions/import/batches')]);
