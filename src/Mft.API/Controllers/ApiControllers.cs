@@ -331,30 +331,72 @@ public sealed class ReportsController(CanonicalIdentityDbContext identity, Canon
     public async Task<IActionResult> RecentAttempts([FromQuery] long? departmentId, [FromQuery] string? search,
         [FromQuery] int take = 100, CancellationToken ct = default)
     {
-        var query = from attempt in academic.ExamAttempts.AsNoTracking()
-                    join exam in academic.Exams.AsNoTracking() on attempt.ExamId equals exam.Id
-                    join student in identity.Users.AsNoTracking() on attempt.StudentUserId equals student.Id
-                    join department in identity.Departments.AsNoTracking() on exam.DepartmentId equals department.Id
-                    where attempt.SubmittedAt != null
-                    select new { attempt, exam, student, department };
+        // Keep each query on its owning DbContext. Joining academic and identity
+        // IQueryable sources in one EF query causes a multiple-context execution error.
+        var attemptsQuery = from attempt in academic.ExamAttempts.AsNoTracking()
+                            join exam in academic.Exams.AsNoTracking() on attempt.ExamId equals exam.Id
+                            where attempt.SubmittedAt != null
+                            select new
+                            {
+                                attemptId = attempt.Id,
+                                departmentId = exam.DepartmentId,
+                                studentId = attempt.StudentUserId,
+                                examId = exam.Id,
+                                exam = exam.Title,
+                                score = attempt.FinalScore,
+                                status = attempt.StatusId,
+                                startedAt = attempt.StartedAt,
+                                submittedAt = attempt.SubmittedAt
+                            };
         if (User.IsInRole("Department"))
         {
             var current = User.CanonicalDepartmentId();
             if (!current.HasValue) return Forbid();
-            query = query.Where(x => x.exam.DepartmentId == current.Value);
+            attemptsQuery = attemptsQuery.Where(x => x.departmentId == current.Value);
         }
-        else if (departmentId.HasValue) query = query.Where(x => x.exam.DepartmentId == departmentId.Value);
-        if (!string.IsNullOrWhiteSpace(search))
+        else if (departmentId.HasValue)
         {
-            var term = search.Trim();
-            query = query.Where(x => x.exam.Title.Contains(term) || x.student.FullName.Contains(term));
+            attemptsQuery = attemptsQuery.Where(x => x.departmentId == departmentId.Value);
         }
-        var rows = await query.OrderBy(x => x.department.Name).ThenByDescending(x => x.attempt.SubmittedAt)
+
+        var attempts = await attemptsQuery
+            .OrderByDescending(x => x.submittedAt)
             .Take(Math.Clamp(take, 1, 250))
-            .Select(x => new { attemptId = x.attempt.Id, departmentId = x.exam.DepartmentId,
-                department = x.department.Name, studentId = x.student.Id, student = x.student.FullName,
-                exam = x.exam.Title, score = x.attempt.FinalScore, status = x.attempt.StatusId,
-                startedAt = x.attempt.StartedAt, submittedAt = x.attempt.SubmittedAt }).ToListAsync(ct);
+            .ToListAsync(ct);
+        if (attempts.Count == 0) return Ok(Array.Empty<object>());
+
+        var studentIds = attempts.Select(x => x.studentId).Distinct().ToArray();
+        var departmentIds = attempts.Select(x => x.departmentId).Distinct().ToArray();
+        var students = await identity.Users.AsNoTracking()
+            .Where(x => studentIds.Contains(x.Id))
+            .Select(x => new { x.Id, x.FullName, x.Username })
+            .ToDictionaryAsync(x => x.Id, ct);
+        var departments = await identity.Departments.AsNoTracking()
+            .Where(x => departmentIds.Contains(x.Id))
+            .Select(x => new { x.Id, x.Name })
+            .ToDictionaryAsync(x => x.Id, ct);
+
+        var term = search?.Trim();
+        var rows = attempts
+            .Where(x => string.IsNullOrEmpty(term) ||
+                x.exam.Contains(term, StringComparison.OrdinalIgnoreCase) ||
+                (students.TryGetValue(x.studentId, out var student) &&
+                 (student.FullName.Contains(term, StringComparison.OrdinalIgnoreCase) ||
+                  student.Username.Contains(term, StringComparison.OrdinalIgnoreCase))))
+            .Select(x => new
+            {
+                x.attemptId,
+                x.departmentId,
+                department = departments.TryGetValue(x.departmentId, out var department) ? department.Name : "بدون دپارتمان",
+                studentId = x.studentId,
+                student = students.TryGetValue(x.studentId, out var student) ? student.FullName : "کاربر حذف‌شده",
+                x.exam,
+                x.score,
+                x.status,
+                x.startedAt,
+                x.submittedAt
+            })
+            .ToList();
         return Ok(rows);
     }
 }
