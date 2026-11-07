@@ -149,6 +149,15 @@ public sealed class CanonicalAcademicDbContext(
             e.Property(x => x.MaxPdfFileSizeBytes).HasColumnType("bigint");
             e.HasOne<CanonicalUser>().WithMany().HasForeignKey(x => x.ResultsPublishedByUserId).OnDelete(DeleteBehavior.NoAction);
             e.HasIndex(x => x.CreatedByUserId); e.HasIndex(x => x.DepartmentId); e.HasIndex(x => x.ExamCategoryId); e.HasIndex(x => x.ClassId);
+            e.HasIndex(x => new { x.ClassId, x.StartAt, x.Id }).IsDescending(false, true, false)
+                .HasDatabaseName("IX_Exams_ClassId_StartAt_Id")
+                .IncludeProperties(x => new { x.DepartmentId, x.Title, x.IsPublished, x.CreatedByUserId });
+            e.HasIndex(x => new { x.DepartmentId, x.StartAt, x.Id }).IsDescending(false, true, false)
+                .HasDatabaseName("IX_Exams_DepartmentId_StartAt_Id")
+                .IncludeProperties(x => new { x.ClassId, x.Title, x.IsPublished, x.CreatedByUserId });
+            e.HasIndex(x => new { x.CreatedByUserId, x.StartAt, x.Id }).IsDescending(false, true, false)
+                .HasDatabaseName("IX_Exams_CreatedByUserId_StartAt_Id")
+                .IncludeProperties(x => new { x.ClassId, x.DepartmentId, x.Title, x.IsPublished });
             e.HasOne<CanonicalExamCategory>().WithMany().HasForeignKey(x => x.ExamCategoryId).OnDelete(DeleteBehavior.NoAction);
             e.HasOne<CanonicalDepartment>().WithMany().HasForeignKey(x => x.DepartmentId).OnDelete(DeleteBehavior.NoAction);
             e.HasOne<CanonicalUser>().WithMany().HasForeignKey(x => x.CreatedByUserId).OnDelete(DeleteBehavior.NoAction);
@@ -164,6 +173,9 @@ public sealed class CanonicalAcademicDbContext(
             e.Property(x => x.NegativeMarkingPoints).HasPrecision(6, 2);
             e.Property(x => x.NegativeMarkingEnabled).HasDefaultValue(false);
             e.HasIndex(x => x.ExamId); e.HasIndex(x => x.SkillId);
+            e.HasIndex(x => new { x.ExamId, x.DisplayOrder, x.Id })
+                .HasDatabaseName("IX_ExamSections_ExamId_DisplayOrder_Id")
+                .IncludeProperties(x => new { x.SkillId, x.SectionType, x.WeightPercent });
             e.HasOne<CanonicalExam>().WithMany().HasForeignKey(x => x.ExamId).OnDelete(DeleteBehavior.Cascade);
             e.HasOne<CanonicalSkill>().WithMany().HasForeignKey(x => x.SkillId).OnDelete(DeleteBehavior.NoAction);
         });
@@ -173,6 +185,12 @@ public sealed class CanonicalAcademicDbContext(
             e.Property(x => x.Id).HasColumnType("bigint").UseIdentityColumn();
             e.Property(x => x.PointsOverride).HasPrecision(6, 2);
             e.HasIndex(x => x.ExamSectionId); e.HasIndex(x => x.QuestionId);
+            e.HasIndex(x => new { x.ExamSectionId, x.DisplayOrder, x.Id })
+                .HasDatabaseName("IX_ExamQuestions_ExamSectionId_DisplayOrder_Id")
+                .IncludeProperties(x => new { x.QuestionId, x.PointsOverride });
+            e.HasIndex(x => new { x.QuestionId, x.ExamSectionId })
+                .HasDatabaseName("IX_ExamQuestions_QuestionId_ExamSectionId")
+                .IncludeProperties(x => x.DisplayOrder);
             e.HasOne<CanonicalExamSection>().WithMany().HasForeignKey(x => x.ExamSectionId).OnDelete(DeleteBehavior.Cascade);
             e.HasOne<CanonicalQuestion>().WithMany().HasForeignKey(x => x.QuestionId).OnDelete(DeleteBehavior.NoAction);
         });
