@@ -33,8 +33,11 @@ public sealed class CanonicalAcademicDbContext(
         base.OnModelCreating(modelBuilder);
 
         // This context references users for academic foreign keys, but does not own identity-role mappings.
-        // Ignore the navigation so EF does not discover CanonicalUserRole without its Identity-context key configuration.
+        // Exclude the identity join entities entirely; their composite key is configured only by
+        // CanonicalIdentityDbContext and they are not part of this context's model.
         modelBuilder.Entity<CanonicalUser>().Ignore(x => x.UserRoles);
+        modelBuilder.Ignore<CanonicalUserRole>();
+        modelBuilder.Ignore<CanonicalRole>();
 
         modelBuilder.Entity<CanonicalExamCategory>(e =>
         {
