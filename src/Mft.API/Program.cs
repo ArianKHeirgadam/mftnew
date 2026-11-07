@@ -258,7 +258,8 @@ using (var scope = app.Services.CreateScope())
             throw new InvalidOperationException(
                 "Bootstrap:ResetPassword must contain at least 8 characters.");
 
-        var admin = await db.Users.SingleOrDefaultAsync(user => user.Username == resetUsername);
+        var admin = await db.Users.Include(user => user.UserRoles)
+            .SingleOrDefaultAsync(user => user.Username == resetUsername);
         if (admin is null)
             throw new InvalidOperationException(
                 $"Cannot reset password: user '{resetUsername}' was not found.");
