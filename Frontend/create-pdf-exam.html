@@ -1,55 +1,5 @@
 <!DOCTYPE html>
 <html lang="fa" dir="rtl">
-<head>
-<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>ساخت آزمون PDFمحور | سامانه سنجش</title>
-<link rel="stylesheet" href="assets/css/style.css"><link rel="stylesheet" href="assets/css/responsive.css"><link rel="stylesheet" href="assets/css/dark.css">
-</head>
-<body data-role="teacher">
-<div class="app-shell"><div id="sidebar-root"></div><div class="main-col"><div id="topbar-root" data-title="ساخت آزمون PDFمحور"></div>
-<main class="content fade-in">
-  <div class="page-head"><div><div class="breadcrumb">سامانه سنجش <span>/</span> <b>آزمون PDFمحور</b></div><h1>ساخت آزمون PDFمحور</h1><p class="text-soft text-sm mt-8">این نوع آزمون از بانک سؤال استفاده نمی‌کند؛ دانشجو فایل صورت سؤال را می‌گیرد و پاسخ را در قالب PDF بارگذاری می‌کند.</p></div></div>
-  <div class="card card-pad" style="max-width:850px">
-    <div class="field"><label for="pdfExamTitle">عنوان آزمون</label><input class="input" id="pdfExamTitle" maxlength="300" required></div>
-    <div class="field mt-16"><label for="pdfExamCategory">دسته‌بندی آزمون</label><select class="input" id="pdfExamCategory" required><option value="">در حال دریافت...</option></select></div>
-    <div class="field mt-16"><label for="pdfExamClass">کلاس</label><select class="input" id="pdfExamClass" required><option value="">در حال دریافت...</option></select></div>
-    <div class="grid grid-2 gap-12 mt-16">
-      <div class="field"><label for="pdfExamStart">شروع آزمون</label><input class="input" type="datetime-local" id="pdfExamStart" required></div>
-      <div class="field"><label for="pdfExamEnd">پایان بازه برگزاری</label><input class="input" type="datetime-local" id="pdfExamEnd" required></div>
-    </div>
-    <div class="field mt-16"><label for="pdfExamDuration">مدت مجاز هر تلاش (دقیقه)</label><input class="input" type="number" min="1" max="600" value="90" id="pdfExamDuration" required></div>
-    <div class="field mt-16"><label for="pdfExamFile">PDF صورت آزمون (حداکثر ۲۰ مگابایت)</label><input class="input" type="file" id="pdfExamFile" accept="application/pdf,.pdf" required></div>
-    <div class="alert alert-info mt-16">آزمون ابتدا به‌صورت منتشرنشده ساخته می‌شود. پس از بارگذاری موفق PDF، انتشار آن انجام خواهد شد.</div>
-    <div class="flex gap-8 mt-24"><button class="btn btn-primary" id="createPdfExam">ساخت و انتشار آزمون</button><a href="dashboard-teacher.html" class="btn btn-outline">بازگشت</a></div>
-    <p class="text-soft text-sm mt-12" id="pdfExamStatus" aria-live="polite"></p>
-  </div>
-</main></div></div>
-<script src="assets/js/theme.js"></script><script src="assets/js/app.js"></script><script src="assets/js/api.js"></script>
-<script>
-(async function(){
- const api=window.MftApi, category=document.getElementById('pdfExamCategory'), cls=document.getElementById('pdfExamClass'), status=document.getElementById('pdfExamStatus'), button=document.getElementById('createPdfExam');
- const msg=t=>{status.textContent=t;};
- try{
-  const [lookups,classes]=await Promise.all([api.request('/questions/lookups'),api.request('/canonical/classes')]);
-  category.innerHTML='<option value="">انتخاب دسته‌بندی</option>'+lookups.categories.map(x=>'<option value="'+x.id+'">'+String(x.name).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]))+'</option>').join('');
-  cls.innerHTML='<option value="">انتخاب کلاس</option>'+classes.map(x=>'<option value="'+x.id+'" data-department-id="'+x.departmentId+'">'+String(x.name).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]))+'</option>').join('');
- }catch(e){msg(e.message||'دریافت اطلاعات اولیه ناموفق بود.');button.disabled=true;return;}
- button.addEventListener('click',async()=>{
-  const title=document.getElementById('pdfExamTitle').value.trim(), categoryId=Number(category.value), classId=Number(cls.value), departmentId=Number(cls.selectedOptions[0]?.dataset.departmentId||0), durationMinutes=Number(document.getElementById('pdfExamDuration').value), file=document.getElementById('pdfExamFile').files[0], startRaw=document.getElementById('pdfExamStart').value,endRaw=document.getElementById('pdfExamEnd').value;
-  if(!title||!categoryId||!classId||!departmentId||!file||!startRaw||!endRaw)return msg('همه فیلدها و فایل PDF الزامی هستند.');
-  if(file.size>20*1024*1024||!file.name.toLowerCase().endsWith('.pdf'))return msg('فایل باید PDF و حداکثر ۲۰ مگابایت باشد.');
-  const startAt=new Date(startRaw),endAt=new Date(endRaw);
-  if(!Number.isInteger(durationMinutes)||durationMinutes<1||durationMinutes>600||endAt<=startAt)return msg('زمان‌بندی یا مدت آزمون معتبر نیست.');
-  button.disabled=true;msg('در حال ساخت آزمون...');
-  let created;
-  try{
-   created=await api.request('/canonical/exams',{method:'POST',body:JSON.stringify({title,examCategoryId:categoryId,departmentId,classId,startAt:startAt.toISOString(),endAt:endAt.toISOString(),durationMinutes,isPublished:false,pdfOnly:true,sections:[]})});
-   const form=new FormData();form.append('file',file);
-   await api.request('/exam-files/exams/'+encodeURIComponent(created.id),{method:'POST',body:form});
-   await api.request('/canonical/exams/'+encodeURIComponent(created.id)+'/publish',{method:'POST'});
-   msg('آزمون PDFمحور ساخته و منتشر شد.');window.showToast?.('آزمون PDFمحور با موفقیت منتشر شد.','ok');
-   setTimeout(()=>location.href='dashboard-teacher.html',900);
-  }catch(e){msg((created?'آزمون ساخته شد اما تکمیل/انتشار آن ناموفق بود: ':'ساخت آزمون ناموفق بود: ')+(e.message||'خطای نامشخص'));button.disabled=false;}
- });
-})();
-</script></body></html>
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta http-equiv="refresh" content="0;url=create-exam.html"><title>ایجاد آزمون</title></head>
+<body><p>در حال انتقال به صفحه یکپارچه ایجاد آزمون...</p><script>location.replace('create-exam.html');</script></body>
+</html>
