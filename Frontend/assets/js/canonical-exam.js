@@ -19,10 +19,21 @@
   let exam, sections=[], essaySections=[], questions=[], answers=new Map(), current=0, deadline=0, remainingAtSyncMs=0, syncMonotonic=0, timer=null, saveTimer=null, saving=false, pending=false, finalizing=false, finished=false, uploadingPdf=false, uploadedPdf=false;
 
   function flatQuestions(data) {
-    return (data.sections || []).flatMap(section => (section.questions || []).map(q => ({
-      ...q, sectionId: section.id, type: q.questionType || '', points: q.points,
-      options: q.options || [], leftItems: q.matchingLeftItems || [], rightItems: q.matchingRightItems || []
-    })));
+    return (data.sections || []).flatMap(section => (section.questions || []).map(q => {
+      const rawType = q.questionType || q.questionTypeCode || q.type || '';
+      const normalizedType = /^(mcq|multiplechoice|multiple_choice)$/i.test(String(rawType).trim())
+        ? 'MultipleChoice'
+        : String(rawType).trim();
+      return {
+        ...q,
+        sectionId: section.id,
+        type: normalizedType,
+        points: q.points,
+        options: Array.isArray(q.options) ? q.options : [],
+        leftItems: Array.isArray(q.matchingLeftItems) ? q.matchingLeftItems : [],
+        rightItems: Array.isArray(q.matchingRightItems) ? q.matchingRightItems : []
+      };
+    }));
   }
   function valueFor(q) {
     if (answers.has(q.examQuestionId)) return answers.get(q.examQuestionId);
@@ -55,7 +66,7 @@
   function render() {
     const q=questions[current]; if(!q || !root) return;
     root.querySelectorAll('[data-canonical-question], [data-canonical-answer]').forEach(n=>n.remove());
-    const heading=root.querySelector('h3');
+    const heading=document.getElementById('canonicalQuestionHeading');
     if(heading) heading.textContent=q.text || 'بدون متن';
     const badge=root.querySelector('.badge'); if(badge) badge.textContent=/multiplechoice/i.test(q.type)?'چهارگزینه‌ای':/matching/i.test(q.type)?'وصل‌کردنی':'تشریحی';
     const v=valueFor(q);
@@ -67,7 +78,7 @@
         const radio=document.createElement('input'); radio.type='radio';radio.name='canonicalAnswer';radio.checked=Number(v.selectedOptionId)===Number(option.id);
         radio.addEventListener('change',()=>{answers.set(q.examQuestionId,{selectedOptionId:option.id});changed();});
         const letter=document.createElement('span');letter.className='option-letter';letter.textContent=['الف','ب','ج','د','هـ','و'][index]||fa(index+1);
-        const text=document.createElement('span');text.textContent=option.optionText;
+        const text=document.createElement('span');text.textContent=option.optionText ?? option.text ?? '';
         label.append(radio,letter,text);add(label);
       });
     } else if(/matching/i.test(q.type)) {
