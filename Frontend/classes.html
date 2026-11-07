@@ -210,7 +210,7 @@
       (item.department || '').toLocaleLowerCase().includes(searchTerm));
     $('#classSelect').innerHTML = '<option value="">انتخاب کلاس</option>' + visibleClasses.map(item =>
       '<option value="' + item.id + '">' + esc(item.name) + ' — ' + esc(item.department || '') +
-      ' (' + Number(item.memberCount || 0) + ' دانشجو)</option>').join('');
+      ' (' + Number(item.memberCount || 0) + ' دانشجو)' + (item.schedule ? ' · ' + esc(item.schedule) : '') + '</option>').join('');
     if (preferredId) $('#classSelect').value = String(preferredId);
     if ($('#classSelect').value) await loadClassMembers(Number($('#classSelect').value));
     else {
@@ -332,6 +332,8 @@
       selectedIds.clear(); selectedTeacherIds.clear();
       $('#classSummary').textContent = 'کلاسی انتخاب نشده است.';
       $('#openRosterModal').disabled = true;
+      $('#editClass').disabled = true;
+      $('#deleteClass').disabled = true;
       return;
     }
     try { await loadClassMembers(Number($('#classSelect').value)); }
