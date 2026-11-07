@@ -205,7 +205,7 @@
               leftItemId:Number(pair.leftItemId ?? pair.leftItem?.id),
               rightItemId:pair.rightItemId ?? pair.rightItem?.id
             }))
-            .filter(pair=>Number.isSafeInteger(pair.leftItemId) && Number.isSafeInteger(Number(pair.rightItemId)))
+            .filter(pair=>Number.isSafeInteger(pair.leftItemId) && pair.rightItemId != null && pair.rightItemId !== '' && Number.isSafeInteger(Number(pair.rightItemId)))
             .map(pair=>({...pair,rightItemId:Number(pair.rightItemId)}))}
         };
       }
