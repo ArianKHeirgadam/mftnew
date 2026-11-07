@@ -12,6 +12,15 @@
 6. The teacher opens the submitted attempt, previews or downloads the student's answer sheet, and enters a score from 0 to 100.
 7. Results remain hidden from students until the teacher publishes the exam results.
 
+## PDF-only teacher grading persistence
+
+Before deploying the PDF-only grading endpoints, run `database/patch-pdf-only-manual-grading.sql`
+against the canonical database after taking a backup. This additive, idempotent patch creates
+attempt-level grade and grade-history tables without changing existing attempt or section-grade
+records. New PDF-only submissions are marked `PendingManual`; teachers can open the protected
+answer PDF, enter a score from 0 to 100, and review grade history. The attempt becomes
+`FullyGraded` only after a successful manual grade.
+
 ## Deployment order
 
 1. Back up the target SQL Server database and test the additive patch against a restored copy.
