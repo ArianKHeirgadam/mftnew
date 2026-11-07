@@ -156,7 +156,6 @@ public sealed class CanonicalExamAttemptController(
             }).ToListAsync(ct);
         var hasExamPdfForSubmission = await academic.ExamDocuments.AnyAsync(x => x.ExamId == examId, ct);
         var hasSubmissionPdfForExam = await academic.ExamSubmissionDocuments.AnyAsync(x => x.AttemptId == attemptId, ct);
-        var hasEssayQuestions = examQuestions.Any(q => string.Equals(q.TypeCode, "Essay", StringComparison.OrdinalIgnoreCase));
         if (examQuestions.Count == 0)
         {
             if (!hasExamPdfForSubmission) return Conflict(new { message = "فایل PDF صورت آزمون موجود نیست." });
