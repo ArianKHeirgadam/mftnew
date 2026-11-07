@@ -411,6 +411,120 @@
         }
       } else if (pdfBox) { pdfBox.hidden = true; pdfBox.innerHTML = ''; }
 
+      const essayGradingBox = $('#essayGradingBox');
+      if (essayGradingBox && role === 'teacher' && !result.isPdfOnly) {
+        essayGradingBox.hidden = true;
+        essayGradingBox.innerHTML = '';
+        try {
+          const queue = await request('/canonical/teacher/essay-grading/queue');
+          const pendingAttempt = (Array.isArray(queue) ? queue : [])
+            .find(item => Number(item.id) === Number(attemptId));
+          const essaySections = pendingAttempt?.sections || [];
+          if (essaySections.length) {
+            essayGradingBox.hidden = false;
+            essayGradingBox.innerHTML = '<div class="section-title"><h3>پاسخ‌های PDF تشریحی — تصحیح استاد</h3></div><p class="text-soft text-sm mb-16">پاسخ‌های تستی این آزمون به‌صورت خودکار تصحیح شده‌اند. برای هر بخش تشریحی، PDF دانشجو را بررسی و نمره را ثبت کنید.</p>';
+            for (const section of essaySections) {
+              const article = document.createElement('section');
+              article.className = 'card card-pad mt-16';
+              const heading = document.createElement('h4');
+              heading.textContent = 'بخش تشریحی ' + faNumber(section.displayOrder || 1);
+              article.append(heading);
+              const paper = document.createElement('p');
+              paper.className = 'text-soft text-sm mt-8';
+              paper.textContent = 'صورت سؤال: ' + (section.questionPaperFileName || 'ثبت نشده');
+              article.append(paper);
+              if (section.answerFileName) {
+                const answerLabel = document.createElement('p');
+                answerLabel.className = 'text-soft text-sm mt-8';
+                answerLabel.textContent = 'پاسخ دانشجو: ' + section.answerFileName;
+                article.append(answerLabel);
+                const frame = document.createElement('iframe');
+                frame.title = 'PDF پاسخ تشریحی دانشجو';
+                frame.style.cssText = 'width:100%;height:560px;border:1px solid var(--border);border-radius:10px;background:#fff;margin-top:10px';
+                const answerRoute = '/canonical/teacher/essay-grading/attempts/' + encodeURIComponent(attemptId) + '/sections/' + encodeURIComponent(section.id) + '/answer.pdf';
+                frame.src = await window.MftApi.objectUrl(answerRoute);
+                article.append(frame);
+                const download = document.createElement('a');
+                download.className = 'btn btn-outline btn-sm mt-8';
+                download.href = frame.src;
+                download.target = '_blank';
+                download.rel = 'noopener';
+                download.textContent = 'بازکردن PDF پاسخ در زبانه جدید';
+                article.append(download);
+              } else {
+                const missing = document.createElement('p');
+                missing.className = 'alert alert-warn mt-12';
+                missing.textContent = 'دانشجو برای این بخش PDF پاسخ بارگذاری نکرده است.';
+                article.append(missing);
+              }
+              const maxScore = Number(section.totalPoints || 100);
+              const grade = section.grade || null;
+              const controls = document.createElement('div');
+              controls.className = 'flex gap-8 mt-16';
+              controls.style.flexWrap = 'wrap';
+              const scoreInput = document.createElement('input');
+              scoreInput.className = 'input';
+              scoreInput.type = 'number';
+              scoreInput.min = '0';
+              scoreInput.max = String(maxScore);
+              scoreInput.step = '0.01';
+              scoreInput.placeholder = 'نمره از ' + maxScore;
+              scoreInput.value = grade?.score == null ? '' : String(grade.score);
+              scoreInput.style.maxWidth = '150px';
+              scoreInput.setAttribute('aria-label', 'نمره بخش تشریحی');
+              const feedbackInput = document.createElement('textarea');
+              feedbackInput.className = 'input';
+              feedbackInput.rows = 2;
+              feedbackInput.maxLength = 2000;
+              feedbackInput.placeholder = 'بازخورد استاد (اختیاری)';
+              feedbackInput.value = grade?.feedback || '';
+              feedbackInput.style.flex = '1 1 260px';
+              const saveGrade = document.createElement('button');
+              saveGrade.type = 'button';
+              saveGrade.className = 'btn btn-primary';
+              saveGrade.textContent = grade ? 'به‌روزرسانی نمره' : 'ثبت نمره بخش';
+              saveGrade.addEventListener('click', async () => {
+                const raw = scoreInput.value.trim();
+                const score = Number(raw);
+                if (!raw || !Number.isFinite(score) || score < 0 || score > maxScore) {
+                  notify('نمره باید بین صفر و ' + maxScore + ' باشد.', 'warn');
+                  return;
+                }
+                saveGrade.disabled = true;
+                try {
+                  const payload = { score, feedback: feedbackInput.value.trim() || null };
+                  if (grade?.rowVersion) payload.rowVersion = grade.rowVersion;
+                  await request('/canonical/teacher/essay-grading/attempts/' + encodeURIComponent(attemptId) +
+                    '/sections/' + encodeURIComponent(section.id) + '/grade', {
+                      method: 'PUT', body: JSON.stringify(payload)
+                    });
+                  notify('نمره بخش تشریحی ثبت شد.', 'ok');
+                  await loadResults();
+                } catch (error) {
+                  notify(error.message || 'ثبت نمره بخش ناموفق بود.', 'danger');
+                  saveGrade.disabled = false;
+                }
+              });
+              controls.append(scoreInput, feedbackInput, saveGrade);
+              article.append(controls);
+              const status = document.createElement('p');
+              status.className = 'text-soft text-sm mt-8';
+              status.textContent = grade
+                ? 'آخرین تصحیح: ' + new Date(grade.gradedAt).toLocaleString('fa-IR') + ' — نمره ' + faNumber(grade.score) + ' از ' + faNumber(maxScore)
+                : 'این بخش هنوز نمره‌گذاری نشده است.';
+              article.append(status);
+              essayGradingBox.append(article);
+            }
+          }
+        } catch (error) {
+          essayGradingBox.hidden = false;
+          essayGradingBox.innerHTML = '<p class="text-soft">دریافت صف تصحیح تشریحی ناموفق بود: ' + escapeHtml(error.message || 'خطای نامشخص') + '</p>';
+        }
+      } else if (essayGradingBox) {
+        essayGradingBox.hidden = true;
+        essayGradingBox.innerHTML = '';
+      }
+
       const publishButton = $('#publishExamResults');
       if (publishButton) {
         publishButton.hidden = !canGrade || result.resultsPublished === true;
