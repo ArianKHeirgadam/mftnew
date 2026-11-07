@@ -124,13 +124,18 @@ public sealed class QuestionImportController(
             return Conflict(new { message = $"سؤال ردیف {existingDuplicate.RowNumber} قبلاً در بانک سؤال ثبت شده است." });
 
         await using var transaction = await academic.Database.BeginTransactionAsync(ct);
-        var batch = new CanonicalQuestionImportBatch
+        var batch = await academic.QuestionImportBatches
+            .FirstOrDefaultAsync(x => x.TeacherUserId == CurrentUserId.Value && x.Title == batchTitle, ct);
+        if (batch is null)
         {
-            TeacherUserId = CurrentUserId.Value,
-            Title = batchTitle
-        };
-        academic.QuestionImportBatches.Add(batch);
-        await academic.SaveChangesAsync(ct);
+            batch = new CanonicalQuestionImportBatch
+            {
+                TeacherUserId = CurrentUserId.Value,
+                Title = batchTitle
+            };
+            academic.QuestionImportBatches.Add(batch);
+            await academic.SaveChangesAsync(ct);
+        }
 
         var insertions = validation.ValidRows.Select(row => new
         {
