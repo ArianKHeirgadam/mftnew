@@ -155,6 +155,7 @@ public sealed class ExamSectionFilesController(
         if (doc is null) return NotFound();
         var path = Resolve(doc.StoredFileName);
         if (!System.IO.File.Exists(path)) return NotFound();
+        Response.Headers["X-Content-Type-Options"] = "nosniff";
         return PhysicalFile(path, "application/pdf", doc.OriginalFileName, enableRangeProcessing: true);
     }
 

@@ -1,8 +1,19 @@
 /*
-  DEPRECATED — DO NOT EXECUTE.
-  This legacy script uses a GUID identity key. The canonical support-table
-  contract uses bigint identity keys.
-  Use database/patch-bigint-feature-tables.sql only after the API/EF Core
-  bigint migration is complete.
+  Additive schema patch for the application settings endpoint.
+  Run once against MftDb_Fresh (or the configured application database).
+  This script creates only the missing AppSettings table and does not alter existing data.
 */
-THROW 52022, 'Deprecated GUID schema script. Use patch-bigint-feature-tables.sql after application cutover.', 1;
+IF OBJECT_ID(N'dbo.AppSettings', N'U') IS NULL
+BEGIN
+    CREATE TABLE dbo.AppSettings
+    (
+        Id uniqueidentifier NOT NULL CONSTRAINT PK_AppSettings PRIMARY KEY,
+        [Key] nvarchar(100) NOT NULL,
+        [Value] nvarchar(max) NOT NULL,
+        UpdatedAt datetime2 NOT NULL
+            CONSTRAINT DF_AppSettings_UpdatedAt DEFAULT (SYSUTCDATETIME())
+    );
+
+    CREATE UNIQUE INDEX UX_AppSettings_Key
+        ON dbo.AppSettings([Key]);
+END;

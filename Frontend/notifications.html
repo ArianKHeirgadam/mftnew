@@ -29,52 +29,47 @@
         <button class="btn btn-outline" data-notification-read-all>علامت‌گذاری همه به‌عنوان خوانده‌شده</button>
       </div>
 
-      <section class="card card-pad mt-24" data-notification-compose hidden>
-        <div class="section-title"><h3>ثبت اعلان جدید</h3><span class="text-soft text-sm">ویژه مدیر کل</span></div>
-        <div class="grid-2" style="margin-top:12px">
-          <div class="field"><label for="notificationAudience">گیرندگان</label>
-            <select class="input" id="notificationAudience" data-notification-audience>
-              <option value="Department">تمام اعضای یک دپارتمان</option>
-              <option value="Managers">تمام مدیران دپارتمان</option>
-              <option value="User">یک کاربر مشخص</option>
-              <option value="Class">اعضای یک کلاس</option>
-            </select>
-          </div>
-          <div class="field" data-notification-department-wrap><label for="notificationDepartment">دپارتمان مقصد</label><select class="input" id="notificationDepartment" data-notification-department><option value="">در حال دریافت...</option></select></div>
-          <div class="field" data-notification-user-wrap hidden><label for="notificationUser">کاربر مقصد</label><select class="input" id="notificationUser" data-notification-user><option value="">در حال دریافت...</option></select></div>
-        </div>
-        <div class="field" data-notification-class-wrap hidden>
-          <label for="notificationClass">کلاس مقصد</label>
-          <select class="input" id="notificationClass" data-notification-class><option value="">در حال دریافت...</option></select>
-          <p class="text-soft text-sm" data-class-summary></p>
-          <div class="field" data-class-roster-wrap hidden>
-            <label for="classRosterMembers">اعضای کلاس (برای ویرایش، اعضای موردنظر را انتخاب کنید)</label>
-            <select class="input" id="classRosterMembers" data-class-roster-members multiple size="6"></select>
-            <button class="btn btn-outline mt-8" type="button" data-class-roster-save>ذخیره اعضای کلاس</button>
-          </div>
-        </div>
-        <div class="grid-2" data-class-create-wrap hidden>
-          <div class="field"><label for="newClassName">نام کلاس جدید</label><input class="input" id="newClassName" data-class-name maxlength="200" placeholder="مثلاً کلاس برنامه‌نویسی وب"></div>
-          <div class="field"><label for="newClassDepartment">دپارتمان کلاس</label><select class="input" id="newClassDepartment" data-class-department><option value="">انتخاب دپارتمان</option></select></div>
-          <div class="field"><label for="newClassMembers">اعضای کلاس (دانشجویان همان دپارتمان)</label><select class="input" id="newClassMembers" data-class-members multiple size="5"></select><small class="text-soft">برای انتخاب چند نفر، Ctrl را نگه دارید.</small></div>
-          <div class="field" style="align-self:end;display:flex;gap:8px;flex-wrap:wrap"><button class="btn btn-outline" type="button" data-class-create>ایجاد کلاس و ثبت اعضا</button><button class="btn btn-primary" type="button" data-class-save-members>ذخیره اعضای کلاس انتخاب‌شده</button></div>
-        </div>
-        <div class="field"><label for="notificationTitle">عنوان اعلان</label><input class="input" id="notificationTitle" maxlength="250" data-notification-title placeholder="عنوان اعلان"></div>
-        <div class="field"><label for="notificationMessage">متن اعلان</label><textarea class="input" id="notificationMessage" rows="4" data-notification-message placeholder="متن اعلان را بنویسید..."></textarea></div>
-        
-        <button class="btn btn-primary" type="button" data-notification-send>ارسال اعلان</button>
-      </section>
-
       <div class="tabs" data-tabs>
-        <button class="tab-btn active" data-tab="tAll">همه (۰)</button>
-        <button class="tab-btn" data-tab="tUnread">خوانده‌نشده (۰)</button>
-        <button class="tab-btn" data-tab="tRead">خوانده‌شده (۰)</button>
+        <button class="tab-btn active" data-tab="tAll">همه (۸)</button>
+        <button class="tab-btn" data-tab="tUnread">خوانده‌نشده (۵)</button>
+        <button class="tab-btn" data-tab="tRead">خوانده‌شده (۳)</button>
       </div>
 
       <div class="card card-pad">
-        <div id="tAll" class="tab-panel active" data-notification-list data-notification-panel><div class="empty-state">در حال دریافت اعلان‌ها...</div></div>
-        <div id="tUnread" class="tab-panel" data-notification-panel></div>
-        <div id="tRead" class="tab-panel" data-notification-panel></div>
+        <div id="tAll" class="tab-panel active" data-notification-list>
+          <div class="notif-item unread">
+            <div class="notif-icon" style="background:color-mix(in srgb, var(--ok) 15%, transparent);color:var(--ok)">✅</div>
+            <div style="flex:1"><b style="font-size:13.5px">نمره آزمون میان‌ترم اعلام شد</b><p class="text-soft text-sm mt-8">نمره شما در آزمون ساختمان داده و الگوریتم ثبت و نهایی شد.</p><span class="text-soft" style="font-size:11px">۱۰ دقیقه پیش</span></div>
+            <button class="btn btn-ghost btn-sm">حذف</button>
+          </div>
+          <div class="notif-item unread">
+            <div class="notif-icon" style="background:color-mix(in srgb, var(--warn) 15%, transparent);color:var(--warn)">⏰</div>
+            <div style="flex:1"><b style="font-size:13.5px">یادآوری آزمون فردا</b><p class="text-soft text-sm mt-8">آزمون ساختمان داده و الگوریتم فردا ساعت ۱۰:۰۰ برگزار می‌شود.</p><span class="text-soft" style="font-size:11px">۲ ساعت پیش</span></div>
+            <button class="btn btn-ghost btn-sm">حذف</button>
+          </div>
+          <div class="notif-item unread">
+            <div class="notif-icon" style="background:color-mix(in srgb, var(--primary) 15%, transparent);color:var(--primary)">📝</div>
+            <div style="flex:1"><b style="font-size:13.5px">ثبت‌نام شما تایید شد</b><p class="text-soft text-sm mt-8">درخواست ثبت‌نام شما در دپارتمان مهندسی کامپیوتر تایید شد.</p><span class="text-soft" style="font-size:11px">دیروز</span></div>
+            <button class="btn btn-ghost btn-sm">حذف</button>
+          </div>
+          <div class="notif-item unread">
+            <div class="notif-icon" style="background:color-mix(in srgb, var(--gold-500) 18%, transparent);color:var(--gold-500)">📢</div>
+            <div style="flex:1"><b style="font-size:13.5px">تغییر زمان‌بندی آزمون</b><p class="text-soft text-sm mt-8">آزمون پایگاه داده به تاریخ جدید موکول شد.</p><span class="text-soft" style="font-size:11px">۲ روز پیش</span></div>
+            <button class="btn btn-ghost btn-sm">حذف</button>
+          </div>
+          <div class="notif-item unread">
+            <div class="notif-icon" style="background:color-mix(in srgb, var(--danger) 15%, transparent);color:var(--danger)">⚠️</div>
+            <div style="flex:1"><b style="font-size:13.5px">هشدار غیبت</b><p class="text-soft text-sm mt-8">شما در آزمون کوییز هفتگی درس شبکه غایب بوده‌اید.</p><span class="text-soft" style="font-size:11px">۳ روز پیش</span></div>
+            <button class="btn btn-ghost btn-sm">حذف</button>
+          </div>
+          <div class="notif-item">
+            <div class="notif-icon" style="background:var(--surface-2);color:var(--text-soft)">📄</div>
+            <div style="flex:1"><b style="font-size:13.5px">کارنامه ترم قابل مشاهده است</b><p class="text-soft text-sm mt-8">کارنامه نیمسال جاری در پروفایل شما بارگذاری شد.</p><span class="text-soft" style="font-size:11px">هفته گذشته</span></div>
+            <button class="btn btn-ghost btn-sm">حذف</button>
+          </div>
+        </div>
+        <div id="tUnread" class="tab-panel"><p class="text-soft text-sm" style="padding:20px 0">اعلان‌های خوانده‌نشده در این بخش نمایش داده می‌شوند.</p></div>
+        <div id="tRead" class="tab-panel"><p class="text-soft text-sm" style="padding:20px 0">اعلان‌های خوانده‌شده در این بخش نمایش داده می‌شوند.</p></div>
       </div>
     </main>
   </div>

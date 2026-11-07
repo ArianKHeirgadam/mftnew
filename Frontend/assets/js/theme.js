@@ -28,30 +28,12 @@
 
   document.addEventListener("DOMContentLoaded", () => {
     document.querySelectorAll("[data-theme-toggle]").forEach((btn) => {
-      if (btn.dataset.themeWired === "true") return;
-      btn.dataset.themeWired = "true";
       btn.addEventListener("click", () => {
         const current = document.documentElement.getAttribute("data-theme");
         apply(current === "dark" ? "light" : "dark");
       });
     });
-    // app.js renders the topbar after this DOMContentLoaded handler.
-    // Bind the dynamically-created control only when app.js signals readiness.
-    function bindTopbarThemeControl() {
-      document.querySelectorAll("[data-theme-toggle]").forEach((btn) => {
-        if (btn.dataset.themeWired === "true") return;
-        btn.dataset.themeWired = "true";
-        btn.addEventListener("click", () => {
-          const current = document.documentElement.getAttribute("data-theme");
-          apply(current === "dark" ? "light" : "dark");
-        });
-      });
-      document.querySelectorAll("[data-theme-icon]").forEach((btn) => {
-        const icon = document.documentElement.getAttribute("data-theme") === "dark" ? ICONS.sun : ICONS.moon;
-        if (btn.innerHTML !== icon) btn.innerHTML = icon;
-      });
-    }
-    document.addEventListener("mft:topbar-ready", bindTopbarThemeControl);
+    // set correct icon on load
     apply(document.documentElement.getAttribute("data-theme") || getPreferred());
   });
 })();

@@ -7,18 +7,6 @@
 <link rel="stylesheet" href="assets/css/style.css">
 <link rel="stylesheet" href="assets/css/responsive.css">
 <link rel="stylesheet" href="assets/css/dark.css">
-<style>
-  .taxonomy-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px;align-items:stretch}
-  .taxonomy-card{min-width:0;padding:16px;border:1px solid var(--border);border-radius:14px;background:var(--surface)}
-  .taxonomy-card-head{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:14px}
-  .taxonomy-card-head b{font-size:14px}
-  .taxonomy-card-head span{font-size:11px}
-  .taxonomy-inline-field{display:flex;align-items:end;gap:10px}
-  .taxonomy-inline-field .field{flex:1;min-width:0;margin:0}
-  .taxonomy-inline-field>.btn{flex-shrink:0;min-height:42px;margin-bottom:0}
-  .taxonomy-card>.field{margin-bottom:12px}
-  @media(max-width:760px){.taxonomy-grid{grid-template-columns:1fr}.taxonomy-inline-field{align-items:stretch;flex-direction:column}.taxonomy-inline-field>.btn{width:100%}.taxonomy-card-head{align-items:flex-start;flex-direction:column;gap:3px}}
-</style>
 </head>
 <body data-role="teacher" data-active="bank">
 <div class="app-shell">
@@ -32,34 +20,11 @@
           <h1>بانک سوالات</h1>
         </div>
         <div class="flex gap-8">
-          
-          <a class="btn btn-outline" href="question-import.html">ورود گروهی سؤالات</a>
+          <a class="btn btn-outline" href="question-import.html">ورود سؤال از PDF</a>
           <button class="btn btn-outline"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 15V3m0 12 4-4m-4 4-4-4M4 21h16"/></svg> خروجی (Export)</button>
           <button class="btn btn-primary" data-modal-open="questionModal">+ سوال جدید</button>
         </div>
       </div>
-
-      <section class="card card-pad" id="taxonomyManagement" hidden style="margin-bottom:18px">
-        <h3 style="margin-bottom:12px">مدیریت دسته‌بندی‌ها و مهارت‌ها</h3>
-        <p class="text-soft text-sm" style="margin-bottom:14px">ابتدا دسته‌بندی بسازید و سپس مهارت‌های مربوط به آن را تعریف کنید. این اطلاعات در فرم ثبت سؤال استفاده می‌شوند.</p>
-        <div class="taxonomy-grid">
-          <div class="taxonomy-card">
-            <div class="taxonomy-card-head"><b>ایجاد دسته‌بندی</b><span class="text-soft">گروه اصلی سؤال‌ها</span></div>
-            <div class="taxonomy-inline-field">
-              <div class="field"><label for="newCategoryName">نام دسته‌بندی جدید</label><input class="input" id="newCategoryName" maxlength="150" placeholder="مثلاً برنامه‌نویسی"></div>
-              <button class="btn btn-outline" id="createCategory">ثبت دسته‌بندی</button>
-            </div>
-          </div>
-          <div class="taxonomy-card">
-            <div class="taxonomy-card-head"><b>ایجاد مهارت یا سرفصل</b><span class="text-soft">وابسته به یک دسته‌بندی</span></div>
-            <div class="field"><label for="newSkillCategory">دسته‌بندی مربوطه</label><select class="select" id="newSkillCategory"><option value="">ابتدا دسته‌بندی بسازید</option></select></div>
-            <div class="taxonomy-inline-field">
-              <div class="field"><label for="newSkillName">نام مهارت / سرفصل</label><input class="input" id="newSkillName" maxlength="100" placeholder="مثلاً ساختمان داده"></div>
-              <button class="btn btn-primary" id="createSkill">ثبت مهارت</button>
-            </div>
-          </div>
-        </div>
-      </section>
 
       <div class="tabs" data-tabs>
         <button class="tab-btn active" data-tab="tabAll">همه (۱۲۴۰)</button>
@@ -78,7 +43,12 @@
           <div class="table-wrap">
             <table class="dt">
               <thead><tr><th>متن سوال</th><th>دسته‌بندی</th><th>نوع</th><th>سطح دشواری</th><th>عملیات</th></tr></thead>
-              <tbody id="questionRows"><tr><td colspan="5" style="text-align:center;padding:24px">در حال دریافت سؤال‌ها...</td></tr></tbody>
+              <tbody>
+                <tr><td style="max-width:340px">پیچیدگی زمانی الگوریتم کویک‌سورت در بدترین حالت چیست؟</td><td>الگوریتم</td><td><span class="badge badge-info">چهارگزینه‌ای</span></td><td><span class="badge badge-warn">متوسط</span></td><td class="flex gap-8"><button class="btn btn-outline btn-sm" data-modal-open="questionModal">ویرایش</button><button class="btn btn-danger btn-sm">حذف</button></td></tr>
+                <tr><td style="max-width:340px">الگوریتم کاراتسوبا را برای ضرب دو عدد ۴ رقمی شرح دهید.</td><td>الگوریتم</td><td><span class="badge badge-muted">تشریحی</span></td><td><span class="badge badge-danger">سخت</span></td><td class="flex gap-8"><button class="btn btn-outline btn-sm" data-modal-open="questionModal">ویرایش</button><button class="btn btn-danger btn-sm">حذف</button></td></tr>
+                <tr><td style="max-width:340px">کدام ساختار داده برای پیاده‌سازی صف اولویت مناسب‌تر است؟</td><td>ساختمان داده</td><td><span class="badge badge-info">چهارگزینه‌ای</span></td><td><span class="badge badge-ok">آسان</span></td><td class="flex gap-8"><button class="btn btn-outline btn-sm" data-modal-open="questionModal">ویرایش</button><button class="btn btn-danger btn-sm">حذف</button></td></tr>
+                <tr><td style="max-width:340px">نرمال‌سازی پایگاه داده تا فرم نرمال سوم را با مثال توضیح دهید.</td><td>پایگاه داده</td><td><span class="badge badge-muted">تشریحی</span></td><td><span class="badge badge-warn">متوسط</span></td><td class="flex gap-8"><button class="btn btn-outline btn-sm" data-modal-open="questionModal">ویرایش</button><button class="btn btn-danger btn-sm">حذف</button></td></tr>
+              </tbody>
             </table>
           </div>
           <div class="pagination"><button>«</button><button class="active">۱</button><button>۲</button><button>۳</button><button>»</button></div>
@@ -95,19 +65,17 @@
     <div class="modal-head"><h3 style="font-size:16px">افزودن / ویرایش سوال</h3><button class="icon-btn" data-modal-close>✕</button></div>
     <div class="modal-body">
       <div class="field"><label>متن سوال</label><textarea class="textarea" rows="3" placeholder="متن سوال را وارد کنید..." data-question-text></textarea></div>
-      <div class="field"><label>مهارت / سرفصل</label><select class="select" id="questionSkill" required><option value="">در حال دریافت مهارت‌ها...</option></select></div>
       <div class="grid-2" style="grid-template-columns:1fr 1fr">
         <div class="field"><label>نوع سوال</label><select class="select" id="qType"><option value="MultipleChoice">چهارگزینه‌ای</option><option value="Essay">تشریحی</option><option value="Matching">وصل‌کردنی</option></select></div>
         <div class="field"><label>سطح دشواری</label><select class="select" data-question-difficulty><option value="Easy">آسان</option><option value="Medium" selected>متوسط</option><option value="Hard">سخت</option></select></div>
       </div>
-      <div class="field"><label>بارم سؤال</label><input class="input" id="questionPoints" type="number" min="0.25" max="9999" step="0.25" value="1"></div>
+      <div class="field"><label>دسته‌بندی</label><select class="select" data-question-category><option>الگوریتم</option><option>ساختمان داده</option><option>پایگاه داده</option></select></div>
       <div id="mcqOptions">
         <label style="font-size:12.5px;font-weight:700;display:block;margin-bottom:7px">گزینه‌ها</label>
-        <div class="field"><input class="input" data-question-option placeholder="گزینه ۱"></div>
-        <div class="field"><input class="input" data-question-option placeholder="گزینه ۲"></div>
-        <div class="field"><input class="input" data-question-option placeholder="گزینه ۳"></div>
-        <div class="field"><input class="input" data-question-option placeholder="گزینه ۴"></div>
-        <div class="field"><label for="correctOption">گزینه صحیح</label><select class="select" id="correctOption"><option value="">انتخاب گزینه صحیح</option><option value="1">۱</option><option value="2">۲</option><option value="3">۳</option><option value="4">۴</option></select></div>
+        <div class="field"><div class="checkbox-row"><input type="radio" name="correct" checked><input class="input" data-question-option placeholder="گزینه ۱ (صحیح)" style="flex:1"></div></div>
+        <div class="field"><div class="checkbox-row"><input type="radio" name="correct"><input class="input" data-question-option placeholder="گزینه ۲" style="flex:1"></div></div>
+        <div class="field"><div class="checkbox-row"><input type="radio" name="correct"><input class="input" data-question-option placeholder="گزینه ۳" style="flex:1"></div></div>
+        <div class="field"><div class="checkbox-row"><input type="radio" name="correct"><input class="input" data-question-option placeholder="گزینه ۴" style="flex:1"></div></div>
       </div>
       <div id="matchingOptions" hidden>
         <label style="font-size:12.5px;font-weight:700;display:block;margin-bottom:7px">جفت‌های وصل‌کردنی</label>
@@ -128,137 +96,10 @@
 <script src="assets/js/app.js"></script>
 <script src="assets/js/api.js"></script>
 <script>
-(() => {
- const api=window.MftApi, skill=document.getElementById('questionSkill'), modal=document.getElementById('questionModal');
- const correct=document.getElementById('correctOption');
- const notify=(m,t='info')=>window.showToast?.(m,t);
- const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
- let lookups=null, questionRows=[];
- const searchField=document.querySelector('.table-toolbar .search-box input');
- const categoryFilter=document.querySelectorAll('.table-toolbar select')[0];
- const difficultyFilter=document.querySelectorAll('.table-toolbar select')[1];
- const typeLabel=code=>({MultipleChoice:'چهارگزینه‌ای',Essay:'تشریحی',Matching:'وصل‌کردنی'}[code]||code||'—');
- const difficultyLabel=value=>({1:'آسان',2:'متوسط',3:'سخت',Easy:'آسان',Medium:'متوسط',Hard:'سخت'}[value]||'—');
- const renderQuestions=()=>{
-  const term=(searchField?.value||'').trim().toLocaleLowerCase();
-  const category=categoryFilter?.value||'';
-  const difficulty=difficultyFilter?.value||'';
-  const rows=questionRows.filter(q=>(!term||String(q.text||'').toLocaleLowerCase().includes(term))&&
-   (!category||category==='همه دسته‌بندی‌ها'||q.categoryName===category)&&
-   (!difficulty||difficulty==='همه سطوح دشواری'||difficultyLabel(q.difficultyLevel)===difficulty));
-  document.getElementById('questionRows').innerHTML=rows.length?rows.map(q=>'<tr>'+
-   '<td style="max-width:340px">'+esc(q.text)+'</td><td>'+esc(q.categoryName||'—')+'</td>'+
-   '<td><span class="badge badge-info">'+esc(typeLabel(q.questionTypeCode))+'</span></td>'+
-   '<td>'+esc(difficultyLabel(q.difficultyLevel))+'</td><td class="flex gap-8">'+
-   '<button class="btn btn-outline btn-sm" data-question-edit="'+q.id+'">ویرایش</button>'+
-   '<button class="btn btn-danger btn-sm" data-question-delete="'+q.id+'">حذف</button></td></tr>').join(''):
-   '<tr><td colspan="5" style="text-align:center;padding:24px">سؤالی برای نمایش وجود ندارد.</td></tr>';
- };
- async function loadQuestions(){
-  const rows=await api.request('/questions');
-  questionRows=Array.isArray(rows)?rows:[];
-  renderQuestions();
- }
- async function loadCanonicalLookups(){
-  try{
-   lookups=await api.request('/questions/lookups');
-   skill.innerHTML='<option value="">انتخاب مهارت</option>'+lookups.skills.map(x=>'<option value="'+x.id+'">'+esc(x.name)+' — '+esc(lookups.categories.find(c=>Number(c.id)===Number(x.examCategoryId))?.name||'')+'</option>').join('');
-   const taxonomyCategory=document.getElementById('newSkillCategory');
-   if(taxonomyCategory)taxonomyCategory.innerHTML='<option value="">انتخاب دسته‌بندی</option>'+lookups.categories.map(x=>'<option value="'+x.id+'">'+esc(x.name)+'</option>').join('');
-   if(categoryFilter)categoryFilter.innerHTML='<option value="">همه دسته‌بندی‌ها</option>'+lookups.categories.map(x=>'<option value="'+esc(x.name)+'">'+esc(x.name)+'</option>').join('');
-   if(!lookups.skills.length) notify('هیچ مهارتی در بانک اطلاعاتی ثبت نشده است؛ ابتدا دسته‌بندی و مهارت‌ها باید در دیتابیس تعریف شوند.','warn');
-  }catch(e){skill.innerHTML='<option value="">دریافت مهارت‌ها ناموفق بود</option>';notify(e.message,'danger');}
- }
- document.getElementById('qType').addEventListener('change',function(){
-  document.getElementById('mcqOptions').style.display=this.value==='MultipleChoice'?'block':'none';
-  document.getElementById('matchingOptions').hidden=this.value!=='Matching';
- });
- document.querySelector('[data-question-save]').addEventListener('click',async()=>{
-  const text=document.querySelector('[data-question-text]').value.trim(), type=document.getElementById('qType').value;
-  const options=[...document.querySelectorAll('[data-question-option]')].map(x=>x.value.trim());
-  const idx=Number(correct.value)-1;
-  const left=[...document.querySelectorAll('[data-match-left]')].map(x=>x.value.trim());
-  const right=[...document.querySelectorAll('[data-match-right]')].map(x=>x.value.trim());
-  const pairs=left.map((v,i)=>({leftItem:v,rightItem:right[i],displayOrder:i+1})).filter(x=>x.leftItem&&x.rightItem);
-  if(!text)return notify('متن سؤال را وارد کنید.','warn');
-  if(!skill.value)return notify('یک مهارت معتبر انتخاب کنید.','warn');
-  if(type==='MultipleChoice'&&(options.filter(Boolean).length<2||!options[idx]))return notify('حداقل دو گزینه و گزینه صحیح را مشخص کنید.','warn');
-  if(type==='Matching'&&(pairs.length<2||new Set(pairs.map(x=>x.rightItem.toLocaleLowerCase())).size!==pairs.length))return notify('حداقل دو جفت وصل‌کردنی با پاسخ‌های غیرتکراری وارد کنید.','warn');
-  const typeRow=lookups?.questionTypes.find(x=>x.code===type);
-  if(!typeRow)return notify('نوع سؤال در داده‌های پایه پیدا نشد.','danger');
-  const difficulty={Easy:1,Medium:2,Hard:3}[document.querySelector('[data-question-difficulty]').value]||2;
-  const body={skillId:Number(skill.value),questionTypeId:Number(typeRow.id),text,points:Number(document.getElementById('questionPoints').value||1),difficultyLevel:difficulty,
-   options:type==='MultipleChoice'?options.map((optionText,i)=>({optionText,isCorrect:i===idx,displayOrder:i+1})).filter(x=>x.optionText):[],
-   matchingPairs:type==='Matching'?pairs:[],criteria:[]};
-  try{
-   const id=modal.dataset.editId;
-   await api.request(id?'/questions/'+encodeURIComponent(id):'/questions',{method:id?'PUT':'POST',body:JSON.stringify(body)});
-   delete modal.dataset.editId; modal.classList.remove('show');
-   document.querySelector('[data-question-text]').value='';
-   document.querySelectorAll('[data-question-option],[data-match-left],[data-match-right]').forEach(x=>x.value='');
-   correct.value=''; skill.value=''; document.getElementById('questionPoints').value='1';
-   notify(id?'سؤال با موفقیت ویرایش شد.':'سؤال با موفقیت ذخیره شد.','ok');
-   location.reload();
-  }catch(e){notify(e.message||'ذخیره سؤال ناموفق بود.','danger');}
- });
- const taxonomyPanel=document.getElementById('taxonomyManagement');
- api.request('/auth/me').then(user=>{
-  if(String(user.role||'').toLowerCase()==='superadmin')taxonomyPanel.hidden=false;
- }).catch(()=>{});
- document.getElementById('createCategory').addEventListener('click',async()=>{
-  const name=document.getElementById('newCategoryName').value.trim();
-  if(!name)return notify('نام دسته‌بندی را وارد کنید.','warn');
-  try{
-   await api.request('/questions/lookups/categories',{method:'POST',body:JSON.stringify({name})});
-   document.getElementById('newCategoryName').value='';
-   await loadCanonicalLookups();
-   notify('دسته‌بندی ثبت شد.','ok');
-  }catch(e){notify(e.message||'ثبت دسته‌بندی ناموفق بود.','danger');}
- });
- document.getElementById('createSkill').addEventListener('click',async()=>{
-  const name=document.getElementById('newSkillName').value.trim();
-  const examCategoryId=Number(document.getElementById('newSkillCategory').value||0);
-  if(!name||!examCategoryId)return notify('نام مهارت و دسته‌بندی را انتخاب کنید.','warn');
-  try{
-   await api.request('/questions/lookups/skills',{method:'POST',body:JSON.stringify({name,examCategoryId})});
-   document.getElementById('newSkillName').value='';
-   await loadCanonicalLookups();
-   notify('مهارت ثبت شد و به فهرست انتخاب سؤال اضافه شد.','ok');
-  }catch(e){notify(e.message||'ثبت مهارت ناموفق بود.','danger');}
- });
- if(searchField)searchField.addEventListener('input',renderQuestions);
- [categoryFilter,difficultyFilter].forEach(x=>x?.addEventListener('change',renderQuestions));
- document.getElementById('questionRows').addEventListener('click',async event=>{
-  const edit=event.target.closest('[data-question-edit]');
-  const remove=event.target.closest('[data-question-delete]');
-  if(edit){
-   try{
-    const q=await api.request('/questions/'+encodeURIComponent(edit.dataset.questionEdit));
-    modal.dataset.editId=q.id;
-    document.querySelector('[data-question-text]').value=q.text||'';
-    skill.value=String(q.skillId);
-    const type=lookups?.questionTypes.find(x=>Number(x.id)===Number(q.questionTypeId));
-    document.getElementById('qType').value=type?.code||'Essay';
-    document.getElementById('qType').dispatchEvent(new Event('change'));
-    document.getElementById('questionPoints').value=q.points??1;
-    document.querySelector('[data-question-difficulty]').value=({1:'Easy',2:'Medium',3:'Hard'}[q.difficultyLevel]||'Medium');
-    document.querySelectorAll('[data-question-option]').forEach((el,i)=>el.value=q.options?.[i]?.optionText||'');
-    const correctIndex=(q.options||[]).findIndex(x=>x.isCorrect);
-    correct.value=correctIndex>=0?String(correctIndex+1):'';
-    document.querySelectorAll('[data-match-left]').forEach((el,i)=>el.value=q.matchingPairs?.[i]?.leftItem||'');
-    document.querySelectorAll('[data-match-right]').forEach((el,i)=>el.value=q.matchingPairs?.[i]?.rightItem||'');
-    modal.classList.add('show');
-   }catch(e){notify(e.message,'danger');}
-  }
-  if(remove){
-   if(!confirm('این سؤال حذف شود؟'))return;
-   try{await api.request('/questions/'+encodeURIComponent(remove.dataset.questionDelete),{method:'DELETE'});notify('سؤال حذف شد.','ok');await loadQuestions();}
-   catch(e){notify(e.message,'danger');}
-  }
- });
- modal.querySelectorAll('[data-modal-close]').forEach(x=>x.addEventListener('click',()=>{delete modal.dataset.editId;}));
- loadCanonicalLookups().then(loadQuestions).catch(e=>notify(e.message,'danger'));
-})();
+  document.getElementById("qType").addEventListener("change", function(){
+    document.getElementById("mcqOptions").style.display = this.value === "MultipleChoice" ? "block" : "none";
+    document.getElementById("matchingOptions").hidden = this.value !== "Matching";
+  });
 </script>
 </body>
 </html>

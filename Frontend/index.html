@@ -1,14 +1,22 @@
 <!DOCTYPE html>
 <html lang="fa" dir="rtl">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta http-equiv="refresh" content="1;url=login.html?entry=index-v2">
-  <title>ورود به سامانه سنجش</title>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>سامانه سنجش</title>
+<meta http-equiv="refresh" content="1.2;url=login.html">
+<link rel="stylesheet" href="assets/css/style.css">
+<style>
+  body{display:flex;align-items:center;justify-content:center;min-height:100vh;background:var(--ink-900);}
+  .splash{display:flex;flex-direction:column;align-items:center;gap:18px;color:#fff;animation:fadeIn .5s ease;}
+  .splash .brand-mark{width:66px;height:66px;font-size:26px;}
+</style>
 </head>
 <body>
-  <main>
-    <p>برای ورود به سامانه سنجش، <a href="login.html?entry=index-v2">اینجا کلیک کنید</a>.</p>
-  </main>
+  <div class="splash">
+    <div class="brand-mark">س</div>
+    <div style="font-family:var(--font-display);font-weight:800;font-size:18px">سامانه سنجش</div>
+    <div class="spinner"></div>
+  </div>
 </body>
 </html>

@@ -27,7 +27,3 @@
 }
 :root[data-theme="dark"] .btn-primary{color:var(--ink-900);}
 :root[data-theme="dark"] ::selection{background:var(--teal-400);color:var(--ink-900);}
-
-:root[data-theme="dark"] select {
-  color-scheme: dark;
-}

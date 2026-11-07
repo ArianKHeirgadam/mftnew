@@ -17,6 +17,7 @@ public class User
     public string FullName { get; set; } = "";
     public string? Email { get; set; }
     public string? Mobile { get; set; }
+    public bool MustChangePassword { get; set; }
     public Guid? DepartmentId { get; set; }
     public bool IsActive { get; set; } = true;
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
@@ -33,7 +34,6 @@ public class Department
     public bool IsActive { get; set; } = true;
     [System.ComponentModel.DataAnnotations.Schema.NotMapped]
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
-    public User? Manager { get; set; }
     public ICollection<User> Users { get; set; } = new List<User>();
 }
 
@@ -54,13 +54,6 @@ public class Question
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 }
 
-public class QuestionOption
-{
-    public Guid Id { get; set; } = Guid.NewGuid();
-    public Guid QuestionId { get; set; }
-    public bool IsCorrect { get; set; }
-}
-
 public class Exam
 {
     public Guid Id { get; set; } = Guid.NewGuid();
@@ -76,9 +69,6 @@ public class Exam
     [System.ComponentModel.DataAnnotations.Schema.NotMapped]
     public DateTime? EndsAt { get; set; }
     public bool IsPublished { get; set; }
-    public bool ResultsPublished { get; set; }
-    public DateTime? ResultsPublishedAt { get; set; }
-    public Guid? ResultsPublishedByUserId { get; set; }
     public Guid CreatedByUserId { get; set; }
     public Guid? DepartmentId { get; set; }
     [System.ComponentModel.DataAnnotations.Schema.NotMapped]
@@ -113,37 +103,12 @@ public class ExamAnswer
     public Guid Id { get; set; } = Guid.NewGuid();
     public Guid ExamAttemptId { get; set; }
     public Guid QuestionId { get; set; }
-    public Guid? SelectedOptionId { get; set; }
     public string? Answer { get; set; }
-    public QuestionOption? SelectedOption { get; set; }
     public bool? IsCorrect { get; set; }
     public decimal AwardedScore { get; set; }
-    public bool IsManuallyGraded { get; set; }
-    public string? GradingComment { get; set; }
-    public Guid? GradedByUserId { get; set; }
-    public DateTime? GradedAt { get; set; }
     [System.ComponentModel.DataAnnotations.Schema.NotMapped]
     public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
     public ExamAttempt Attempt { get; set; } = null!;
-}
-
-public class StudentClass
-{
-    public Guid Id { get; set; } = Guid.NewGuid();
-    public string Name { get; set; } = "";
-    public Guid DepartmentId { get; set; }
-    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
-    public ICollection<StudentClassMember> Members { get; set; } = new List<StudentClassMember>();
-}
-
-public class StudentClassMember
-{
-    public Guid Id { get; set; } = Guid.NewGuid();
-    public Guid ClassId { get; set; }
-    public Guid StudentUserId { get; set; }
-    public DateTime AddedAt { get; set; } = DateTime.UtcNow;
-    public StudentClass Class { get; set; } = null!;
-    public User Student { get; set; } = null!;
 }
 
 public class Notification
@@ -176,27 +141,4 @@ public class AttendanceRecord
     public DateOnly AttendanceDate { get; set; }
     public string Status { get; set; } = "Present";
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
-}
-
-
-public class ExamDocument
-{
-    public Guid Id { get; set; } = Guid.NewGuid();
-    public Guid ExamId { get; set; }
-    public string StoredFileName { get; set; } = "";
-    public string OriginalFileName { get; set; } = "";
-    public long FileSize { get; set; }
-    public Guid UploadedByUserId { get; set; }
-    public DateTime UploadedAt { get; set; } = DateTime.UtcNow;
-}
-
-public class ExamSubmissionDocument
-{
-    public Guid Id { get; set; } = Guid.NewGuid();
-    public Guid AttemptId { get; set; }
-    public string StoredFileName { get; set; } = "";
-    public string OriginalFileName { get; set; } = "";
-    public long FileSize { get; set; }
-    public Guid UploadedByUserId { get; set; }
-    public DateTime UploadedAt { get; set; } = DateTime.UtcNow;
 }

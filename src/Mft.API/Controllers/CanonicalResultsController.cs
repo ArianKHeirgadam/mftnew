@@ -116,7 +116,10 @@ public sealed class CanonicalResultsController(
         var maxScore = isPdfOnly ? 100m : answers.Sum(x => x.PointsOverride ?? x.Points);
         var payload = answers.Select(x => {
             var code = typeCodes.GetValueOrDefault(x.QuestionTypeId) ?? "Unknown";
-            var reveal = !isStudent || exam.ResultsPublished;
+            // Correct answers and matching keys are never included in student responses,
+            // even after publication. Publication controls scores, not answer-key disclosure.
+            var reveal = !isStudent;
+            var studentFinalized = isStudent && attempt.StatusId == 4 && exam.ResultsPublished;
             return new {
                 questionId = x.QuestionId, examQuestionId = x.ExamQuestionId, question = x.Text,
                 questionType = code,
@@ -127,7 +130,7 @@ public sealed class CanonicalResultsController(
                 matchingKey = reveal && code == "Matching"
                     ? matching.Where(p => p.QuestionId == x.QuestionId).Select(p => new { p.LeftItem, p.RightItem }).ToList()
                     : null,
-                awardedScore = reveal || (isStudent && x.IsAutoGraded) ? x.Score : null,
+                awardedScore = reveal || (isStudent && (x.IsAutoGraded || studentFinalized)) ? x.Score : null,
                 maxScore = x.PointsOverride ?? x.Points,
                 isAutoGraded = x.IsAutoGraded,
                 isManuallyGraded = !x.IsAutoGraded && x.Score.HasValue,

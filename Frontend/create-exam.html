@@ -3,207 +3,221 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>ایجاد آزمون | سامانه سنجش</title>
+<title>ساخت آزمون | سامانه سنجش</title>
 <link rel="stylesheet" href="assets/css/style.css">
 <link rel="stylesheet" href="assets/css/responsive.css">
 <link rel="stylesheet" href="assets/css/dark.css">
 <style>
-.exam-steps{display:flex;gap:10px;align-items:center;margin:0 0 22px;flex-wrap:wrap}
-.exam-step{display:flex;align-items:center;gap:8px;color:var(--text-soft);font-size:13px;font-weight:700}
-.exam-step .n{width:30px;height:30px;border-radius:50%;display:grid;place-items:center;background:var(--surface-2);border:1px solid var(--border)}
-.exam-step.active{color:var(--text)}.exam-step.active .n{background:var(--primary);color:#fff;border-color:var(--primary)}
-.exam-step.done .n{background:var(--ok);color:#fff;border-color:var(--ok)}
-.exam-panel{display:none}.exam-panel.active{display:block}
-.exam-form-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}
-.exam-form-grid .field{margin:0}.exam-form-grid .wide{grid-column:1/-1}
-.question-tools{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin:14px 0}
-.question-tools .input{flex:1;min-width:220px}
-.question-list{max-height:480px;overflow:auto;display:grid;gap:8px}
-.question-row{display:flex;align-items:flex-start;gap:12px;padding:13px;border:1px solid var(--border);border-radius:12px;background:var(--surface);cursor:pointer}
-.question-row:has(input:checked){border-color:var(--primary);background:color-mix(in srgb,var(--primary) 7%,var(--surface))}
-.question-row input{margin-top:5px;accent-color:var(--primary)}
-.question-row .qtext{flex:1;line-height:1.9;font-size:13px}
-.question-empty{padding:28px 16px;text-align:center;border:1px dashed var(--border);border-radius:12px;color:var(--text-soft)}
-.summary-list{display:grid;gap:12px}.summary-item{display:flex;justify-content:space-between;gap:16px;padding-bottom:10px;border-bottom:1px solid var(--border)}
-@media(max-width:700px){.exam-form-grid{grid-template-columns:1fr}.exam-form-grid .wide{grid-column:auto}.summary-item{flex-direction:column;gap:4px}}
+  .wizard-steps{display:flex;align-items:center;gap:6px;margin-bottom:26px;overflow-x:auto;padding-bottom:4px;}
+  .wstep{display:flex;align-items:center;gap:10px;flex-shrink:0;}
+  .wstep .num{
+    width:32px;height:32px;border-radius:99px;display:flex;align-items:center;justify-content:center;
+    background:var(--surface-2);color:var(--text-soft);font-weight:800;font-size:13px;border:2px solid transparent;
+    transition:all .25s;
+  }
+  .wstep.active .num{background:var(--primary);color:#fff;}
+  .wstep.done .num{background:color-mix(in srgb, var(--ok) 15%, transparent);color:var(--ok);border-color:var(--ok);}
+  .wstep span{font-size:12.5px;font-weight:700;color:var(--text-soft);white-space:nowrap;}
+  .wstep.active span{color:var(--text);}
+  .wstep-line{width:36px;height:2px;background:var(--border);flex-shrink:0;}
+  .wpanel{display:none;animation:fadeUp .3s ease;}
+  .wpanel.active{display:block;}
+  .choice-card{
+    border:1.5px solid var(--border);border-radius:var(--r-md);padding:16px;cursor:pointer;transition:.2s;
+    display:flex;align-items:center;gap:12px;
+  }
+  .choice-card:hover{border-color:var(--primary);}
+  .choice-card.selected{border-color:var(--primary);background:color-mix(in srgb, var(--primary) 6%, transparent);}
+  .choice-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:12px;}
+  .qpick-row{display:flex;align-items:center;gap:12px;padding:12px 0;border-bottom:1px solid var(--border);}
 </style>
 </head>
 <body data-role="teacher" data-active="exams">
 <div class="app-shell">
- <div id="sidebar-root"></div>
- <div class="main-col">
-  <div id="topbar-root" data-title="ایجاد آزمون"></div>
-  <main class="content fade-in">
-   <div class="page-head">
-    <div><div class="breadcrumb">سامانه سنجش <span>/</span> <b>ایجاد آزمون</b></div><h1>ایجاد آزمون</h1><p class="text-soft text-sm mt-8">ابتدا مشخصات آزمون را وارد کنید، سپس سؤال‌ها را از بانک انتخاب کنید یا آزمون را با فایل PDF بسازید.</p></div>
-   </div>
-   <div class="exam-steps" id="examSteps"></div>
-   <div class="card card-pad">
-    <section class="exam-panel active" id="panel1">
-     <h3 class="mb-16">۱. مشخصات آزمون</h3>
-     <div class="exam-form-grid">
-      <div class="field wide"><label for="examTitle">نام آزمون</label><input class="input" id="examTitle" maxlength="300" placeholder="مثلاً آزمون میان‌ترم ساختمان داده" required></div>
-      <div class="field"><label for="examClass">کلاس دریافت‌کنندگان</label><select class="select" id="examClass" required><option value="">در حال دریافت کلاس‌ها...</option></select><small class="text-soft">آزمون برای دانشجویان همین کلاس نمایش داده می‌شود.</small></div>
-      <div class="field"><label for="examCategory">دسته‌بندی</label><select class="select" id="examCategory" required><option value="">در حال دریافت دسته‌بندی‌ها...</option></select></div>
-      <div class="field"><label for="examDuration">مدت آزمون (دقیقه)</label><input class="input" id="examDuration" type="number" min="1" max="600" value="45" required></div>
-      <div class="field"><label for="examStart">زمان شروع</label><input class="input" id="examStart" type="datetime-local" required></div>
-      <div class="field"><label for="examEnd">پایان مهلت شرکت</label><input class="input" id="examEnd" type="datetime-local" required></div>
-      <div class="field wide"><label for="examPdfFile">فایل PDF صورت آزمون (اختیاری، حداکثر ۲۰ مگابایت)</label><input class="input" id="examPdfFile" type="file" accept="application/pdf,.pdf"><small class="text-soft">اگر آزمون فقط برگه PDF است و سؤال آنلاین ندارد، بارگذاری این فایل الزامی است. در آزمون‌های دارای سؤال هم می‌توانید PDF صورت سؤال را پیوست کنید.</small></div>
-      <div class="field wide"><label for="essaySectionPdfFile">PDF بخش تشریحی (اختیاری، حداکثر ۲۰ مگابایت)</label><input class="input" id="essaySectionPdfFile" type="file" accept="application/pdf,.pdf"><small class="text-soft">با انتخاب این فایل، یک بخش Essay مستقل و PDFمحور ساخته می‌شود. دانشجو برای این بخش فقط PDF پاسخ بارگذاری می‌کند و کادر پاسخ متنی نخواهد داشت.</small></div>
-      <div class="field"><label for="examMaxPdfSizeMb">حداکثر حجم PDF بخش تشریحی (مگابایت)</label><input class="input" id="examMaxPdfSizeMb" type="number" min="1" max="100" value="20"><small class="text-soft">مقدار پیش‌فرض ۲۰ مگابایت؛ قابل تنظیم بین ۱ تا ۱۰۰ مگابایت.</small></div>
-     </div>
-     <div class="flex justify-between gap-8 mt-24"><a href="dashboard-teacher.html" class="btn btn-outline">بازگشت</a><button class="btn btn-primary" id="toQuestions">ادامه و افزودن سؤال‌ها</button></div>
-    </section>
-    <section class="exam-panel" id="panel2">
-     <div class="flex justify-between items-center gap-8" style="flex-wrap:wrap">
-      <div><h3>۲. سؤال‌های آزمون</h3><p class="text-soft text-sm mt-8">سؤال‌ها را از بانک انتخاب کنید. نوع هر سؤال هنگام تعریف همان سؤال مشخص می‌شود.</p></div>
-      <a class="btn btn-outline btn-sm" href="question-bank.html" target="_blank" rel="noopener">+ تعریف سؤال جدید در بانک</a>
-     </div>
-     <div class="question-tools">
-      <input class="input" id="questionSearch" type="search" placeholder="جستجو در سؤال‌ها...">
-      <span class="badge badge-muted" id="questionCount">۰ سؤال انتخاب‌شده</span>
-      <button class="btn btn-ghost btn-sm" id="refreshQuestions" type="button">بروزرسانی بانک سؤال</button>
-     </div>
-     <div class="question-list" id="questionList"><div class="question-empty">در حال دریافت سؤال‌ها...</div></div>
-     <div class="flex justify-between gap-8 mt-24"><button class="btn btn-outline" id="backToDetails">مرحله قبل</button><button class="btn btn-primary" id="toReview">ادامه و بررسی آزمون</button></div>
-    </section>
-    <section class="exam-panel" id="panel3">
-     <h3 class="mb-16">۳. بررسی و انتشار</h3>
-     <div class="summary-list">
-      <div class="summary-item"><span class="text-soft">نام آزمون</span><b id="sumTitle">—</b></div>
-      <div class="summary-item"><span class="text-soft">کلاس</span><b id="sumClass">—</b></div>
-      <div class="summary-item"><span class="text-soft">دسته‌بندی</span><b id="sumCategory">—</b></div>
-      <div class="summary-item"><span class="text-soft">تعداد سؤال آنلاین</span><b id="sumQuestions">۰</b></div>
-      <div class="summary-item"><span class="text-soft">مدت آزمون</span><b id="sumDuration">—</b></div>
-      <div class="summary-item"><span class="text-soft">فایل PDF صورت آزمون</span><b id="sumPdf">—</b></div>
-      <div class="summary-item"><span class="text-soft">زمان برگزاری</span><b id="sumSchedule">—</b></div>
-     </div>
-     <div class="alert alert-info mt-16" id="publishHint">پس از بررسی، آزمون برای کلاس انتخاب‌شده منتشر می‌شود.</div>
-     <div class="flex justify-between gap-8 mt-24"><button class="btn btn-outline" id="backToQuestions">مرحله قبل</button><button class="btn btn-primary" id="createExam">ساخت و انتشار آزمون</button></div>
-     <p class="text-soft text-sm mt-12" id="createStatus" aria-live="polite"></p>
-    </section>
-   </div>
-  </main>
- </div>
+  <div id="sidebar-root"></div>
+  <div class="main-col">
+    <div id="topbar-root" data-title="ساخت آزمون"></div>
+    <main class="content fade-in">
+      <div class="page-head">
+        <div>
+          <div class="breadcrumb">سامانه سنجش <span>/</span> <b>ساخت آزمون جدید</b></div>
+          <h1>ساخت آزمون جدید</h1>
+        </div>
+      </div>
+
+      <div class="wizard-steps" id="wizardSteps"></div>
+
+      <div class="card card-pad">
+        <!-- Step 1: Department -->
+        <div class="wpanel active" id="step1">
+          <h3 style="margin-bottom:16px">دپارتمان را انتخاب کنید</h3>
+          <div class="flex items-center justify-between gap-8" style="margin-bottom:12px"><span class="text-soft text-sm">اگر دپارتمان موردنظر وجود ندارد، همین‌جا بسازید.</span><button type="button" class="btn btn-outline btn-sm" data-create-department>+ ایجاد دپارتمان</button></div>
+          <div class="choice-grid" id="deptChoices">
+            <div class="choice-card selected" data-value="کامپیوتر"><div class="mohr sm"><div class="mohr-inner"><b>ک</b></div></div><b>مهندسی کامپیوتر</b></div>
+            <div class="choice-card" data-value="برق"><div class="mohr sm gold"><div class="mohr-inner"><b>ب</b></div></div><b>مهندسی برق</b></div>
+            <div class="choice-card" data-value="عمران"><div class="mohr sm"><div class="mohr-inner"><b>ع</b></div></div><b>مهندسی عمران</b></div>
+          </div>
+        </div>
+
+        <!-- Step 2: Teacher -->
+        <div class="wpanel" id="step2">
+          <h3 style="margin-bottom:16px">استاد مربوطه را انتخاب کنید</h3>
+          <div class="flex items-center justify-between gap-8" style="margin-bottom:12px"><span class="text-soft text-sm">در صورت نبود استاد، حساب استاد جدید بسازید.</span><button type="button" class="btn btn-outline btn-sm" data-create-teacher>+ ایجاد استاد</button></div>
+          <div class="choice-grid" id="teacherChoices">
+            <div class="choice-card selected" data-value="دکتر کریمی"><div class="mohr sm"><div class="mohr-inner"><b>دک</b></div></div><b>دکتر کریمی</b></div>
+            <div class="choice-card" data-value="مهندس صادقی"><div class="mohr sm gold"><div class="mohr-inner"><b>مص</b></div></div><b>مهندس صادقی</b></div>
+          </div>
+        </div>
+
+        <!-- Step 3: Questions -->
+        <div class="wpanel" id="step3">
+          <div class="flex justify-between items-center" style="margin-bottom:16px">
+            <h3>انتخاب سوالات</h3>
+            <label class="checkbox-row"><input type="checkbox" id="randomToggle"> انتخاب تصادفی سوالات از بانک سوال</label>
+          </div>
+          <div id="manualPick">
+            <div class="qpick-row"><input type="checkbox" checked><span style="flex:1">پیچیدگی زمانی الگوریتم کویک‌سورت در بدترین حالت چیست؟</span><span class="badge badge-info">چهارگزینه‌ای</span></div>
+            <div class="qpick-row"><input type="checkbox" checked><span style="flex:1">کدام ساختار داده برای پیاده‌سازی صف اولویت مناسب‌تر است؟</span><span class="badge badge-info">چهارگزینه‌ای</span></div>
+            <div class="qpick-row"><input type="checkbox"><span style="flex:1">الگوریتم کاراتسوبا را برای ضرب دو عدد ۴ رقمی شرح دهید.</span><span class="badge badge-muted">تشریحی</span></div>
+          </div>
+          <div id="randomPick" style="display:none">
+            <div class="field"><label>تعداد سوالات چهارگزینه‌ای</label><input class="input" id="randomMcqCount" type="number" min="0" value="15"></div>
+            <div class="field"><label>تعداد سوالات تشریحی</label><input class="input" id="randomEssayCount" type="number" min="0" value="2"></div>
+            <div class="field"><label>تعداد سؤال‌های وصل‌کردنی</label><input class="input" id="randomMatchingCount" type="number" min="0" value="0"></div>
+          </div>
+        </div>
+
+        <!-- Step 4: Duration & Passing score -->
+        <div class="wpanel" id="step4">
+          <h3 style="margin-bottom:16px">اطلاعات آزمون، مدت زمان و نمره قبولی</h3>
+          <div class="field"><label>عنوان آزمون</label><input class="input" id="examTitle" required placeholder="مثلاً آزمون میان‌ترم"></div>
+          <div class="field"><label>درس / موضوع</label><input class="input" id="examSubject" placeholder="نام درس"></div>
+          <div class="field"><label>توضیحات</label><textarea class="textarea" id="examDescription" rows="2" placeholder="توضیحات اختیاری"></textarea></div>
+          <div class="grid-2" style="grid-template-columns:1fr 1fr">
+            <div class="field"><label>مدت زمان آزمون (دقیقه)</label><input class="input" id="examDuration" type="number" min="1" max="600" value="45"></div>
+            <div class="field"><label>نمره قبولی (از ۱۰۰)</label><input class="input" id="examPassingScore" type="number" min="0" max="100" step="0.25" value="50"></div>
+          </div>
+          <div class="checkbox-row"><input type="checkbox" id="allowQuestionNavigation" checked> امکان جابجایی بین سوالات فعال باشد</div>
+        </div>
+
+        <!-- Step 5: Schedule -->
+        <div class="wpanel" id="step5">
+          <h3 style="margin-bottom:16px">زمان‌بندی آزمون</h3>
+          <div class="grid-2" style="grid-template-columns:1fr 1fr">
+            <div class="field"><label>تاریخ برگزاری</label><input class="input" id="examDate" type="date"></div>
+            <div class="field"><label>ساعت شروع</label><input class="input" id="examTime" type="time" value="10:00"></div>
+          </div>
+        </div>
+
+        <!-- Step 6: Preview -->
+        <div class="wpanel" id="step6">
+          <h3 style="margin-bottom:16px">پیش‌نمایش و انتشار</h3>
+          <div class="alert alert-info" style="margin-bottom:16px">پیش از انتشار، اطلاعات زیر را بررسی کنید.</div>
+          <ul style="display:flex;flex-direction:column;gap:10px;font-size:13.5px">
+            <li class="flex justify-between" style="border-bottom:1px solid var(--border);padding-bottom:8px"><span class="text-soft">دپارتمان</span><b id="prevDept">—</b></li>
+            <li class="flex justify-between" style="border-bottom:1px solid var(--border);padding-bottom:8px"><span class="text-soft">استاد</span><b id="prevTeacher">—</b></li>
+            <li class="flex justify-between" style="border-bottom:1px solid var(--border);padding-bottom:8px"><span class="text-soft">تعداد سوالات</span><b id="prevQuestionCount">۰ سوال</b></li>
+            <li class="flex justify-between"><span class="text-soft">مدت زمان</span><b id="prevDuration">۴۵ دقیقه</b></li>
+            <li class="flex justify-between"><span class="text-soft">نمره قبولی</span><b id="prevPassingScore">۵۰ از ۱۰۰</b></li>
+          </ul>
+        </div>
+
+        <div class="flex justify-between" style="margin-top:26px;border-top:1px solid var(--border);padding-top:20px">
+          <button class="btn btn-outline" id="wizPrev">مرحله قبل</button>
+          <button class="btn btn-primary" id="wizNext">مرحله بعد</button>
+        </div>
+      </div>
+    </main>
+  </div>
 </div>
+
 <script src="assets/js/theme.js"></script>
 <script src="assets/js/app.js"></script>
 <script src="assets/js/api.js"></script>
 <script>
-(async function(){
- const $=id=>document.getElementById(id), api=window.MftApi;
- const selectedIds=new Set();let lookups={categories:[],skills:[]},questions=[];
- let pendingExamId=null,pendingPdfUploaded=false,pendingEssaySectionId=null,pendingEssayPdfUploaded=false;
- const escapeHtml=value=>String(value??'').replace(/[&<>"']/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
- const typeNames={MultipleChoice:'چهارگزینه‌ای',Essay:'تشریحی',Matching:'وصل‌کردنی'};
- const steps=['مشخصات آزمون','سؤال‌ها','بررسی و انتشار'];let current=1;
- function showStep(n){current=n;document.querySelectorAll('.exam-panel').forEach(p=>p.classList.toggle('active',p.id==='panel'+n));$('examSteps').innerHTML=steps.map((s,i)=>{const k=i+1;return '<div class="exam-step '+(k===n?'active':k<n?'done':'')+'"><span class="n">'+(k<n?'✓':k)+'</span><span>'+s+'</span></div>'+(i<2?'<span style="width:28px;height:1px;background:var(--border)"></span>':'');}).join('');}
- function selectedQuestions(){return questions.filter(q=>selectedIds.has(String(q.id)));}
- function renderQuestions(){
-  const categoryId=Number($('examCategory').value||0),term=$('questionSearch').value.trim().toLocaleLowerCase();
-  const skillIds=new Set(lookups.skills.filter(s=>Number(s.examCategoryId)===categoryId).map(s=>Number(s.id)));
-  const rows=questions.filter(q=>skillIds.has(Number(q.skillId))&&!/essay/i.test(String(q.questionTypeCode||q.questionType||''))&&(!term||String(q.text||'').toLocaleLowerCase().includes(term)));
-  $('questionCount').textContent=selectedIds.size+' سؤال انتخاب‌شده';
-  $('questionList').innerHTML=rows.length?rows.map(q=>'<label class="question-row"><input type="checkbox" value="'+Number(q.id)+'" '+(selectedIds.has(String(q.id))?'checked':'')+'><span class="qtext">'+escapeHtml(q.text)+'</span><span class="badge badge-info">'+escapeHtml(typeNames[q.questionTypeCode]||q.questionTypeName||'سؤال')+'</span></label>').join(''):'<div class="question-empty">'+(categoryId?'برای این دسته‌بندی سؤال آنلاین قابل انتخابی پیدا نشد. سؤال‌های تشریحی متنی قدیمی در آزمون جدید قابل افزودن نیستند؛ برای Essay از بخش PDF تشریحی استفاده کنید.':'ابتدا دسته‌بندی آزمون را در مرحله مشخصات انتخاب کنید.')+'</div>';
- }
- async function loadData(){
-  const [l,q,classes]=await Promise.all([api.request('/questions/lookups'),api.request('/questions'),api.request('/canonical/classes')]);
-  lookups=l||{categories:[],skills:[]};questions=Array.isArray(q)?q:[];
-  $('examCategory').innerHTML='<option value="">انتخاب دسته‌بندی</option>'+lookups.categories.map(x=>'<option value="'+Number(x.id)+'">'+escapeHtml(x.name)+'</option>').join('');
-  $('examClass').innerHTML='<option value="">انتخاب کلاس</option>'+(Array.isArray(classes)?classes:[]).map(x=>'<option value="'+Number(x.id)+'" data-department-id="'+Number(x.departmentId)+'">'+escapeHtml(x.name)+' — '+escapeHtml(x.department||'')+'</option>').join('');
-  renderQuestions();
- }
- function getEssayPdfSizeMb(){
-  if(!$('essaySectionPdfFile').files[0])return null;
-  const raw=$('examMaxPdfSizeMb').value.trim();
-  const value=raw===''?20:Number(raw);
-  return Number.isInteger(value)&&value>=1&&value<=100?value:NaN;
- }
- function validateDetails(){
-  const title=$('examTitle').value.trim(),classId=Number($('examClass').value),categoryId=Number($('examCategory').value),duration=Number($('examDuration').value);
-  const start=new Date($('examStart').value),end=new Date($('examEnd').value);
-  if(!title)return 'نام آزمون را وارد کنید.';
-  if(!classId)return 'کلاس دریافت‌کنندگان را انتخاب کنید.';
-  if(!categoryId)return 'دسته‌بندی را انتخاب کنید.';
-  if(!Number.isInteger(duration)||duration<1||duration>600)return 'مدت آزمون باید بین ۱ تا ۶۰۰ دقیقه باشد.';
-  if(!$('examStart').value||$('examStart').value==='')return 'زمان شروع را مشخص کنید.';
-  if(!$('examEnd').value||Number.isNaN(end.getTime())||Number.isNaN(start.getTime())||end<=start)return 'زمان پایان باید بعد از زمان شروع باشد.';
-  const file=$('examPdfFile').files[0];if(file&&(file.size>20*1024*1024||!(/\.pdf$/i.test(file.name))))return 'فایل صورت آزمون باید PDF و حداکثر ۲۰ مگابایت باشد.';
-  const essayFile=$('essaySectionPdfFile').files[0];
-  const maxPdfSizeMb=getEssayPdfSizeMb();
-  if(essayFile&&!Number.isInteger(maxPdfSizeMb))return 'حداکثر حجم PDF بخش تشریحی باید بین ۱ تا ۱۰۰ مگابایت باشد.';
-  if(essayFile&&(essayFile.size>maxPdfSizeMb*1024*1024||!(/\.pdf$/i.test(essayFile.name))))return 'فایل بخش تشریحی باید PDF و در محدوده حجم تنظیم‌شده باشد.';
-  return null;
- }
- function showSummary(){
-  const cls=$('examClass').selectedOptions[0],cat=$('examCategory').selectedOptions[0],file=$('examPdfFile').files[0],essayFile=$('essaySectionPdfFile').files[0],chosen=selectedQuestions();
-  $('sumTitle').textContent=$('examTitle').value.trim();$('sumClass').textContent=cls?.textContent||'—';$('sumCategory').textContent=cat?.textContent||'—';
-  $('sumQuestions').textContent=chosen.length+' سؤال';$('sumDuration').textContent=$('examDuration').value+' دقیقه';
-  $('sumPdf').textContent=[file?('صورت آزمون: '+file.name):'',essayFile?('بخش Essay: '+essayFile.name):''].filter(Boolean).join(' | ')||(chosen.length?'پیوست نشده':'بارگذاری نشده');
-  $('sumSchedule').textContent=new Date($('examStart').value).toLocaleString('fa-IR')+' تا '+new Date($('examEnd').value).toLocaleString('fa-IR');
-  $('publishHint').textContent=essayFile?'یک بخش Essay مستقل ساخته می‌شود؛ فایل صورت سؤال آن PDF است و پاسخ دانشجو نیز فقط PDF خواهد بود.':chosen.length?'آزمون با سؤال‌های انتخاب‌شده منتشر می‌شود. سؤال‌های تشریحی قدیمیِ متنی برای سازگاری حفظ می‌شوند.':'این آزمون بدون سؤال آنلاین و بر پایه PDF خواهد بود؛ فایل صورت آزمون برای انتشار الزامی است.';
- }
- $('toQuestions').addEventListener('click',()=>{const e=validateDetails();if(e)return window.showToast?.(e,'warn');showStep(2);});
- $('backToDetails').addEventListener('click',()=>showStep(1));
- $('toReview').addEventListener('click',()=>{const e=validateDetails();if(e)return window.showToast?.(e,'warn');if(!selectedIds.size&&!$('examPdfFile').files[0]&&!$('essaySectionPdfFile').files[0])return window.showToast?.('برای آزمون باید سؤال آنلاین یا یکی از فایل‌های PDF را انتخاب کنید.','warn');showSummary();showStep(3);});
- $('backToQuestions').addEventListener('click',()=>showStep(2));
- $('questionSearch').addEventListener('input',renderQuestions);
- $('questionList').addEventListener('change',e=>{const input=e.target;if(!input.matches('input[type=checkbox]'))return;input.checked?selectedIds.add(String(input.value)):selectedIds.delete(String(input.value));$('questionCount').textContent=selectedIds.size+' سؤال انتخاب‌شده';});
- $('examCategory').addEventListener('change',()=>{selectedIds.clear();renderQuestions();});
- $('refreshQuestions').addEventListener('click',async()=>{try{questions=await api.request('/questions');questions=Array.isArray(questions)?questions:[];renderQuestions();window.showToast?.('بانک سؤال بروزرسانی شد.','ok');}catch(e){window.showToast?.(e.message||'دریافت بانک سؤال ناموفق بود.','danger');}});
- $('createExam').addEventListener('click',async()=>{
-  const err=validateDetails();if(err)return window.showToast?.(err,'warn');
-   const chosen=selectedQuestions(),file=$('examPdfFile').files[0],essayFile=$('essaySectionPdfFile').files[0];
-   const maxPdfSizeMb=getEssayPdfSizeMb();
-   const isPdfOnly=chosen.length===0&&!essayFile;
-   if(isPdfOnly&&!file)return window.showToast?.('برای آزمون بدون سؤال آنلاین یا بخش Essay، فایل PDF صورت آزمون الزامی است.','warn');
-   const classOption=$('examClass').selectedOptions[0],classId=Number($('examClass').value),departmentId=Number(classOption?.dataset.departmentId||0);
-   if(!departmentId)return window.showToast?.('دپارتمان کلاس معتبر نیست.','warn');
-   const grouped=new Map();chosen.forEach(q=>{const id=Number(q.skillId);if(!grouped.has(id))grouped.set(id,[]);grouped.get(id).push(Number(q.id));});
-   const groups=[...grouped.entries()],duration=Number($('examDuration').value);
-   const essaySkillId=essayFile?(groups.length?groups[0][0]:Number(lookups.skills.find(s=>Number(s.examCategoryId)===Number($('examCategory').value))?.id||0)):0;
-   if(essayFile&&!essaySkillId)return window.showToast?.('برای ساخت بخش Essay باید حداقل یک مهارت در دسته‌بندی انتخاب‌شده تعریف شده باشد.','warn');
-   const sectionCount=groups.length+(essayFile?1:0);
-   if(!isPdfOnly&&duration<sectionCount)return window.showToast?.('مدت آزمون باید حداقل به تعداد بخش‌های آزمون دقیقه باشد.','warn');
-   const baseWeight=sectionCount?100/sectionCount:0;let usedMinutes=0;
-   const sections=groups.map(([skillId,questionIds],i)=>{const minutes=i===sectionCount-1&&!essayFile?duration-usedMinutes:Math.max(1,Math.floor(duration/sectionCount));usedMinutes+=minutes;return{skillId,sectionType:'Online',durationMinutes:minutes,weightPercent:i===sectionCount-1&&!essayFile?100-baseWeight*(sectionCount-1):baseWeight,questionIds};});
-   if(essayFile){const minutes=duration-usedMinutes;sections.push({skillId:essaySkillId,sectionType:'Essay',durationMinutes:Math.max(1,minutes),weightPercent:100-baseWeight*(sectionCount-1),questionIds:[]});}
-  const startAt=new Date($('examStart').value),endAt=new Date($('examEnd').value),button=$('createExam');
-  button.disabled=true;
-  try{
-   if(!pendingExamId){
-    $('createStatus').textContent='در حال ساخت آزمون...';
-    const created=await api.request('/canonical/exams',{method:'POST',body:JSON.stringify({title:$('examTitle').value.trim(),examCategoryId:Number($('examCategory').value),departmentId,classId,startAt:startAt.toISOString(),endAt:endAt.toISOString(),durationMinutes:duration,...(maxPdfSizeMb===null?{}:{maxPdfFileSizeBytes:maxPdfSizeMb*1024*1024}),isPublished:false,pdfOnly:isPdfOnly,sections})});
-    pendingExamId=created.id;
-   }
-    if(file&&!pendingPdfUploaded){
-     $('createStatus').textContent='آزمون ساخته شد؛ در حال بارگذاری PDF صورت آزمون...';
-     const form=new FormData();form.append('file',file);
-     await api.request('/exam-files/exams/'+encodeURIComponent(pendingExamId),{method:'POST',body:form});
-     pendingPdfUploaded=true;
+  const STEPS = ["دپارتمان", "استاد", "سوالات", "اطلاعات آزمون", "زمان‌بندی", "پیش‌نمایش"];
+  let current = 1;
+  function renderSteps() {
+    document.getElementById("wizardSteps").innerHTML = STEPS.map((label, index) => {
+      const number = index + 1;
+      const state = number < current ? "done" : number === current ? "active" : "";
+      return `<div class="wstep ${state}"><div class="num">${number < current ? "✓" : number}</div><span>${label}</span></div>${index < STEPS.length - 1 ? '<div class="wstep-line"></div>' : ''}`;
+    }).join("");
+  }
+  function showStep(number) {
+    current = number;
+    document.querySelectorAll(".wpanel").forEach(panel => panel.classList.toggle("active", panel.id === `step${number}`));
+    document.getElementById("wizPrev").disabled = number === 1;
+    document.getElementById("wizNext").textContent = number === STEPS.length ? "انتشار آزمون" : "مرحله بعد";
+    renderSteps();
+    if (number === 6) {
+      const randomMode = document.getElementById("randomToggle").checked;
+      const selectedCount = randomMode
+        ? Number(document.getElementById("randomMcqCount").value || 0) + Number(document.getElementById("randomEssayCount").value || 0) + Number(document.getElementById("randomMatchingCount").value || 0)
+        : document.querySelectorAll('#manualPick input[type=checkbox]:checked').length;
+      document.getElementById("prevQuestionCount").textContent = `${selectedCount} سوال${randomMode ? ' (تصادفی)' : ''}`;
+      document.getElementById("prevDuration").textContent = `${document.getElementById("examDuration").value || 0} دقیقه`;
+      document.getElementById("prevPassingScore").textContent = `${document.getElementById("examPassingScore").value || 0} از ۲۰`;
     }
-    if(essayFile&&!pendingEssayPdfUploaded){
-     $('createStatus').textContent='در حال آماده‌سازی بخش Essay و بارگذاری PDF آن...';
-     if(!pendingEssaySectionId){
-      const detail=await api.request('/canonical/exams/'+encodeURIComponent(pendingExamId));
-      const essaySection=(detail.sections||[]).find(section=>String(section.sectionType||'').toLowerCase()==='essay');
-      if(!essaySection)throw new Error('بخش Essay در آزمون ساخته‌شده پیدا نشد.');
-      pendingEssaySectionId=essaySection.id;
-     }
-     const form=new FormData();form.append('file',essayFile);
-     await api.request('/exam-files/sections/'+encodeURIComponent(pendingEssaySectionId)+'/question-paper',{method:'POST',body:form});
-     pendingEssayPdfUploaded=true;
+  }
+  document.addEventListener("click", event => {
+    const card = event.target.closest(".choice-card");
+    if (!card) return;
+    card.parentElement.querySelectorAll(".choice-card").forEach(item => item.classList.remove("selected"));
+    card.classList.add("selected");
+    if (card.parentElement.id === "deptChoices") document.getElementById("prevDept").textContent = card.dataset.value || card.textContent.trim();
+    if (card.parentElement.id === "teacherChoices") document.getElementById("prevTeacher").textContent = card.dataset.value || card.textContent.trim();
+  });
+  document.getElementById("randomToggle").addEventListener("change", event => {
+    document.getElementById("manualPick").style.display = event.target.checked ? "none" : "block";
+    document.getElementById("randomPick").style.display = event.target.checked ? "block" : "none";
+  });
+  document.getElementById("wizPrev").addEventListener("click", () => { if (current > 1) showStep(current - 1); });
+  document.getElementById("wizNext").addEventListener("click", async () => {
+    if (current < STEPS.length) {
+      if (current === 4 && !document.getElementById("examTitle").value.trim()) return showToast("عنوان آزمون را وارد کنید.", "warn");
+      showStep(current + 1);
+      return;
     }
-   $('createStatus').textContent='در حال انتشار آزمون...';
-   await api.request('/canonical/exams/'+encodeURIComponent(pendingExamId)+'/publish',{method:'POST'});
-   $('createStatus').textContent='آزمون با موفقیت ساخته و منتشر شد.';window.showToast?.('آزمون با موفقیت منتشر شد.','ok');setTimeout(()=>location.href='dashboard-teacher.html',900);
-  }catch(e){$('createStatus').textContent=(pendingExamId?'آزمون ذخیره شد؛ برای ادامه دوباره روی انتشار بزنید: ':'ساخت آزمون ناموفق بود: ')+(e.message||'خطای نامشخص');button.disabled=false;}
- });
- try{await loadData();}catch(e){$('questionList').innerHTML='<div class="question-empty">'+escapeHtml(e.message||'دریافت اطلاعات اولیه ناموفق بود.')+'</div>';window.showToast?.(e.message||'دریافت اطلاعات اولیه ناموفق بود.','danger');}
- const now=new Date(),later=new Date(now.getTime()+60*60*1000);const localValue=d=>{const z=n=>String(n).padStart(2,'0');return d.getFullYear()+'-'+z(d.getMonth()+1)+'-'+z(d.getDate())+'T'+z(d.getHours())+':'+z(d.getMinutes());};
- $('examStart').value=localValue(now);$('examEnd').value=localValue(new Date(now.getTime()+24*60*60*1000));
- showStep(1);
-})();
+    const api = window.MftApi;
+    if (!api) return showToast("اتصال API آماده نیست.", "danger");
+    const department = document.querySelector("#deptChoices .choice-card.selected");
+    let questionIds = [...document.querySelectorAll('#manualPick input[type="checkbox"]:checked')].map(input => input.value).filter(Boolean);
+    if (document.getElementById("randomToggle").checked) {
+      const pool = [...document.querySelectorAll('#manualPick input[type="checkbox"]')];
+      const mcqCount = Math.max(0, Number(document.getElementById("randomMcqCount").value) || 0);
+      const essayCount = Math.max(0, Number(document.getElementById("randomEssayCount").value) || 0);
+      const matchingCount = Math.max(0, Number(document.getElementById("randomMatchingCount").value) || 0);
+      const pickRandom = items => items.sort(() => Math.random() - 0.5);
+      const mcq = pickRandom(pool.filter(input => /multiplechoice|mcq/i.test(input.dataset.questionType || ''))).slice(0, mcqCount);
+      const essay = pickRandom(pool.filter(input => /essay|text|descriptive/i.test(input.dataset.questionType || ''))).slice(0, essayCount);
+      const matching = pickRandom(pool.filter(input => /matching/i.test(input.dataset.questionType || ''))).slice(0, matchingCount);
+      questionIds = [...mcq, ...essay, ...matching].map(input => input.value).filter(Boolean);
+    }
+    const selectedTeacher = document.querySelector("#teacherChoices .choice-card.selected");
+    const durationMinutes = Number(document.getElementById("examDuration").value);
+    if (!document.getElementById("examTitle").value.trim()) return showToast("عنوان آزمون را وارد کنید.", "warn");
+    if (!Number.isInteger(durationMinutes) || durationMinutes < 1) return showToast("مدت آزمون باید حداقل یک دقیقه باشد.", "warn");
+    if (!questionIds.length) return showToast("حداقل یک سؤال برای آزمون انتخاب کنید؛ تعداد تصادفی را هم بررسی کنید.", "warn");
+    let startsAt = null;
+    const date = document.getElementById("examDate").value;
+    const time = document.getElementById("examTime").value;
+    if (date) startsAt = new Date(`${date}T${time || "00:00"}`).toISOString();
+    try {
+      await api.request("/exams", { method: "POST", body: JSON.stringify({
+        title: document.getElementById("examTitle").value.trim(),
+        subject: document.getElementById("examSubject").value.trim() || null,
+        description: document.getElementById("examDescription").value.trim() || null,
+        durationMinutes, passingScore: Number(document.getElementById("examPassingScore").value || 0), allowQuestionNavigation: document.getElementById("allowQuestionNavigation").checked, startsAt, endsAt: null, isPublished: true,
+        departmentId: department?.dataset.id || null,
+        createdByUserId: selectedTeacher?.dataset.id || null,
+        questionIds
+      }) });
+      showToast("آزمون با موفقیت ذخیره و منتشر شد.", "ok");
+      setTimeout(() => location.href = "dashboard-teacher.html", 700);
+    } catch (error) { showToast(error.message || "ذخیره آزمون ناموفق بود.", "danger"); }
+  });
+  showStep(1);
 </script>
 </body>
 </html>

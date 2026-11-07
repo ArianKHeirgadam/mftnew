@@ -5,35 +5,29 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.IdentityModel.Tokens;
 using Mft.Application.Abstractions;
 using Mft.Application.Contracts;
+using Mft.Domain.Entities;
 using Mft.Infrastructure.Persistence;
 
 namespace Mft.Infrastructure.Services;
 
-public sealed class TokenService(IConfiguration configuration) : ITokenService
+public class TokenService(IConfiguration configuration) : ITokenService
 {
-    public string Create(long userId, string username, string fullName, long? departmentId,
-        IReadOnlyCollection<string> roles, DateTime expiresAt)
+    public string Create(User user, DateTime expiresAt)
     {
         var key = configuration["Jwt:Key"]
             ?? throw new InvalidOperationException("Jwt:Key is required.");
-
-        var claims = new List<Claim>
+        var claims = new[]
         {
-            new(ClaimTypes.NameIdentifier, userId.ToString()),
-            new(ClaimTypes.Name, username),
-            new("fullName", fullName)
+            new Claim(ClaimTypes.NameIdentifier, user.Id.ToString()),
+            new Claim(ClaimTypes.Name, user.Username),
+            new Claim(ClaimTypes.Role, user.Role.ToString()),
+            new Claim("fullName", user.FullName),
+            new Claim("departmentId", user.DepartmentId?.ToString() ?? "")
         };
-
-        if (departmentId.HasValue)
-            claims.Add(new Claim("departmentId", departmentId.Value.ToString()));
-
-        foreach (var role in roles.Distinct(StringComparer.Ordinal))
-            claims.Add(new Claim(ClaimTypes.Role, CanonicalRoleNames.ToPolicyRole(role)));
 
         var credentials = new SigningCredentials(
             new SymmetricSecurityKey(Encoding.UTF8.GetBytes(key)),
             SecurityAlgorithms.HmacSha256);
-
         var token = new System.IdentityModel.Tokens.Jwt.JwtSecurityToken(
             configuration["Jwt:Issuer"],
             configuration["Jwt:Audience"],
@@ -45,55 +39,31 @@ public sealed class TokenService(IConfiguration configuration) : ITokenService
     }
 }
 
-public sealed class AuthService(
-    CanonicalIdentityDbContext db,
-    ITokenService tokenService) : IAuthService
+public class AuthService(AppDbContext db, ITokenService tokenService) : IAuthService
 {
     public async Task<LoginResponse?> LoginAsync(LoginRequest request, CancellationToken cancellationToken)
     {
-        var username = request.Username.Trim();
         var user = await db.Users
-            .AsNoTracking()
             .Include(item => item.Department)
-            .Include(item => item.UserRoles)
-                .ThenInclude(userRole => userRole.Role)
             .SingleOrDefaultAsync(
-                item => item.Username == username && item.IsActive,
+                item => item.Username == request.Username && item.IsActive,
                 cancellationToken);
 
         if (user is null || !BCrypt.Net.BCrypt.Verify(request.Password, user.PasswordHash))
+        {
             return null;
-
-        var databaseRoles = user.UserRoles
-            .Select(item => item.Role.Name)
-            .Distinct(StringComparer.Ordinal)
-            .ToArray();
-
-        if (databaseRoles.Length == 0)
-            return null;
-
-        var policyRoles = databaseRoles
-            .Select(CanonicalRoleNames.ToPolicyRole)
-            .ToArray();
-
-        var primaryRole = new[] { "SuperAdmin", "Department", "Teacher", "Student" }
-            .FirstOrDefault(role => policyRoles.Contains(role, StringComparer.Ordinal));
-
-        if (primaryRole is null)
-            return null;
+        }
 
         var expiresAt = DateTime.UtcNow.AddHours(4);
-        var accessToken = tokenService.Create(
-            user.Id, user.Username, user.FullName, user.DepartmentId,
-            databaseRoles, expiresAt);
-
+        var accessToken = tokenService.Create(user, expiresAt);
         return new LoginResponse(
             accessToken,
             expiresAt,
             user.Id,
             user.Username,
             user.FullName,
-            primaryRole,
+            user.Role.ToString(),
+            user.MustChangePassword,
             user.DepartmentId);
     }
 }
