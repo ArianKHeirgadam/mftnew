@@ -27,6 +27,8 @@ public sealed class AnswerKeyController(CanonicalAcademicDbContext db) : Control
     {
         var exam = await LoadExam(examId, ct);
         if (exam is null) return NotFound();
+        if (await IsPdfOnly(examId, ct))
+            return Conflict(new { message = "آزمون PDFمحور پاسخ‌نامه کلیدی ساختاریافته ندارد؛ نمره آن از صفحه نتایج ثبت می‌شود." });
         var links = await GetExamQuestions(examId, ct);
         var rows = new List<object>();
         for (var index = 0; index < links.Count; index++)
@@ -49,6 +51,8 @@ public sealed class AnswerKeyController(CanonicalAcademicDbContext db) : Control
     {
         var exam = await LoadExam(examId, ct);
         if (exam is null) return NotFound();
+        if (await IsPdfOnly(examId, ct))
+            return Conflict(new { message = "برای آزمون PDFمحور پاسخ‌نامه کلیدی قابل ثبت نیست؛ نمره کلی از صفحه نتایج ثبت می‌شود." });
         return await ApplyEntries(examId, request.Entries ?? new(), request.ReplaceExisting, "direct", ct);
     }
 
@@ -59,6 +63,8 @@ public sealed class AnswerKeyController(CanonicalAcademicDbContext db) : Control
         if (file.Length > 15_000_000) return BadRequest(new { message = "حداکثر حجم فایل ۱۵ مگابایت است." });
         var exam = await LoadExam(examId, ct);
         if (exam is null) return NotFound();
+        if (await IsPdfOnly(examId, ct))
+            return Conflict(new { message = "برای آزمون PDFمحور پاسخ‌نامه کلیدی قابل ثبت نیست؛ نمره کلی از صفحه نتایج ثبت می‌شود." });
         var ext = Path.GetExtension(file.FileName).ToLowerInvariant();
         try
         {
@@ -100,6 +106,10 @@ public sealed class AnswerKeyController(CanonicalAcademicDbContext db) : Control
         if (User.IsInRole("Teacher") && exam.CreatedByUserId != CurrentUserId) return null;
         return exam;
     }
+
+    private async Task<bool> IsPdfOnly(long examId, CancellationToken ct) =>
+        !await db.ExamSections.AnyAsync(x => x.ExamId == examId, ct) &&
+        await db.ExamDocuments.AnyAsync(x => x.ExamId == examId, ct);
 
     private async Task<List<CanonicalExamQuestion>> GetExamQuestions(long examId, CancellationToken ct)
     {
