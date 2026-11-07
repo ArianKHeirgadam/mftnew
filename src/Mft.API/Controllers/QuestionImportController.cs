@@ -389,12 +389,12 @@ public sealed class QuestionImportController(
 
         foreach (var rawParagraph in paragraphs)
         {
-            foreach (var rawLine in rawParagraph.Split(new[] { '\\r', '\\n' }, StringSplitOptions.RemoveEmptyEntries))
+            foreach (var rawLine in rawParagraph.Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries))
             {
                 var line = rawLine.Trim();
                 if (line.Length == 0) continue;
 
-                var questionMatch = Regex.Match(line, @"^\\s*[0-9۰-۹٠-٩]+\\s*[.٫)\\-ـ:]\\s*(.+?)\\s*$");
+                var questionMatch = Regex.Match(line, @"^\s*[0-9۰-۹٠-٩]+\s*[.٫)\-ـ:]\s*(.+?)\s*$");
                 if (questionMatch.Success)
                 {
                     FinishCurrent();
@@ -413,17 +413,17 @@ public sealed class QuestionImportController(
 
                 if (current is null) continue;
 
-                var isCorrect = Regex.IsMatch(line, @"\(\\s*صحیح\\s*\\)\\s*$", RegexOptions.IgnoreCase);
+                var isCorrect = Regex.IsMatch(line, @"\(\s*صحیح\s*\)\s*$", RegexOptions.IgnoreCase);
                 if (isCorrect)
                 {
-                    line = Regex.Replace(line, @"\s*\\(\\s*صحیح\\s*\\)\\s*$", "").Trim();
+                    line = Regex.Replace(line, @"\s*\(\s*صحیح\s*\)\s*$", "").Trim();
                     correctCount++;
                 }
 
                 // Optional label support: "گزینه یک: متن گزینه". If no colon exists,
                 // the whole line is treated as the option text (e.g. "گزینه یک").
                 line = Regex.Replace(line,
-                    @"^گزینه\\s*(?:یک|اول|دوم|سوم|چهارم|1|2|3|4|۱|۲|۳|۴)\\s*[:：]\\s*",
+                    @"^گزینه\s*(?:یک|اول|دوم|سوم|چهارم|1|2|3|4|۱|۲|۳|۴)\s*[:：]\s*",
                     "", RegexOptions.IgnoreCase).Trim();
 
                 if (line.Length > 0)
