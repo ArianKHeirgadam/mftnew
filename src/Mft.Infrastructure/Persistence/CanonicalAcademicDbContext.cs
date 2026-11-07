@@ -19,6 +19,7 @@ public sealed class CanonicalAcademicDbContext(
     public DbSet<CanonicalEssayGradingCriterion> EssayGradingCriteria => Set<CanonicalEssayGradingCriterion>();
     public DbSet<CanonicalClass> Classes => Set<CanonicalClass>();
     public DbSet<CanonicalClassMember> ClassMembers => Set<CanonicalClassMember>();
+    public DbSet<CanonicalClassTeacher> ClassTeachers => Set<CanonicalClassTeacher>();
     public DbSet<CanonicalExam> Exams => Set<CanonicalExam>();
     public DbSet<CanonicalExamSection> ExamSections => Set<CanonicalExamSection>();
     public DbSet<CanonicalExamQuestion> ExamQuestions => Set<CanonicalExamQuestion>();
@@ -120,6 +121,16 @@ public sealed class CanonicalAcademicDbContext(
             e.Property(x => x.AddedAt).HasColumnType("datetime2").HasDefaultValueSql("sysutcdatetime()");
             e.HasIndex(x => new { x.ClassId, x.StudentUserId }).IsUnique();
             e.HasIndex(x => x.StudentUserId);
+            e.HasOne<CanonicalClass>().WithMany().HasForeignKey(x => x.ClassId).OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<CanonicalClassTeacher>(e =>
+        {
+            e.ToTable("CanonicalClassTeachers"); e.HasKey(x => x.Id);
+            e.Property(x => x.Id).HasColumnType("bigint").UseIdentityColumn();
+            e.Property(x => x.AddedAt).HasColumnType("datetime2").HasDefaultValueSql("sysutcdatetime()");
+            e.HasIndex(x => new { x.ClassId, x.TeacherUserId }).IsUnique();
+            e.HasIndex(x => x.TeacherUserId);
             e.HasOne<CanonicalClass>().WithMany().HasForeignKey(x => x.ClassId).OnDelete(DeleteBehavior.Cascade);
         });
         modelBuilder.Entity<CanonicalExam>(e =>
@@ -228,6 +239,7 @@ public sealed class CanonicalMatchingPair { public long Id { get; set; } public 
 public sealed class CanonicalEssayGradingCriterion { public long Id { get; set; } public long QuestionId { get; set; } public string CriteriaText { get; set; } = ""; public decimal MaxPoints { get; set; } }
 public sealed class CanonicalClass { public long Id { get; set; } public string Name { get; set; } = ""; public long DepartmentId { get; set; } public DateTime CreatedAt { get; set; } }
 public sealed class CanonicalClassMember { public long Id { get; set; } public long ClassId { get; set; } public long StudentUserId { get; set; } public DateTime AddedAt { get; set; } }
+public sealed class CanonicalClassTeacher { public long Id { get; set; } public long ClassId { get; set; } public long TeacherUserId { get; set; } public DateTime AddedAt { get; set; } }
 public sealed class CanonicalExam { public long Id { get; set; } public string Title { get; set; } = ""; public long ExamCategoryId { get; set; } public long DepartmentId { get; set; } public long? ClassId { get; set; } public long CreatedByUserId { get; set; } public DateTime StartAt { get; set; } public DateTime EndAt { get; set; } public int DurationMinutes { get; set; } public bool IsPublished { get; set; } public bool ResultsPublished { get; set; } public DateTime? ResultsPublishedAt { get; set; } public long? ResultsPublishedByUserId { get; set; } public DateTime CreatedAt { get; set; } }
 public sealed class CanonicalExamSection { public long Id { get; set; } public long ExamId { get; set; } public long SkillId { get; set; } public int DurationMinutes { get; set; } public int DisplayOrder { get; set; } public decimal WeightPercent { get; set; } }
 public sealed class CanonicalExamQuestion { public long Id { get; set; } public long ExamSectionId { get; set; } public long QuestionId { get; set; } public int DisplayOrder { get; set; } public decimal? PointsOverride { get; set; } }
