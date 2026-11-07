@@ -194,7 +194,7 @@
    ).join('')+'</div></section>'
   ).join(''):'<div class="question-empty">هنوز پوشه ورود گروهی ثبت نشده است. هنگام Import، عنوان آزمون را وارد کنید.</div>';
   renderQuestions();
-  if(editQuestionId&&!editAutoOpened){editAutoOpened=true;document.querySelector('[data-question-edit="'+CSS.escape(editQuestionId)+'"]')?.click();}
+  if(editQuestionId&&!editAutoOpened){editAutoOpened=true;[...document.querySelectorAll('[data-question-edit]')].find(button=>button.dataset.questionEdit===editQuestionId)?.click();}
  }
  async function loadCanonicalLookups(){
   try{
