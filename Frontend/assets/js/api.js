@@ -243,9 +243,10 @@
     if (!$('body[data-active="bank"]')) return;
     const search = $('main .table-toolbar .search-box input')?.value.trim() || new URLSearchParams(location.search).get('search') || '';
     const rows = await request(`/questions${search ? `?search=${encodeURIComponent(search)}` : ''}`);
+    const ungroupedRows = (Array.isArray(rows) ? rows : []).filter(row => !row.importBatchId);
     const typeNames = { MultipleChoice: 'چهارگزینه‌ای', Essay: 'تشریحی', Matching: 'وصل‌کردنی' };
     const difficultyNames = { 1: 'آسان', 2: 'متوسط', 3: 'سخت' };
-    renderRows('body[data-active="bank"] table tbody', rows, row => `<tr>
+    renderRows('body[data-active="bank"] table tbody', ungroupedRows, row => `<tr>
       <td>${escapeHtml(row.text)}</td><td>${escapeHtml(row.skillName || row.categoryName || '—')}</td>
       <td>${escapeHtml(typeNames[row.questionTypeCode] || row.questionTypeName || row.questionTypeCode || '—')}</td>
       <td>${escapeHtml(difficultyNames[Number(row.difficultyLevel)] || '—')}</td>
