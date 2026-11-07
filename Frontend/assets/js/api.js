@@ -328,13 +328,15 @@
       const heading = $('body[data-active="results"] h1');
       const isStudentView = role === 'student';
       const pendingManualCount = Number(result.pendingManualCount || 0);
+      const hasHiddenManualScore = Number(result.maxScore || 0) > Number(result.autoMaxScore || 0);
       if (heading) {
         const scoreLabel = result.isPdfOnly && result.score == null
           ? 'پاسخنامه PDF در انتظار تصحیح استاد'
-          : isStudentView && result.autoScore != null && !result.resultsPublished &&
-              Number(result.autoMaxScore ?? result.maxScore) < Number(result.maxScore)
-            ? `نمره خودکار تستی و وصل‌کردنی: ${faNumber(result.autoScore)} از ${faNumber(result.autoMaxScore ?? result.maxScore)} — ${pendingManualCount > 0 ? `${faNumber(pendingManualCount)} بخش تشریحی در انتظار تصحیح` : 'نمره نهایی پس از انتشار رسمی استاد'}`
-            : result.score != null
+          : isStudentView && !result.resultsPublished && hasHiddenManualScore && result.autoScore == null
+            ? (pendingManualCount > 0 ? 'بخش تشریحی PDF در انتظار تصحیح استاد است' : 'تصحیح بخش تشریحی انجام شده؛ نمره نهایی پس از انتشار رسمی نمایش داده می‌شود')
+            : isStudentView && result.autoScore != null && !result.resultsPublished && hasHiddenManualScore
+              ? `نمره خودکار تستی و وصل‌کردنی: ${faNumber(result.autoScore)} از ${faNumber(result.autoMaxScore ?? result.maxScore)} — ${pendingManualCount > 0 ? `${faNumber(pendingManualCount)} بخش تشریحی در انتظار تصحیح` : 'نمره نهایی پس از انتشار رسمی استاد'}`
+              : result.score != null
               ? `${faNumber(result.score)} از ${faNumber(result.maxScore)}`
               : result.autoScore != null
                 ? `نمره خودکار: ${faNumber(result.autoScore)} از ${faNumber(result.maxScore)}`
@@ -394,8 +396,8 @@
             <td>${faNumber(index + 1)}</td><td>${questionTitle}</td>
             <td>${answerSummary}</td><td>${correctAnswerSummary}</td>
             <td>${gradeControl}</td></tr>`;
-        }).join('') : (isStudentView && pendingManualCount > 0
-          ? '<tr><td colspan="5" style="text-align:center;padding:24px">بخش تشریحی این آزمون با PDF تصحیح می‌شود و تا زمان تصحیح استاد در این صفحه نمایش داده نمی‌شود.</td></tr>'
+        }).join('') : (isStudentView && hasHiddenManualScore
+          ? '<tr><td colspan="5" style="text-align:center;padding:24px">بخش تشریحی این آزمون با PDF تصحیح می‌شود و جزئیات آن برای دانشجو نمایش داده نمی‌شود.</td></tr>'
           : '<tr><td colspan="5">پاسخی ثبت نشده است.</td></tr>');
 
         if (canGrade) body.querySelectorAll('[data-grade-answer]').forEach(button => button.addEventListener('click', async () => {
