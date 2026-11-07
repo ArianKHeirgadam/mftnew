@@ -117,6 +117,23 @@ public sealed class ExamScoringTests
             2m, invalidMap, Array.Empty<MatchingPairSelection>()));
     }
 
+
+    [Fact]
+    public void Matching_EmptySelection_GetsZero()
+    {
+        var correctMap = new Dictionary<long, long> { [10] = 101, [20] = 102 };
+        Assert.Equal(0m, ExamScoring.CalculateMatching(
+            2m, correctMap, Array.Empty<MatchingPairSelection>()));
+    }
+
+    [Fact]
+    public void Matching_OneCorrectPair_RoundsAwayFromZero()
+    {
+        var correctMap = new Dictionary<long, long> { [10] = 101, [20] = 102, [30] = 103 };
+        var selections = new[] { new MatchingPairSelection(10, 101) };
+        Assert.Equal(0.34m, ExamScoring.CalculateMatching(1m, correctMap, selections));
+    }
+
     [Fact]
     public void RoundScore_UsesAwayFromZeroToTwoDecimals()
     {
