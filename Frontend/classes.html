@@ -164,7 +164,11 @@
 
   async function loadClasses(preferredId) {
     classes = await api().request('/canonical/classes');
-    $('#classSelect').innerHTML = '<option value="">انتخاب کلاس</option>' + classes.map(item =>
+    const searchTerm = (new URLSearchParams(location.search).get('search') || '').trim().toLocaleLowerCase();
+    const visibleClasses = classes.filter(item => !searchTerm ||
+      (item.name || '').toLocaleLowerCase().includes(searchTerm) ||
+      (item.department || '').toLocaleLowerCase().includes(searchTerm));
+    $('#classSelect').innerHTML = '<option value="">انتخاب کلاس</option>' + visibleClasses.map(item =>
       '<option value="' + item.id + '">' + esc(item.name) + ' — ' + esc(item.department || '') +
       ' (' + Number(item.memberCount || 0) + ' دانشجو)</option>').join('');
     if (preferredId) $('#classSelect').value = String(preferredId);
