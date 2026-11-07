@@ -416,10 +416,8 @@
         essayGradingBox.hidden = true;
         essayGradingBox.innerHTML = '';
         try {
-          const queue = await request('/canonical/teacher/essay-grading/queue');
-          const pendingAttempt = (Array.isArray(queue) ? queue : [])
-            .find(item => Number(item.id) === Number(attemptId));
-          const essaySections = pendingAttempt?.sections || [];
+          const essaySections = await request('/canonical/teacher/essay-grading/attempts/' +
+            encodeURIComponent(attemptId) + '/sections');
           if (essaySections.length) {
             essayGradingBox.hidden = false;
             essayGradingBox.innerHTML = '<div class="section-title"><h3>پاسخ‌های PDF تشریحی — تصحیح استاد</h3></div><p class="text-soft text-sm mb-16">پاسخ‌های تستی این آزمون به‌صورت خودکار تصحیح شده‌اند. برای هر بخش تشریحی، PDF دانشجو را بررسی و نمره را ثبت کنید.</p>';
