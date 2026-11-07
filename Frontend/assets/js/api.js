@@ -211,7 +211,7 @@
     const role = (currentUser()?.role || '').toLowerCase();
     if (attemptId) {
       let result;
-      try { result = await request(`/results/${encodeURIComponent(attemptId)}`); }
+      try { result = await request(`/canonical/results/${encodeURIComponent(attemptId)}`); }
       catch (error) {
         const heading = $('body[data-active="results"] h1');
         if (heading) heading.textContent = 'نتیجه هنوز منتشر نشده یا در دسترس نیست';
@@ -226,8 +226,8 @@
           : result.autoScore != null
             ? `نمره موقت ${faNumber(result.autoScore)} از ${faNumber(result.maxScore)} — در انتظار تصحیح ${faNumber(result.pendingManualCount)} سؤال تشریحی`
             : (result.resultsPublished ? 'در انتظار تکمیل تصحیح' : 'منتشر نشده');
-        const outcome = result.score == null ? '' : (Number(result.score) >= Number(result.passingScore) ? ' — قبول' : ' — نیازمند تلاش بیشتر');
-        heading.textContent = `نتیجه آزمون: ${result.exam} — ${scoreLabel}${outcome}`;
+        const outcome = '';
+        heading.textContent = `نتیجه آزمون: ${result.exam} — ${scoreLabel}`;
       }
       const body = $('body[data-active="results"] .card table tbody');
       const canGrade = ['teacher', 'department', 'superadmin'].includes(role);
@@ -236,11 +236,11 @@
           const isEssay = ['Essay', 'Text'].includes(String(answer.questionType || '').trim());
           const canEditGrade = canGrade && isEssay && !result.resultsPublished;
           const gradeControl = canEditGrade
-            ? `<div class="flex gap-8 mt-8"><input class="input" type="number" min="0" max="${Number(answer.maxRawScore || 0)}" step="0.01" value="${Number(answer.rawAwardedScore || 0)}" data-grade-score style="max-width:100px" aria-label="نمره خام سؤال"><input class="input" type="text" maxlength="2000" data-grade-comment value="${escapeHtml(answer.gradingComment || '')}" placeholder="توضیح تصحیح" style="max-width:180px"><button class="btn btn-primary btn-sm" data-grade-answer="${answer.questionId}">ثبت نمره</button></div><small class="text-soft">حداکثر نمره خام: ${faNumber(answer.maxRawScore || 0)}</small>`
+            ? `<div class="flex gap-8 mt-8"><input class="input" type="number" min="0" max="${Number(answer.maxScore || 0)}" step="0.01" value="${Number(answer.awardedScore || 0)}" data-grade-score style="max-width:100px" aria-label="نمره خام سؤال"><input class="input" type="text" maxlength="2000" data-grade-comment value="${escapeHtml(answer.gradingComment || '')}" placeholder="توضیح تصحیح" style="max-width:180px"><button class="btn btn-primary btn-sm" data-grade-answer="${answer.examQuestionId}">ثبت نمره</button></div><small class="text-soft">حداکثر نمره خام: ${faNumber(answer.maxScore || 0)}</small>`
             : (isEssay && answer.isCorrect == null ? 'در انتظار تصحیح تشریحی' : answer.isCorrect == null ? 'کلید پاسخ تعریف نشده' : answer.isCorrect ? 'صحیح' : 'نادرست');
           return `<tr>
             <td>${faNumber(index + 1)}</td><td>${escapeHtml(answer.question || `سؤال ${answer.questionId}`)}</td>
-            <td>${escapeHtml(answer.answer || 'بدون پاسخ')}</td><td>${escapeHtml(answer.correctAnswer || '—')}</td>
+            <td>${escapeHtml(typeof answer.answer === 'string' ? answer.answer : answer.answer?.text ?? JSON.stringify(answer.answer ?? 'بدون پاسخ'))}</td><td>${escapeHtml(Array.isArray(answer.correctAnswer) ? answer.correctAnswer.map(x => x.optionText || `${x.leftItem || ''}: ${x.rightItem || ''}`).join('، ') : answer.correctAnswer || '—')}</td>
             <td>${gradeControl}</td></tr>`;
         }).join('') : '<tr><td colspan="5">پاسخی ثبت نشده است.</td></tr>';
 
@@ -251,7 +251,7 @@
           if (!Number.isFinite(score) || score < 0) return notify('نمره واردشده معتبر نیست.', 'warn');
           button.disabled = true;
           try {
-            await request(`/results/${encodeURIComponent(attemptId)}/answers/${encodeURIComponent(button.dataset.gradeAnswer)}/grade`, { method: 'PUT', body: JSON.stringify({ score, comment }) });
+            await request(`/canonical/results/${encodeURIComponent(attemptId)}/answers/${encodeURIComponent(button.dataset.gradeAnswer)}/grade`, { method: 'PUT', body: JSON.stringify({ score }) });
             notify('نمره سؤال ثبت شد.', 'ok');
             await loadResults();
           } catch (error) { notify(error.message || 'ثبت نمره ناموفق بود.', 'danger'); button.disabled = false; }
@@ -275,7 +275,7 @@
         publishButton.onclick = async () => {
           publishButton.disabled = true;
           try {
-            await request(`/results/exams/${encodeURIComponent(result.examId)}/publish`, { method: 'POST' });
+            await request(`/canonical/results/exams/${encodeURIComponent(result.examId)}/publish`, { method: 'POST' });
             notify('نتایج آزمون منتشر شد.', 'ok');
             await loadResults();
           } catch (error) { notify(error.message || 'انتشار نتایج ناموفق بود.', 'danger'); }
@@ -288,7 +288,7 @@
         unpublishButton.onclick = async () => {
           unpublishButton.disabled = true;
           try {
-            await request(`/results/exams/${encodeURIComponent(result.examId)}/unpublish`, { method: 'POST' });
+            await request(`/canonical/results/exams/${encodeURIComponent(result.examId)}/unpublish`, { method: 'POST' });
             notify('انتشار نتایج لغو شد؛ اکنون می‌توانید نمرات را اصلاح کنید.', 'ok');
             await loadResults();
           } catch (error) { notify(error.message || 'لغو انتشار ناموفق بود.', 'danger'); }
@@ -297,7 +297,7 @@
       }
       return;
     }
-    const rows = await request(`/results${examId ? `?examId=${encodeURIComponent(examId)}` : ''}`);
+    const rows = await request(`/canonical/results${examId ? `?examId=${encodeURIComponent(examId)}` : ''}`);
     const header = $('body[data-active="results"] table thead tr');
     if (header) header.innerHTML = '<th>#</th><th>آزمون</th><th>دانشجو</th><th>وضعیت</th><th>نمره</th>';
     renderRows('body[data-active="results"] table tbody', rows, row => `<tr>
@@ -312,7 +312,7 @@
         if (!examId || publishButton.disabled) return;
         publishButton.disabled = true;
         try {
-          await request(`/results/exams/${encodeURIComponent(examId)}/publish`, { method: 'POST' });
+          await request(`/canonical/results/exams/${encodeURIComponent(examId)}/publish`, { method: 'POST' });
           notify('نتایج آزمون منتشر شد.', 'ok');
           await loadResults();
         } catch (error) { notify(error.message || 'انتشار نتایج ناموفق بود.', 'danger'); }
@@ -326,7 +326,7 @@
         if (!examId || unpublishButton.disabled) return;
         unpublishButton.disabled = true;
         try {
-          await request(`/results/exams/${encodeURIComponent(examId)}/unpublish`, { method: 'POST' });
+          await request(`/canonical/results/exams/${encodeURIComponent(examId)}/unpublish`, { method: 'POST' });
           notify('انتشار نتایج لغو شد؛ می‌توانید نمرات را اصلاح کنید.', 'ok');
           await loadResults();
         } catch (error) { notify(error.message || 'لغو انتشار ناموفق بود.', 'danger'); }
