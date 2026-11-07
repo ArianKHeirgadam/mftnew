@@ -57,6 +57,10 @@
             <div class="field">
               <label for="classCapacity">ظرفیت پذیرش کلاس (نفر)</label>
               <input class="input" id="classCapacity" type="number" min="1" max="100000" step="1" placeholder="مثلاً ۳۰" required>
+            <div class="field">
+              <label for="classSchedule">زمان برگزاری کلاس</label>
+              <input class="input" id="classSchedule" maxlength="200" placeholder="مثلاً شنبه و دوشنبه، ساعت ۱۶ تا ۱۸">
+            </div>
             </div>
             <button class="btn btn-primary" id="classCreate">ایجاد کلاس</button>
             <div class="divider" style="margin:20px 0"></div>
@@ -65,6 +69,10 @@
           <div class="field">
             <label for="classSelect">انتخاب کلاس برای مدیریت اعضا</label>
             <select class="select" id="classSelect"><option value="">در حال دریافت کلاس‌ها...</option></select>
+            <div class="flex gap-8" style="margin-top:10px;flex-wrap:wrap">
+              <button type="button" class="btn btn-outline btn-sm" id="editClass" disabled>ویرایش نام و زمان کلاس</button>
+              <button type="button" class="btn btn-danger btn-sm" id="deleteClass" disabled>حذف کلاس</button>
+            </div>
           </div>
           <p class="text-soft text-sm">یک کلاس را انتخاب کنید تا اعضای آن را مدیریت کنید.</p>
         </section>
@@ -208,7 +216,9 @@
     else {
       currentClass = null;
       $('#openRosterModal').disabled = true;
-      $('#classSummary').textContent = 'کلاسی انتخاب نشده است.';
+       $('#classSummary').textContent = 'کلاسی انتخاب نشده است.';
+      $('#editClass').disabled = true;
+      $('#deleteClass').disabled = true;
     }
   }
 
@@ -226,7 +236,10 @@
     selectedTeacherIds = new Set((teacherResult.teachers || []).map(item => Number(item.id)));
     $('#classSummary').textContent = currentClass.name + ' — ' +
       (currentClass.department || me?.department || 'دپارتمان') +
-      ' — ' + selectedIds.size + ' دانشجو و ' + selectedTeacherIds.size + ' استاد';
+      ' — ' + selectedIds.size + ' دانشجو و ' + selectedTeacherIds.size + ' استاد' +
+      (currentClass.schedule ? ' — زمان: ' + currentClass.schedule : ' — زمان برگزاری ثبت نشده است');
+    $('#editClass').disabled = false;
+    $('#deleteClass').disabled = false;
     $('#classCapacitySummary').textContent = 'ظرفیت: ' + (currentClass.capacity ? Number(currentClass.capacity) + ' نفر' : 'تعریف‌نشده');
     $('#rosterModalSubtitle').textContent = currentClass.name + ' · ' + (currentClass.department || '');
     $('#openRosterModal').disabled = false;
@@ -257,13 +270,44 @@
     if (!departmentId) return notify('دپارتمان معتبر انتخاب نشده است.', 'warn');
     try {
       const created = await api().request('/canonical/classes', {
-        method: 'POST', body: JSON.stringify({ name, departmentId, capacity })
+        method: 'POST', body: JSON.stringify({ name, departmentId, capacity, schedule: $('#classSchedule').value.trim() || null })
       });
       $('#className').value = '';
       $('#classCapacity').value = '';
+      $('#classSchedule').value = '';
       await loadClasses(created.id);
       notify('کلاس ایجاد شد.', 'ok');
     } catch (error) { notify(error.message || 'ایجاد کلاس ناموفق بود.', 'danger'); }
+  });
+
+  $('#editClass').addEventListener('click', async () => {
+    if (!currentClass) return;
+    const name = window.prompt('نام جدید کلاس:', currentClass.name || '');
+    if (name === null) return;
+    const trimmedName = name.trim();
+    if (!trimmedName) return notify('نام کلاس نمی‌تواند خالی باشد.', 'warn');
+    const schedule = window.prompt('زمان برگزاری کلاس (مثلاً شنبه و دوشنبه، ساعت ۱۶ تا ۱۸):', currentClass.schedule || '');
+    if (schedule === null) return;
+    try {
+      await api().request('/canonical/classes/' + currentClass.id, {
+        method: 'PUT',
+        body: JSON.stringify({ name: trimmedName, schedule: schedule.trim() || null })
+      });
+      await loadClasses(currentClass.id);
+      notify('اطلاعات کلاس به‌روزرسانی شد.', 'ok');
+    } catch (error) { notify(error.message || 'ویرایش کلاس ناموفق بود.', 'danger'); }
+  });
+
+  $('#deleteClass').addEventListener('click', async () => {
+    if (!currentClass) return;
+    const confirmed = window.confirm('کلاس «' + currentClass.name + '» حذف شود؟ فقط کلاسی که آزمون یا عضو ثبت‌شده نداشته باشد حذف می‌شود.');
+    if (!confirmed) return;
+    try {
+      await api().request('/canonical/classes/' + currentClass.id, { method: 'DELETE' });
+      currentClass = null;
+      await loadClasses();
+      notify('کلاس حذف شد.', 'ok');
+    } catch (error) { notify(error.message || 'حذف کلاس ناموفق بود.', 'danger'); }
   });
 
   $('#classCapacitySummary').addEventListener('click', async () => {
