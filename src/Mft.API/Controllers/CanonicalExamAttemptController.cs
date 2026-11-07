@@ -167,8 +167,8 @@ public sealed class CanonicalExamAttemptController(
             return Conflict(new { message = "فایل PDF صورت سؤال برای یک یا چند بخش تشریحی موجود نیست.", missingSectionIds = missingQuestionPaperIds });
         if (missingAnswerIds.Length > 0 && !request.AutoSubmit)
             return BadRequest(new { message = "برای ثبت نهایی، پاسخ PDF تمام بخش‌های تشریحی را بارگذاری کنید.", missingSectionIds = missingAnswerIds });
-        if (missingAnswerIds.Length > 0)
-            return Conflict(new { message = "زمان آزمون تمام شده اما پاسخ PDF یک یا چند بخش تشریحی بارگذاری نشده است؛ برای ثبت نهایی باید فایل‌ها بارگذاری شوند.", missingSectionIds = missingAnswerIds });
+        // At the deadline, auto-submit locks the attempt even if a PDF was omitted.
+        // The manual grading workflow can then flag the missing section response.
 
         var examQuestions = await academic.ExamQuestions.AsNoTracking()
             .Where(x => academic.ExamSections.Any(s => s.Id == x.ExamSectionId && s.ExamId == examId))
