@@ -211,6 +211,8 @@ public sealed class CanonicalAcademicDbContext(
             e.Property(x => x.FinalScore).HasPrecision(7, 2);
             e.Property(x => x.ManualGradedScore).HasPrecision(7, 2);
             e.Property(x => x.GradingStatus).HasMaxLength(30);
+            e.Property(x => x.ManualReviewRequired).HasColumnType("bit");
+            e.Property(x => x.RowVersion).IsRowVersion().IsConcurrencyToken();
             e.HasIndex(x => new { x.ExamId, x.StudentUserId }).IsUnique();
             e.HasIndex(x => x.StudentUserId);
             e.HasOne<CanonicalExam>().WithMany().HasForeignKey(x => x.ExamId).OnDelete(DeleteBehavior.NoAction);
@@ -313,7 +315,7 @@ public sealed class CanonicalExamSection { public long Id { get; set; } public l
 public sealed class CanonicalExamQuestion { public long Id { get; set; } public long ExamSectionId { get; set; } public long QuestionId { get; set; } public int DisplayOrder { get; set; } public decimal? PointsOverride { get; set; } }
 
 public sealed class CanonicalExamAttemptStatus { public byte Id { get; set; } public string Code { get; set; } = ""; }
-public sealed class CanonicalExamAttempt { public long Id { get; set; } public long ExamId { get; set; } public long StudentUserId { get; set; } public DateTime StartedAt { get; set; } public DateTime? SubmittedAt { get; set; } public byte StatusId { get; set; } public decimal? AutoGradedScore { get; set; } public decimal? FinalScore { get; set; } public decimal? ManualGradedScore { get; set; } public string? GradingStatus { get; set; } }
+public sealed class CanonicalExamAttempt { public long Id { get; set; } public long ExamId { get; set; } public long StudentUserId { get; set; } public DateTime StartedAt { get; set; } public DateTime? SubmittedAt { get; set; } public byte StatusId { get; set; } public decimal? AutoGradedScore { get; set; } public decimal? FinalScore { get; set; } public decimal? ManualGradedScore { get; set; } public string? GradingStatus { get; set; } public bool? ManualReviewRequired { get; set; } public byte[] RowVersion { get; set; } = Array.Empty<byte>(); }
 public sealed class CanonicalStudentAnswer { public long Id { get; set; } public long ExamAttemptId { get; set; } public long ExamQuestionId { get; set; } public string AnswerJson { get; set; } = ""; public bool IsAutoGraded { get; set; } public decimal? Score { get; set; } public long? GradedByUserId { get; set; } public DateTime? GradedAt { get; set; } public decimal? AutoScore { get; set; } public decimal? ManualScore { get; set; } public string? GradingStatus { get; set; } public string? ManualFeedback { get; set; } }
 
 public sealed class CanonicalExamDocument
