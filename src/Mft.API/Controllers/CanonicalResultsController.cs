@@ -54,13 +54,14 @@ public sealed class CanonicalResultsController(
                 HasAutoGradedAnswers = academic.StudentAnswers.Any(answer => answer.ExamAttemptId == x.Attempt.Id && answer.IsAutoGraded)
             }).ToListAsync(ct);
         var userIds = rows.Select(x => x.StudentUserId).Distinct().ToArray();
-        var names = await identity.Users.AsNoTracking().Where(x => userIds.Contains(x.Id))
-            .Select(x => new { x.Id, x.FullName }).ToDictionaryAsync(x => x.Id, x => x.FullName, ct);
+        var studentDetails = await identity.Users.AsNoTracking().Where(x => userIds.Contains(x.Id))
+            .Select(x => new { x.Id, x.FullName, x.Username }).ToDictionaryAsync(x => x.Id, x => new { x.FullName, x.Username }, ct);
 
         return Ok(rows.Select(x => new {
             id = x.AttemptId, examId = x.ExamId, examTitle = x.Title,
             studentId = x.StudentUserId,
-            studentName = names.GetValueOrDefault(x.StudentUserId),
+            studentName = studentDetails.GetValueOrDefault(x.StudentUserId)?.FullName,
+            studentNumber = studentDetails.GetValueOrDefault(x.StudentUserId)?.Username,
             startedAt = x.StartedAt, submittedAt = x.SubmittedAt,
             score = isStudent
                 ? (x.StatusId == 4 ? (x.ResultsPublished ? x.FinalScore : null) :
@@ -108,10 +109,10 @@ public sealed class CanonicalResultsController(
             .OrderBy(x => x.DisplayOrder).ToListAsync(ct);
         var isPdfOnly = answers.Count == 0 && !await academic.ExamSections.AnyAsync(x => x.ExamId == exam.Id, ct) &&
             await academic.ExamDocuments.AnyAsync(x => x.ExamId == exam.Id, ct);
-        var submissionDocument = isPdfOnly
-            ? await academic.ExamSubmissionDocuments.AsNoTracking().Where(x => x.AttemptId == attemptId)
-                .Select(x => new { x.OriginalFileName, x.FileSize, x.UploadedAt }).FirstOrDefaultAsync(ct)
-            : null;
+        var submissionDocument = await academic.ExamSubmissionDocuments.AsNoTracking().Where(x => x.AttemptId == attemptId)
+            .Select(x => new { x.OriginalFileName, x.FileSize, x.UploadedAt }).FirstOrDefaultAsync(ct);
+        var student = await identity.Users.AsNoTracking().Where(x => x.Id == attempt.StudentUserId)
+            .Select(x => new { x.FullName, x.Username }).FirstOrDefaultAsync(ct);
         var maxScore = isPdfOnly ? 100m : answers.Sum(x => x.PointsOverride ?? x.Points);
         var payload = answers.Select(x => {
             var code = typeCodes.GetValueOrDefault(x.QuestionTypeId) ?? "Unknown";
@@ -137,6 +138,7 @@ public sealed class CanonicalResultsController(
         var pending = isPdfOnly ? (attempt.StatusId == 4 ? 0 : 1) : answers.Count(x => !x.IsAutoGraded && !x.Score.HasValue);
         return Ok(new {
             id = attempt.Id, examId = exam.Id, exam = exam.Title, isPdfOnly,
+            studentName = student?.FullName, studentNumber = student?.Username,
             submissionPdf = submissionDocument,
             score = isPdfOnly
                 ? (isStudent && !exam.ResultsPublished ? null : attempt.FinalScore)
