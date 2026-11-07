@@ -49,6 +49,7 @@
       <div class="field"><label for="examStart">زمان شروع</label><input class="input" id="examStart" type="datetime-local" required></div>
       <div class="field"><label for="examEnd">پایان مهلت شرکت</label><input class="input" id="examEnd" type="datetime-local" required></div>
       <div class="field wide"><label for="examPdfFile">فایل PDF صورت آزمون (اختیاری، حداکثر ۲۰ مگابایت)</label><input class="input" id="examPdfFile" type="file" accept="application/pdf,.pdf"><small class="text-soft">اگر آزمون فقط برگه PDF است و سؤال آنلاین ندارد، بارگذاری این فایل الزامی است. در آزمون‌های دارای سؤال هم می‌توانید PDF صورت سؤال را پیوست کنید.</small></div>
+      <div class="field wide"><label for="essaySectionPdfFile">PDF بخش تشریحی (اختیاری، حداکثر ۲۰ مگابایت)</label><input class="input" id="essaySectionPdfFile" type="file" accept="application/pdf,.pdf"><small class="text-soft">با انتخاب این فایل، یک بخش Essay مستقل و PDFمحور ساخته می‌شود. دانشجو برای این بخش فقط PDF پاسخ بارگذاری می‌کند و کادر پاسخ متنی نخواهد داشت.</small></div>
      </div>
      <div class="flex justify-between gap-8 mt-24"><a href="dashboard-teacher.html" class="btn btn-outline">بازگشت</a><button class="btn btn-primary" id="toQuestions">ادامه و افزودن سؤال‌ها</button></div>
     </section>
@@ -91,7 +92,7 @@
 (async function(){
  const $=id=>document.getElementById(id), api=window.MftApi;
  const selectedIds=new Set();let lookups={categories:[],skills:[]},questions=[];
- let pendingExamId=null,pendingPdfUploaded=false;
+ let pendingExamId=null,pendingPdfUploaded=false,pendingEssaySectionId=null,pendingEssayPdfUploaded=false;
  const escapeHtml=value=>String(value??'').replace(/[&<>"']/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
  const typeNames={MultipleChoice:'چهارگزینه‌ای',Essay:'تشریحی',Matching:'وصل‌کردنی'};
  const steps=['مشخصات آزمون','سؤال‌ها','بررسی و انتشار'];let current=1;
@@ -121,19 +122,20 @@
   if(!$('examStart').value||$('examStart').value==='')return 'زمان شروع را مشخص کنید.';
   if(!$('examEnd').value||Number.isNaN(end.getTime())||Number.isNaN(start.getTime())||end<=start)return 'زمان پایان باید بعد از زمان شروع باشد.';
   const file=$('examPdfFile').files[0];if(file&&(file.size>20*1024*1024||!(/\.pdf$/i.test(file.name))))return 'فایل صورت آزمون باید PDF و حداکثر ۲۰ مگابایت باشد.';
+   const essayFile=$('essaySectionPdfFile').files[0];if(essayFile&&(essayFile.size>20*1024*1024||!(/\.pdf$/i.test(essayFile.name))))return 'فایل بخش تشریحی باید PDF و حداکثر ۲۰ مگابایت باشد.';
   return null;
  }
  function showSummary(){
-  const cls=$('examClass').selectedOptions[0],cat=$('examCategory').selectedOptions[0],file=$('examPdfFile').files[0],chosen=selectedQuestions();
+  const cls=$('examClass').selectedOptions[0],cat=$('examCategory').selectedOptions[0],file=$('examPdfFile').files[0],essayFile=$('essaySectionPdfFile').files[0],chosen=selectedQuestions();
   $('sumTitle').textContent=$('examTitle').value.trim();$('sumClass').textContent=cls?.textContent||'—';$('sumCategory').textContent=cat?.textContent||'—';
   $('sumQuestions').textContent=chosen.length+' سؤال';$('sumDuration').textContent=$('examDuration').value+' دقیقه';
-  $('sumPdf').textContent=file?file.name:(chosen.length?'پیوست نشده':'بارگذاری نشده');
+  $('sumPdf').textContent=[file?('صورت آزمون: '+file.name):'',essayFile?('بخش Essay: '+essayFile.name):''].filter(Boolean).join(' | ')||(chosen.length?'پیوست نشده':'بارگذاری نشده');
   $('sumSchedule').textContent=new Date($('examStart').value).toLocaleString('fa-IR')+' تا '+new Date($('examEnd').value).toLocaleString('fa-IR');
-  $('publishHint').textContent=chosen.length?'آزمون با سؤال‌های انتخاب‌شده منتشر می‌شود. اگر سؤال تشریحی داشته باشد، دانشجو باید پاسخ خود را فقط با PDF ارسال کند.':'این آزمون بدون سؤال آنلاین و بر پایه PDF خواهد بود؛ فایل صورت آزمون برای انتشار الزامی است.';
+  $('publishHint').textContent=essayFile?'یک بخش Essay مستقل ساخته می‌شود؛ فایل صورت سؤال آن PDF است و پاسخ دانشجو نیز فقط PDF خواهد بود.':chosen.length?'آزمون با سؤال‌های انتخاب‌شده منتشر می‌شود. سؤال‌های تشریحی قدیمیِ متنی برای سازگاری حفظ می‌شوند.':'این آزمون بدون سؤال آنلاین و بر پایه PDF خواهد بود؛ فایل صورت آزمون برای انتشار الزامی است.';
  }
  $('toQuestions').addEventListener('click',()=>{const e=validateDetails();if(e)return window.showToast?.(e,'warn');showStep(2);});
  $('backToDetails').addEventListener('click',()=>showStep(1));
- $('toReview').addEventListener('click',()=>{const e=validateDetails();if(e)return window.showToast?.(e,'warn');if(!selectedIds.size&&!$('examPdfFile').files[0])return window.showToast?.('برای آزمون باید حداقل یک سؤال انتخاب کنید یا فایل PDF صورت آزمون را بارگذاری کنید.','warn');showSummary();showStep(3);});
+ $('toReview').addEventListener('click',()=>{const e=validateDetails();if(e)return window.showToast?.(e,'warn');if(!selectedIds.size&&!$('examPdfFile').files[0]&&!$('essaySectionPdfFile').files[0])return window.showToast?.('برای آزمون باید سؤال آنلاین یا یکی از فایل‌های PDF را انتخاب کنید.','warn');showSummary();showStep(3);});
  $('backToQuestions').addEventListener('click',()=>showStep(2));
  $('questionSearch').addEventListener('input',renderQuestions);
  $('questionList').addEventListener('change',e=>{const input=e.target;if(!input.matches('input[type=checkbox]'))return;input.checked?selectedIds.add(String(input.value)):selectedIds.delete(String(input.value));$('questionCount').textContent=selectedIds.size+' سؤال انتخاب‌شده';});
@@ -141,15 +143,20 @@
  $('refreshQuestions').addEventListener('click',async()=>{try{questions=await api.request('/questions');questions=Array.isArray(questions)?questions:[];renderQuestions();window.showToast?.('بانک سؤال بروزرسانی شد.','ok');}catch(e){window.showToast?.(e.message||'دریافت بانک سؤال ناموفق بود.','danger');}});
  $('createExam').addEventListener('click',async()=>{
   const err=validateDetails();if(err)return window.showToast?.(err,'warn');
-  const chosen=selectedQuestions(),file=$('examPdfFile').files[0],isPdfOnly=chosen.length===0;
-  if(isPdfOnly&&!file)return window.showToast?.('برای آزمون بدون سؤال آنلاین، فایل PDF صورت آزمون الزامی است.','warn');
-  const classOption=$('examClass').selectedOptions[0],classId=Number($('examClass').value),departmentId=Number(classOption?.dataset.departmentId||0);
-  if(!departmentId)return window.showToast?.('دپارتمان کلاس معتبر نیست.','warn');
-  const grouped=new Map();chosen.forEach(q=>{const id=Number(q.skillId);if(!grouped.has(id))grouped.set(id,[]);grouped.get(id).push(Number(q.id));});
-  const groups=[...grouped.entries()],duration=Number($('examDuration').value);
-  if(!isPdfOnly&&duration<groups.length)return window.showToast?.('مدت آزمون باید حداقل به تعداد مهارت‌های سؤال‌های انتخاب‌شده دقیقه باشد.','warn');
-  const baseWeight=groups.length?100/groups.length:0;let usedMinutes=0;
-  const sections=groups.map(([skillId,questionIds],i)=>{const minutes=i===groups.length-1?duration-usedMinutes:Math.max(1,Math.floor(duration/groups.length));usedMinutes+=minutes;return{skillId,durationMinutes:minutes,weightPercent:i===groups.length-1?100-baseWeight*(groups.length-1):baseWeight,questionIds};});
+   const chosen=selectedQuestions(),file=$('examPdfFile').files[0],essayFile=$('essaySectionPdfFile').files[0];
+   const isPdfOnly=chosen.length===0&&!essayFile;
+   if(isPdfOnly&&!file)return window.showToast?.('برای آزمون بدون سؤال آنلاین یا بخش Essay، فایل PDF صورت آزمون الزامی است.','warn');
+   const classOption=$('examClass').selectedOptions[0],classId=Number($('examClass').value),departmentId=Number(classOption?.dataset.departmentId||0);
+   if(!departmentId)return window.showToast?.('دپارتمان کلاس معتبر نیست.','warn');
+   const grouped=new Map();chosen.forEach(q=>{const id=Number(q.skillId);if(!grouped.has(id))grouped.set(id,[]);grouped.get(id).push(Number(q.id));});
+   const groups=[...grouped.entries()],duration=Number($('examDuration').value);
+   const essaySkillId=essayFile?(groups.length?groups[0][0]:Number(lookups.skills.find(s=>Number(s.examCategoryId)===Number($('examCategory').value))?.id||0)):0;
+   if(essayFile&&!essaySkillId)return window.showToast?.('برای ساخت بخش Essay باید حداقل یک مهارت در دسته‌بندی انتخاب‌شده تعریف شده باشد.','warn');
+   const sectionCount=groups.length+(essayFile?1:0);
+   if(!isPdfOnly&&duration<sectionCount)return window.showToast?.('مدت آزمون باید حداقل به تعداد بخش‌های آزمون دقیقه باشد.','warn');
+   const baseWeight=sectionCount?100/sectionCount:0;let usedMinutes=0;
+   const sections=groups.map(([skillId,questionIds],i)=>{const minutes=i===sectionCount-1&&!essayFile?duration-usedMinutes:Math.max(1,Math.floor(duration/sectionCount));usedMinutes+=minutes;return{skillId,sectionType:'Online',durationMinutes:minutes,weightPercent:i===sectionCount-1&&!essayFile?100-baseWeight*(sectionCount-1):baseWeight,questionIds};});
+   if(essayFile){const minutes=duration-usedMinutes;sections.push({skillId:essaySkillId,sectionType:'Essay',durationMinutes:Math.max(1,minutes),weightPercent:100-baseWeight*(sectionCount-1),questionIds:[]});}
   const startAt=new Date($('examStart').value),endAt=new Date($('examEnd').value),button=$('createExam');
   button.disabled=true;
   try{
@@ -158,12 +165,24 @@
     const created=await api.request('/canonical/exams',{method:'POST',body:JSON.stringify({title:$('examTitle').value.trim(),examCategoryId:Number($('examCategory').value),departmentId,classId,startAt:startAt.toISOString(),endAt:endAt.toISOString(),durationMinutes:duration,isPublished:false,pdfOnly:isPdfOnly,sections})});
     pendingExamId=created.id;
    }
-   if(file&&!pendingPdfUploaded){
-    $('createStatus').textContent='آزمون ساخته شد؛ در حال بارگذاری PDF...';
-    const form=new FormData();form.append('file',file);
-    await api.request('/exam-files/exams/'+encodeURIComponent(pendingExamId),{method:'POST',body:form});
-    pendingPdfUploaded=true;
-   }
+    if(file&&!pendingPdfUploaded){
+     $('createStatus').textContent='آزمون ساخته شد؛ در حال بارگذاری PDF صورت آزمون...';
+     const form=new FormData();form.append('file',file);
+     await api.request('/exam-files/exams/'+encodeURIComponent(pendingExamId),{method:'POST',body:form});
+     pendingPdfUploaded=true;
+    }
+    if(essayFile&&!pendingEssayPdfUploaded){
+     $('createStatus').textContent='در حال آماده‌سازی بخش Essay و بارگذاری PDF آن...';
+     if(!pendingEssaySectionId){
+      const detail=await api.request('/canonical/exams/'+encodeURIComponent(pendingExamId));
+      const essaySection=(detail.sections||[]).find(section=>String(section.sectionType||'').toLowerCase()==='essay');
+      if(!essaySection)throw new Error('بخش Essay در آزمون ساخته‌شده پیدا نشد.');
+      pendingEssaySectionId=essaySection.id;
+     }
+     const form=new FormData();form.append('file',essayFile);
+     await api.request('/exam-files/sections/'+encodeURIComponent(pendingEssaySectionId)+'/question-paper',{method:'POST',body:form});
+     pendingEssayPdfUploaded=true;
+    }
    $('createStatus').textContent='در حال انتشار آزمون...';
    await api.request('/canonical/exams/'+encodeURIComponent(pendingExamId)+'/publish',{method:'POST'});
    $('createStatus').textContent='آزمون با موفقیت ساخته و منتشر شد.';window.showToast?.('آزمون با موفقیت منتشر شد.','ok');setTimeout(()=>location.href='dashboard-teacher.html',900);
