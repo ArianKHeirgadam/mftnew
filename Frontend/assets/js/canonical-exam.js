@@ -16,7 +16,7 @@
   const fa = n => Number(n || 0).toLocaleString('fa-IR');
   const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   const toast = (m,t='info') => window.showToast?.(m,t);
-  let exam, sections=[], questions=[], answers=new Map(), current=0, deadline=0, timer=null, saveTimer=null, saving=false, pending=false, finalizing=false, finished=false, uploadingPdf=false;
+  let exam, sections=[], questions=[], answers=new Map(), current=0, deadline=0, remainingAtSyncMs=0, syncMonotonic=0, timer=null, saveTimer=null, saving=false, pending=false, finalizing=false, finished=false, uploadingPdf=false;
 
   function flatQuestions(data) {
     return (data.sections || []).flatMap(section => (section.questions || []).map(q => ({
@@ -110,14 +110,14 @@
     if(saving){pending=true;return;}
     saving=true;pending=false;if(saveLabel)saveLabel.textContent='در حال ذخیره...';
     try{
-      await api.request(`/canonical/exams/${encodeURIComponent(examId)}/attempt/${encodeURIComponent(attemptId)}/answers`,{method:'PUT',body:JSON.stringify({answers:requestPayload()})});
+      await api.request(`/canonical/exams/${encodeURIComponent(examId)}/attempt/${encodeURIComponent(attemptId)}/answers`,{method:'PUT',body:JSON.stringify({answers:requestPayload(),autoSubmit:auto})});
       if(saveLabel)saveLabel.textContent='ذخیره شد';
     }catch(error){if(saveLabel)saveLabel.textContent='ذخیره ناموفق';toast(error.message,'danger');}
     finally{saving=false;if(pending&&!finished)saveAnswers();}
   }
   function formatTime(seconds){const s=Math.max(0,seconds);return `${String(Math.floor(s/60)).padStart(2,'0')}:${String(s%60).padStart(2,'0')}`;}
   function startClock(){
-    const tick=()=>{const left=Math.max(0,Math.floor((deadline-Date.now())/1000));if(timerNode)timerNode.textContent=formatTime(left);
+    const tick=()=>{const elapsed=(window.performance?.now?.() ?? Date.now())-syncMonotonic;const left=Math.max(0,Math.floor((remainingAtSyncMs-elapsed)/1000));if(timerNode)timerNode.textContent=formatTime(left);
       if(left===300)toast('۵ دقیقه تا پایان آزمون باقی مانده است.','warn');
       if(left<=0){clearInterval(timer);toast('زمان آزمون تمام شد؛ پاسخ‌ها در حال ثبت نهایی هستند.','danger');submit(true);}
     };
@@ -131,7 +131,7 @@
     const button=document.getElementById('confirmFinishBtn');if(button){button.disabled=true;button.textContent='در حال ثبت...';}
     try{
       while(saving) await new Promise(resolve=>setTimeout(resolve,40));
-      const result=await api.request(`/canonical/exams/${encodeURIComponent(examId)}/attempt/${encodeURIComponent(attemptId)}/submit`,{method:'POST',body:JSON.stringify({answers:requestPayload()})});
+      const result=await api.request(`/canonical/exams/${encodeURIComponent(examId)}/attempt/${encodeURIComponent(attemptId)}/submit`,{method:'POST',body:JSON.stringify({answers:requestPayload(),autoSubmit:auto})});
       finished=true;
       if(root)root.innerHTML='<div class="alert alert-ok">آزمون با موفقیت ثبت نهایی شد. امکان شرکت مجدد در این آزمون وجود ندارد.</div><p class="mt-16">وضعیت تصحیح: '+(result.requiresManualGrading?'در انتظار تصحیح پاسخ‌های تشریحی':'تصحیح خودکار انجام شد')+'</p><a class="btn btn-primary mt-16" href="dashboard-student.html">بازگشت به داشبورد</a>';
       document.querySelector('.exam-nav-panel')?.remove();
@@ -177,7 +177,10 @@
     const data=await api.request(`/canonical/exams/${encodeURIComponent(examId)}/attempt/${encodeURIComponent(attemptId)}`);
     exam=data;sections=data.sections||[];questions=flatQuestions(data);
     deadline=new Date(data.deadline).getTime();
-    if(!Number.isFinite(deadline))throw new Error('مهلت آزمون از سرور دریافت نشد.');
+    const serverNow=data.serverNowUtc ? Date.parse(data.serverNowUtc) : Date.now();
+    remainingAtSyncMs=deadline-serverNow;
+    syncMonotonic=window.performance?.now?.() ?? Date.now();
+    if(!Number.isFinite(deadline)||!Number.isFinite(remainingAtSyncMs)||remainingAtSyncMs<0)throw new Error('مهلت آزمون از سرور معتبر دریافت نشد.');
     if(titleNode)titleNode.textContent=data.title||'آزمون آنلاین';
     const saved=data.savedAnswers||{};
     Object.entries(saved).forEach(([id,json])=>{try{answers.set(Number(id),JSON.parse(json));}catch{}});
