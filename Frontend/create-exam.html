@@ -80,10 +80,8 @@
         <div class="wpanel" id="step2">
           <h3 style="margin-bottom:16px">استاد مربوطه را انتخاب کنید</h3>
           <div class="flex items-center justify-between gap-8" style="margin-bottom:12px"><span class="text-soft text-sm">در صورت نبود استاد، حساب استاد جدید بسازید.</span><button type="button" class="btn btn-outline btn-sm" data-create-teacher>+ ایجاد استاد</button></div>
-          <div class="choice-grid" id="teacherChoices">
-            <div class="choice-card selected" data-value="دکتر کریمی"><div class="mohr sm"><div class="mohr-inner"><b>دک</b></div></div><b>دکتر کریمی</b></div>
-            <div class="choice-card" data-value="مهندس صادقی"><div class="mohr sm gold"><div class="mohr-inner"><b>مص</b></div></div><b>مهندس صادقی</b></div>
-          </div>
+          <div class="alert alert-info" id="classTeachersInfo">ابتدا کلاس دریافت‌کنندگان را در مرحله قبل انتخاب کنید. استادان واقعی ثبت‌شده برای همان کلاس در این بخش نمایش داده می‌شوند و به آزمون و صف تصحیح آن دسترسی خواهند داشت.</div>
+          <div class="choice-grid" id="teacherChoices"></div>
         </div>
 
         <!-- Step 3: Questions -->
@@ -213,6 +211,33 @@
       '</div>';
   }
 
+  async function loadClassTeachers(classId) {
+    const host = document.getElementById('teacherChoices');
+    const info = document.getElementById('classTeachersInfo');
+    if (!host || !info) return;
+    host.innerHTML = '';
+    if (!classId) {
+      info.textContent = 'ابتدا کلاس دریافت‌کنندگان را در مرحله قبل انتخاب کنید.';
+      return;
+    }
+    info.textContent = 'در حال دریافت استادان ثبت‌شده برای این کلاس...';
+    try {
+      const response = await window.MftApi.request('/canonical/classes/' + encodeURIComponent(classId) + '/teachers');
+      const teachers = Array.isArray(response?.teachers) ? response.teachers : [];
+      if (!teachers.length) {
+        info.textContent = 'برای این کلاس هنوز استادی ثبت نشده است. از بخش کلاس‌ها و اعضا، استاد مربوطه را به کلاس اضافه کنید؛ تا آن زمان صف تصحیح به استاد مشخصی نمی‌رسد.';
+        return;
+      }
+      info.textContent = 'این استادان به آزمون‌های کلاس و پاسخ‌های ارسالی آن دسترسی دارند:';
+      host.innerHTML = teachers.map((teacher, index) => {
+        const initials = String(teacher.fullName || teacher.username || 'استاد').trim().split(/\\s+/).slice(0,2).map(part => part[0] || '').join('');
+        return '<div class="choice-card selected" data-teacher-id="' + Number(teacher.id) + '"><div class="mohr sm"><div class="mohr-inner"><b>' + escapeExamHtml(initials) + '</b></div></div><b>' + escapeExamHtml(teacher.fullName || teacher.username || 'استاد') + '</b></div>';
+      }).join('');
+    } catch (error) {
+      info.textContent = 'دریافت استادان کلاس ناموفق بود: ' + (error.message || 'خطای نامشخص');
+    }
+  }
+
   async function loadExamPickerData() {
     const api = window.MftApi;
     if (!api) throw new Error('اتصال API آماده نیست.');
@@ -227,6 +252,7 @@
     categorySelect.innerHTML = '<option value="">انتخاب دسته‌بندی آزمون</option>' +
       (examLookups.categories || []).map(item => '<option value="' + Number(item.id) + '">' + escapeExamHtml(item.name) + '</option>').join('');
     const classSelect = document.getElementById('examClass');
+    classSelect.addEventListener('change', () => loadClassTeachers(classSelect.value));
     classSelect.innerHTML = '<option value="">انتخاب کلاس دریافت‌کنندگان</option>' +
       (Array.isArray(classes) ? classes : []).map(item => '<option value="' + Number(item.id) +
         '" data-department-id="' + Number(item.departmentId) + '">' + escapeExamHtml(item.name) +
