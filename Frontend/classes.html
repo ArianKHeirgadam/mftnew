@@ -40,7 +40,7 @@
             <label for="classSelect">انتخاب کلاس برای مدیریت اعضا</label>
             <select class="select" id="classSelect"><option value="">در حال دریافت کلاس‌ها...</option></select>
           </div>
-          <div id="classSummary" class="text-soft text-sm">کلاسی انتخاب نشده است.</div>
+          <p class="text-soft text-sm">یک کلاس را انتخاب کنید تا اعضای آن را مدیریت کنید.</p>
         </section>
 
         <section class="card card-pad">
@@ -193,6 +193,7 @@
       ' — ' + selectedIds.size + ' دانشجو و ' + selectedTeacherIds.size + ' استاد';
     $('#rosterModalSubtitle').textContent = currentClass.name + ' · ' + (currentClass.department || '');
     $('#openRosterModal').disabled = false;
+    $('#saveMembers').disabled = false;
     renderStudents();
     renderTeachers();
   }
