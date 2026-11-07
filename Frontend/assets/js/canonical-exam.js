@@ -16,7 +16,7 @@
   const fa = n => Number(n || 0).toLocaleString('fa-IR');
   const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   const toast = (m,t='info') => window.showToast?.(m,t);
-  let exam, sections=[], questions=[], answers=new Map(), current=0, deadline=0, remainingAtSyncMs=0, syncMonotonic=0, timer=null, saveTimer=null, saving=false, pending=false, finalizing=false, finished=false, uploadingPdf=false;
+  let exam, sections=[], questions=[], answers=new Map(), current=0, deadline=0, remainingAtSyncMs=0, syncMonotonic=0, timer=null, saveTimer=null, saving=false, pending=false, finalizing=false, finished=false, uploadingPdf=false, uploadedPdf=false;
 
   function flatQuestions(data) {
     return (data.sections || []).flatMap(section => (section.questions || []).map(q => ({
@@ -40,7 +40,7 @@
     const v=valueFor(q);
     if (/multiplechoice/i.test(q.type)) return !!v.selectedOptionId;
     if (/matching/i.test(q.type)) return (v.pairs || []).some(p=>p.rightItem);
-    return !!String(v.text || '').trim();
+    return !!String(v.text || '').trim() || (!!exam?.examPdfAvailable && uploadedPdf);
   }
   function updateProgress() {
     const count=questions.filter(answered).length;
@@ -126,6 +126,7 @@
   async function submit(auto=false){
     if(finished||finalizing)return;
     if(uploadingPdf){toast('تا پایان بارگذاری فایل پاسخ صبر کنید.','warn');return;}
+    if(exam?.examPdfAvailable && !uploadedPdf){toast('برای این آزمون ابتدا فایل PDF پاسخ‌نامه را بارگذاری کنید.','warn');studentPdfInput?.focus();return;}
     if(!auto&&!confirm('پس از ثبت نهایی، امکان شرکت مجدد در این آزمون وجود ندارد. پاسخ‌ها ثبت نهایی شوند؟'))return;
     finalizing=true;clearTimeout(saveTimer);clearInterval(timer);
     const button=document.getElementById('confirmFinishBtn');if(button){button.disabled=true;button.textContent='در حال ثبت...';}
@@ -164,7 +165,9 @@
     if(studentPdfStatus)studentPdfStatus.textContent='در حال بارگذاری...';
     try{
       const result=await api.request(`/exam-files/attempts/${encodeURIComponent(attemptId)}`,{method:'POST',body:form});
+      uploadedPdf=true;
       if(studentPdfStatus)studentPdfStatus.textContent=`بارگذاری شد: ${result.fileName}`;
+      updateProgress();
       toast('فایل پاسخ با موفقیت بارگذاری شد.','ok');
     }catch(error){
       if(studentPdfStatus)studentPdfStatus.textContent=error.message||'بارگذاری فایل ناموفق بود.';
@@ -175,7 +178,21 @@
   try{
     if(!api||!examId||!attemptId)throw new Error('شناسه آزمون یا تلاش معتبر نیست.');
     const data=await api.request(`/canonical/exams/${encodeURIComponent(examId)}/attempt/${encodeURIComponent(attemptId)}`);
-    exam=data;sections=data.sections||[];questions=flatQuestions(data);
+    exam={...data,examPdfAvailable:data.examPdfAvailable===true};sections=data.sections||[];questions=flatQuestions(data);
+    const downloadButton=document.getElementById('downloadExamPdf');
+    if(downloadButton)downloadButton.hidden=!exam.examPdfAvailable;
+    const pdfViewer=document.getElementById('examPdfViewer');
+    if(exam.examPdfAvailable&&pdfViewer){
+      pdfViewer.hidden=false;
+      const name=document.getElementById('examPdfName');if(name)name.textContent=data.examPdfFileName||'فایل صورت آزمون';
+      const frame=document.getElementById('examPdfFrame');
+      if(frame)frame.src=await api.objectUrl(`/exam-files/exams/${encodeURIComponent(examId)}`);
+    }
+    if(studentPdfBox)studentPdfBox.hidden=!exam.examPdfAvailable;
+    if(exam.examPdfAvailable){
+      const label=studentPdfBox?.querySelector('label');if(label)label.textContent='بارگذاری پاسخ‌نامه PDF (حداکثر ۲۰ مگابایت) — برای ثبت نهایی الزامی است';
+      try{const info=await api.request(`/exam-files/attempts/${encodeURIComponent(attemptId)}/info`);uploadedPdf=true;if(studentPdfStatus)studentPdfStatus.textContent=`فایل ثبت‌شده: ${info.fileName}`;}catch{uploadedPdf=false;}
+    }
     deadline=new Date(data.deadline).getTime();
     const serverNow=data.serverNowUtc ? Date.parse(data.serverNowUtc) : Date.now();
     remainingAtSyncMs=deadline-serverNow;
@@ -190,13 +207,12 @@
       const heading=root.querySelector('h3');if(heading)heading.textContent='آزمون PDFمحور';
       const intro=document.createElement('p');intro.className='text-soft';intro.textContent='فایل صورت آزمون را دریافت کنید، پاسخ‌ها را در یک فایل PDF آماده و پیش از ثبت نهایی بارگذاری کنید.';
       heading?.after(intro);
-      if(studentPdfBox){studentPdfBox.hidden=false;studentPdfBox.querySelector('label').textContent='فایل پاسخ آزمون (PDF، حداکثر ۲۰ مگابایت)';}
+      if(studentPdfBox){studentPdfBox.hidden=false;studentPdfBox.querySelector('label').textContent='فایل پاسخ آزمون (PDF، حداکثر ۲۰ مگابایت؛ برای ثبت نهایی الزامی)';}
       document.querySelector('.exam-nav-panel')?.remove();
       if(progressLabel)progressLabel.textContent='آزمون PDFمحور';
       if(progress)progress.style.width='100%';
     }else{
       if(!questions.length)throw new Error('برای این آزمون سؤالی تعریف نشده است.');
-      if(studentPdfBox)studentPdfBox.hidden=false;
       renderNav();render();
     }
     startClock();
