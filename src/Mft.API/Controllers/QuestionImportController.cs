@@ -92,9 +92,10 @@ public sealed class QuestionImportController(
             return Conflict(new { message = $"سؤال ردیف {existingDuplicate.RowNumber} قبلاً در بانک سؤال ثبت شده است." });
 
         await using var transaction = await academic.Database.BeginTransactionAsync(ct);
-        foreach (var row in validation.ValidRows)
+        var insertions = validation.ValidRows.Select(row => new
         {
-            var question = new CanonicalQuestion
+            Row = row,
+            Question = new CanonicalQuestion
             {
                 SkillId = row.SkillId,
                 QuestionTypeId = row.QuestionTypeId,
@@ -102,15 +103,21 @@ public sealed class QuestionImportController(
                 Points = row.Points,
                 DifficultyLevel = row.DifficultyLevel,
                 CreatedByUserId = CurrentUserId.Value
-            };
-            academic.Questions.Add(question);
-            await academic.SaveChangesAsync(ct);
+            }
+        }).ToList();
+        academic.Questions.AddRange(insertions.Select(x => x.Question));
+        await academic.SaveChangesAsync(ct);
+
+        foreach (var insertion in insertions)
+        {
+            var row = insertion.Row;
+            var questionId = insertion.Question.Id;
             if (row.TypeCode == "MultipleChoice")
             {
                 for (var i = 0; i < row.Options.Count; i++)
                     academic.MultipleChoiceOptions.Add(new CanonicalMultipleChoiceOption
                     {
-                        QuestionId = question.Id, OptionText = row.Options[i],
+                        QuestionId = questionId, OptionText = row.Options[i],
                         IsCorrect = i + 1 == row.CorrectOption, DisplayOrder = i + 1
                     });
             }
@@ -119,7 +126,7 @@ public sealed class QuestionImportController(
                 for (var i = 0; i < row.MatchingPairs.Count; i++)
                     academic.MatchingPairs.Add(new CanonicalMatchingPair
                     {
-                        QuestionId = question.Id, LeftItem = row.MatchingPairs[i].LeftItem,
+                        QuestionId = questionId, LeftItem = row.MatchingPairs[i].LeftItem,
                         RightItem = row.MatchingPairs[i].RightItem, DisplayOrder = i + 1
                     });
             }
@@ -240,9 +247,11 @@ public sealed class QuestionImportController(
     private static ImportQuestionRow BuildRow(IReadOnlyDictionary<string, int> headers, Func<string, string> get, int rowNumber)
     {
         var row = new ImportQuestionRow { RowNumber = rowNumber, Category = get("category"), Skill = get("skill"), Type = get("type"), Text = get("text") };
-        if (decimal.TryParse(get("points"), NumberStyles.Number, CultureInfo.InvariantCulture, out var points) ||
-            decimal.TryParse(get("points"), NumberStyles.Number, CultureInfo.CurrentCulture, out points)) row.Points = points;
-        if (string.IsNullOrWhiteSpace(get("points"))) row.Points = 1;
+        var pointsText = get("points");
+        if (string.IsNullOrWhiteSpace(pointsText)) row.Points = 1;
+        else if (decimal.TryParse(pointsText, NumberStyles.Number, CultureInfo.InvariantCulture, out var points) ||
+                 decimal.TryParse(pointsText, NumberStyles.Number, CultureInfo.CurrentCulture, out points)) row.Points = points;
+        else row.Points = 0;
         row.Difficulty = string.IsNullOrWhiteSpace(get("difficulty")) ? "Medium" : get("difficulty");
         for (var i = 1; i <= 4; i++) { var option = get($"option{i}"); if (!string.IsNullOrWhiteSpace(option)) row.Options.Add(option); }
         if (int.TryParse(get("correctoption"), out var correct)) row.CorrectOption = correct;
