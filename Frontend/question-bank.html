@@ -9,6 +9,10 @@
 <link rel="stylesheet" href="assets/css/dark.css">
 <style>
   .taxonomy-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px;align-items:stretch}
+  .import-folder-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:12px}
+  .import-folder-card{border:1px solid var(--border);border-radius:12px;padding:16px;background:var(--surface);display:flex;flex-direction:column;gap:10px;min-width:0}
+  .import-folder-card .folder-meta{display:flex;gap:12px;flex-wrap:wrap;color:var(--text-soft);font-size:12px}
+  .import-folder-card .folder-open{align-self:flex-start;margin-top:auto}
   .taxonomy-card{min-width:0;padding:16px;border:1px solid var(--border);border-radius:14px;background:var(--surface)}
   .taxonomy-card-head{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:14px}
   .taxonomy-card-head b{font-size:14px}
@@ -59,6 +63,14 @@
             </div>
           </div>
         </div>
+      </section>
+
+      <section class="card card-pad" id="importFoldersPanel" style="margin-bottom:18px">
+        <div class="flex justify-between items-center gap-8" style="flex-wrap:wrap;margin-bottom:14px">
+          <div><h3 id="importFoldersTitle">پوشه‌های ورود گروهی</h3><p class="text-soft text-sm mt-8">سؤال‌های هر نوبت ورود گروهی بر اساس عنوان آزمون مرتب شده‌اند.</p></div>
+          <span class="badge badge-muted" id="importFolderCount">۰ پوشه</span>
+        </div>
+        <div class="import-folder-grid" id="importFolderGrid"><div class="question-empty">در حال دریافت پوشه‌ها...</div></div>
       </section>
 
       <div class="tabs" data-tabs>
@@ -143,7 +155,7 @@
   const term=(searchField?.value||'').trim().toLocaleLowerCase();
   const category=categoryFilter?.value||'';
   const difficulty=difficultyFilter?.value||'';
-  const rows=questionRows.filter(q=>(!term||String(q.text||'').toLocaleLowerCase().includes(term))&&
+  const rows=questionRows.filter(q=>!q.importBatchId&&(!term||String(q.text||'').toLocaleLowerCase().includes(term))&&
    (!category||category==='همه دسته‌بندی‌ها'||q.categoryName===category)&&
    (!difficulty||difficulty==='همه سطوح دشواری'||difficultyLabel(q.difficultyLevel)===difficulty));
   document.getElementById('questionRows').innerHTML=rows.length?rows.map(q=>'<tr>'+
@@ -155,8 +167,21 @@
    '<tr><td colspan="5" style="text-align:center;padding:24px">سؤالی برای نمایش وجود ندارد.</td></tr>';
  };
  async function loadQuestions(){
-  const rows=await api.request('/questions');
+  const [rows,batches,user]=await Promise.all([
+   api.request('/questions'),
+   api.request('/questions/import/batches'),
+   api.request('/auth/me').catch(()=>null)
+  ]);
   questionRows=Array.isArray(rows)?rows:[];
+  const folders=Array.isArray(batches)?batches:[];
+  const title=document.getElementById('importFoldersTitle');
+  if(title)title.textContent=user?.fullName?'پوشه‌های سؤالات استاد '+user.fullName:'پوشه‌های ورود گروهی';
+  document.getElementById('importFolderCount').textContent=folders.length.toLocaleString('fa-IR')+' پوشه';
+  document.getElementById('importFolderGrid').innerHTML=folders.length?folders.map(batch=>
+   '<article class="import-folder-card"><div class="flex justify-between items-center gap-8"><b>'+esc(batch.title)+'</b><span class="badge badge-info">'+Number(batch.questionCount||0).toLocaleString('fa-IR')+' سؤال</span></div>'+
+   '<div class="folder-meta"><span>استاد: '+esc(batch.teacherName||user?.fullName||'—')+'</span><span>'+esc(new Date(batch.createdAt).toLocaleDateString('fa-IR'))+'</span></div>'+
+   '<a class="btn btn-outline btn-sm folder-open" href="question-bank-folder.html?batchId='+encodeURIComponent(batch.id)+'">نمایش سؤال‌ها</a></article>'
+  ).join(''):'<div class="question-empty">هنوز پوشه ورود گروهی ثبت نشده است. هنگام Import، عنوان آزمون را وارد کنید.</div>';
   renderQuestions();
  }
  async function loadCanonicalLookups(){
