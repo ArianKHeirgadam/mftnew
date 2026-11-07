@@ -326,13 +326,13 @@
         return;
       }
       const heading = $('body[data-active="results"] h1');
+      const isStudentView = role === 'student';
       if (heading) {
-        const isStudentView = role === 'student';
         const pendingManualCount = Number(result.pendingManualCount || 0);
         const scoreLabel = result.isPdfOnly && result.score == null
           ? 'پاسخنامه PDF در انتظار تصحیح استاد'
           : isStudentView && result.autoScore != null && !result.resultsPublished
-            ? `نمره خودکار تستی و وصل‌کردنی: ${faNumber(result.autoScore)} از ${faNumber(result.maxScore)} — ${pendingManualCount > 0 ? `${faNumber(pendingManualCount)} بخش تشریحی در انتظار تصحیح` : 'نمره نهایی پس از انتشار رسمی استاد'}`
+            ? `نمره خودکار تستی و وصل‌کردنی: ${faNumber(result.autoScore)} از ${faNumber(result.autoMaxScore ?? result.maxScore)} — ${pendingManualCount > 0 ? `${faNumber(pendingManualCount)} بخش تشریحی در انتظار تصحیح` : 'نمره نهایی پس از انتشار رسمی استاد'}`
             : result.score != null
               ? `${faNumber(result.score)} از ${faNumber(result.maxScore)}`
               : result.autoScore != null
@@ -343,7 +343,11 @@
         if (studentInfo) { studentInfo.hidden = !['teacher','department','superadmin'].includes(role); studentInfo.textContent = 'دانشجو: ' + (result.studentName || '—') + ' | شماره دانشجویی: ' + (result.studentNumber || 'ثبت نشده'); }
       }
       const body = $('body[data-active="results"] .card table tbody');
+      const detailHeader = $('body[data-active="results"] .card table thead tr');
       const canGrade = ['teacher', 'department', 'superadmin'].includes(role);
+      if (detailHeader) detailHeader.innerHTML = isStudentView
+        ? '<th>#</th><th>سؤال</th><th>پاسخ شما</th><th>وضعیت پاسخ</th><th>نمره</th>'
+        : '<th>#</th><th>سؤال</th><th>پاسخ دانشجو</th><th>پاسخ صحیح</th><th>تصحیح / نمره</th>';
       if (body) {
         if (result.isPdfOnly) {
           body.innerHTML = `<tr><td>۱</td><td>آزمون PDFمحور</td><td>فایل پاسخ به‌صورت PDF ارسال شده است.</td><td>—</td><td>${canGrade && !result.resultsPublished ? `<div class="flex gap-8 mt-8"><input class="input" type="number" min="0" max="100" step="0.01" value="${result.pdfGrade?.score ?? result.score ?? ''}" placeholder="نمره" data-pdf-grade-score style="max-width:110px" aria-label="نمره از ۱۰۰"><button class="btn btn-primary btn-sm" id="savePdfGrade">ثبت نمره</button></div><small class="text-soft">نمره کلی از ۱۰۰</small>` : (result.score == null ? 'در انتظار تصحیح استاد' : `${faNumber(result.score)} از ۱۰۰`)}</td></tr>`;
@@ -374,10 +378,20 @@
           }
           const gradeControl = canEditGrade
             ? `<div class="flex gap-8 mt-8"><input class="input" type="number" min="0" max="${Number(answer.maxScore || 0)}" step="0.01" value="${Number(answer.awardedScore || 0)}" data-grade-score style="max-width:100px" aria-label="نمره خام سؤال"><button class="btn btn-primary btn-sm" data-grade-answer="${answer.examQuestionId}">ثبت نمره</button></div><small class="text-soft">حداکثر نمره خام: ${faNumber(answer.maxScore || 0)}</small>`
-            : (isEssay ? (answer.isManuallyGraded ? 'تصحیح شده' : 'در انتظار تصحیح تشریحی') : (answer.isAutoGraded ? 'تصحیح خودکار شده' : '—'));
+            : isStudentView
+              ? (answer.isAutoGraded && answer.awardedScore != null
+                ? `${faNumber(answer.awardedScore)} از ${faNumber(answer.maxScore || 0)}`
+                : 'در انتظار تصحیح')
+              : (isEssay ? (answer.isManuallyGraded ? 'تصحیح شده' : 'در انتظار تصحیح تشریحی') : (answer.isAutoGraded ? 'تصحیح خودکار شده' : '—'));
+          const answerSummary = isStudentView
+            ? 'پاسخ شما ثبت شده است'
+            : escapeHtml(typeof answer.answer === 'string' ? answer.answer : answer.answer?.text ?? JSON.stringify(answer.answer ?? 'بدون پاسخ'));
+          const correctAnswerSummary = isStudentView
+            ? 'کلید پاسخ نمایش داده نمی‌شود'
+            : escapeHtml(Array.isArray(answer.correctAnswer) ? answer.correctAnswer.map(x => x.optionText || `${x.leftItem || ''}: ${x.rightItem || ''}`).join('، ') : answer.correctAnswer || '—');
           return `<tr>
             <td>${faNumber(index + 1)}</td><td>${questionTitle}</td>
-            <td>${escapeHtml(typeof answer.answer === 'string' ? answer.answer : answer.answer?.text ?? JSON.stringify(answer.answer ?? 'بدون پاسخ'))}</td><td>${escapeHtml(Array.isArray(answer.correctAnswer) ? answer.correctAnswer.map(x => x.optionText || `${x.leftItem || ''}: ${x.rightItem || ''}`).join('، ') : answer.correctAnswer || '—')}</td>
+            <td>${answerSummary}</td><td>${correctAnswerSummary}</td>
             <td>${gradeControl}</td></tr>`;
         }).join('') : '<tr><td colspan="5">پاسخی ثبت نشده است.</td></tr>';
 
