@@ -365,7 +365,7 @@ public sealed class QuestionImportController(
         return document.Descendants(word + "p")
             .Select(paragraph => string.Concat(paragraph.Descendants()
                 .Where(element => element.Name == word + "t" || element.Name == word + "tab" || element.Name == word + "br")
-                .Select(element => element.Name == word + "tab" ? " " : element.Name == word + "br" ? "\\n" : element.Value)))
+                .Select(element => element.Name == word + "tab" ? " " : element.Name == word + "br" ? "\n" : element.Value)))
             .Select(value => value.Trim())
             .Where(value => value.Length > 0)
             .ToList();
@@ -413,10 +413,10 @@ public sealed class QuestionImportController(
 
                 if (current is null) continue;
 
-                var isCorrect = Regex.IsMatch(line, @"\\(\\s*صحیح\\s*\\)\\s*$", RegexOptions.IgnoreCase);
+                var isCorrect = Regex.IsMatch(line, @"\(\\s*صحیح\\s*\\)\\s*$", RegexOptions.IgnoreCase);
                 if (isCorrect)
                 {
-                    line = Regex.Replace(line, @"\\s*\\(\\s*صحیح\\s*\\)\\s*$", "").Trim();
+                    line = Regex.Replace(line, @"\s*\\(\\s*صحیح\\s*\\)\\s*$", "").Trim();
                     correctCount++;
                 }
 
