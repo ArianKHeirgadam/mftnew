@@ -60,6 +60,38 @@ public sealed class CanonicalQuestionsController(
         return Ok(new { Categories = categories, Skills = skills, QuestionTypes = types });
     }
 
+    [HttpPost("lookups/categories")]
+    public async Task<IActionResult> CreateCategory(CategoryCreateRequest request, CancellationToken ct)
+    {
+        if (!User.IsInRole("SuperAdmin")) return Forbid();
+        var name = request.Name?.Trim();
+        if (string.IsNullOrWhiteSpace(name) || name.Length > 150)
+            return BadRequest(new { message = "نام دسته‌بندی الزامی و حداکثر ۱۵۰ کاراکتر است." });
+        if (await academic.ExamCategories.AnyAsync(x => x.Name == name, ct))
+            return Conflict(new { message = "این دسته‌بندی قبلاً ثبت شده است." });
+        var entity = new CanonicalExamCategory { Name = name };
+        academic.ExamCategories.Add(entity);
+        await academic.SaveChangesAsync(ct);
+        return CreatedAtAction(nameof(Lookups), new { }, new { id = entity.Id, name = entity.Name });
+    }
+
+    [HttpPost("lookups/skills")]
+    public async Task<IActionResult> CreateSkill(SkillCreateRequest request, CancellationToken ct)
+    {
+        if (!User.IsInRole("SuperAdmin")) return Forbid();
+        var name = request.Name?.Trim();
+        if (string.IsNullOrWhiteSpace(name) || name.Length > 100 || request.ExamCategoryId <= 0)
+            return BadRequest(new { message = "نام مهارت و دسته‌بندی معتبر الزامی است." });
+        if (!await academic.ExamCategories.AnyAsync(x => x.Id == request.ExamCategoryId, ct))
+            return BadRequest(new { message = "دسته‌بندی انتخاب‌شده معتبر نیست." });
+        if (await academic.Skills.AnyAsync(x => x.ExamCategoryId == request.ExamCategoryId && x.Name == name, ct))
+            return Conflict(new { message = "این مهارت قبلاً در دسته‌بندی انتخاب‌شده ثبت شده است." });
+        var entity = new CanonicalSkill { Name = name, ExamCategoryId = request.ExamCategoryId };
+        academic.Skills.Add(entity);
+        await academic.SaveChangesAsync(ct);
+        return CreatedAtAction(nameof(Lookups), new { }, new { id = entity.Id, name = entity.Name, examCategoryId = entity.ExamCategoryId });
+    }
+
     [HttpGet("{id:long}")]
     public async Task<IActionResult> Get(long id, CancellationToken ct)
     {
@@ -184,3 +216,6 @@ public sealed class QuestionUpsert
 public sealed class QuestionOptionInput { public string OptionText { get; set; } = ""; public bool IsCorrect { get; set; } public int DisplayOrder { get; set; } }
 public sealed class MatchingPairInput { public string LeftItem { get; set; } = ""; public string RightItem { get; set; } = ""; public int DisplayOrder { get; set; } }
 public sealed class EssayCriterionInput { public string CriteriaText { get; set; } = ""; public decimal MaxPoints { get; set; } }
+
+public sealed class CategoryCreateRequest { public string Name { get; set; } = ""; }
+public sealed class SkillCreateRequest { public string Name { get; set; } = ""; public long ExamCategoryId { get; set; } }
