@@ -148,17 +148,6 @@ public sealed class ExamFilesController(
         if (attempt.StatusId != 1 || DateTime.UtcNow > attempt.StartedAt.AddMinutes(exam.DurationMinutes))
             return BadRequest(new { message = "مهلت بارگذاری پاسخ این آزمون به پایان رسیده است." });
 
-        var examQuestionIds = await academic.ExamQuestions.AsNoTracking()
-            .Where(link => academic.ExamSections.Any(section => section.Id == link.ExamSectionId && section.ExamId == exam.Id))
-            .Select(link => link.QuestionId).Distinct().ToListAsync(ct);
-        var questionTypeIds = await academic.Questions.AsNoTracking()
-            .Where(question => examQuestionIds.Contains(question.Id))
-            .Select(question => question.QuestionTypeId).Distinct().ToListAsync(ct);
-        var hasEssayQuestions = await academic.QuestionTypes.AsNoTracking()
-            .AnyAsync(type => questionTypeIds.Contains(type.Id) && type.Code == "Essay", ct);
-        if (!hasEssayQuestions)
-            return BadRequest(new { message = "این آزمون سؤال تشریحی ندارد و بارگذاری پاسخ‌نامه جداگانه لازم نیست." });
-
         var saved = await SaveFile(file, pdfOnly: false, ct);
         if (saved is null)
             return BadRequest(new { message = "فایل پاسخ باید PDF، JPG، JPEG یا PNG معتبر و حداکثر ۲۰ مگابایت باشد." });

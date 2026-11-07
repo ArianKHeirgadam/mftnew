@@ -79,7 +79,7 @@
 
         <!-- Step 3: Questions -->
         <div class="wpanel" id="step3">
-          <div class="alert alert-info" style="margin-bottom:14px">آزمون‌های این مسیر بر اساس بانک سؤالات canonical ساخته می‌شوند. ساخت آزمون صرفاً PDF در این گردش‌کار هنوز پشتیبانی نمی‌شود.</div>
+          <div class="alert alert-info" style="margin-bottom:14px">سؤال‌های آزمون از بانک سؤال انتخاب می‌شوند و می‌توانید فایل PDF صورت آزمون را نیز به‌عنوان پیوست برای دانشجویان بارگذاری کنید.</div>
           <div class="field"><label for="examCategory">دسته‌بندی آزمون</label><select class="select" id="examCategory" required><option value="">در حال دریافت دسته‌بندی‌ها...</option></select></div>
           <div id="questionSelectionArea">
           <div class="flex justify-between items-center" style="margin-bottom:16px">
@@ -107,6 +107,7 @@
           <div class="grid-2" style="grid-template-columns:1fr 1fr">
             <div class="field"><label>مدت زمان آزمون (دقیقه)</label><input class="input" id="examDuration" type="number" min="1" max="600" value="45"></div>
           </div>
+          <div class="field mt-16"><label for="examPdfFile">پیوست PDF صورت آزمون (اختیاری، حداکثر ۲۰ مگابایت)</label><input class="input" id="examPdfFile" type="file" accept="application/pdf,.pdf"><small class="text-soft">پس از ساخت آزمون، فایل برای دانشجویان عضو کلاس قابل دریافت خواهد بود.</small></div>
         </div>
 
         <!-- Step 5: Schedule -->
@@ -251,7 +252,7 @@
     });
 
     try {
-      await api.request("/canonical/exams", {
+      const created = await api.request("/canonical/exams", {
         method: "POST",
         body: JSON.stringify({
           title: document.getElementById("examTitle").value.trim(),
@@ -265,8 +266,21 @@
           sections
         })
       });
-      showToast("آزمون canonical با موفقیت ذخیره و منتشر شد.", "ok");
-      setTimeout(() => location.href = "dashboard-teacher.html", 700);
+      const pdfFile = document.getElementById("examPdfFile").files[0];
+      if (pdfFile) {
+        const form = new FormData();
+        form.append("file", pdfFile);
+        try {
+          await api.request(`/exam-files/exams/${encodeURIComponent(created.id)}`, { method: "POST", body: form });
+          showToast("آزمون ساخته و منتشر شد؛ فایل PDF هم بارگذاری شد.", "ok");
+        } catch (uploadError) {
+          showToast(`آزمون ساخته شد، اما بارگذاری PDF ناموفق بود: ${uploadError.message}`, "warn");
+          return;
+        }
+      } else {
+        showToast("آزمون canonical با موفقیت ذخیره و منتشر شد.", "ok");
+      }
+      setTimeout(() => location.href = "dashboard-teacher.html", 900);
     } catch (error) {
       showToast(error.message || "ذخیره آزمون ناموفق بود.", "danger");
     }

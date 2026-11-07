@@ -16,7 +16,7 @@
   const fa = n => Number(n || 0).toLocaleString('fa-IR');
   const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   const toast = (m,t='info') => window.showToast?.(m,t);
-  let exam, sections=[], questions=[], answers=new Map(), current=0, deadline=0, timer=null, saveTimer=null, saving=false, pending=false, finalizing=false, finished=false;
+  let exam, sections=[], questions=[], answers=new Map(), current=0, deadline=0, timer=null, saveTimer=null, saving=false, pending=false, finalizing=false, finished=false, uploadingPdf=false;
 
   function flatQuestions(data) {
     return (data.sections || []).flatMap(section => (section.questions || []).map(q => ({
@@ -125,6 +125,7 @@
   }
   async function submit(auto=false){
     if(finished||finalizing)return;
+    if(uploadingPdf){toast('تا پایان بارگذاری فایل پاسخ صبر کنید.','warn');return;}
     if(!auto&&!confirm('پس از ثبت نهایی، امکان شرکت مجدد در این آزمون وجود ندارد. پاسخ‌ها ثبت نهایی شوند؟'))return;
     finalizing=true;clearTimeout(saveTimer);clearInterval(timer);
     const button=document.getElementById('confirmFinishBtn');if(button){button.disabled=true;button.textContent='در حال ثبت...';}
@@ -146,7 +147,30 @@
     document.getElementById('finishModal')?.classList.add('show');
   });
   document.getElementById('confirmFinishBtn')?.addEventListener('click',()=>submit(false));
-  document.getElementById('downloadExamPdf')?.remove();
+  document.getElementById('downloadExamPdf')?.addEventListener('click',async()=>{
+    try{await api.download(`/exam-files/exams/${encodeURIComponent(examId)}`);}
+    catch(error){toast(error.message||'دریافت PDF آزمون ناموفق بود.','danger');}
+  });
+  const studentPdfBox=document.getElementById('studentPdfUpload');
+  const studentPdfStatus=document.getElementById('studentPdfStatus');
+  const studentPdfInput=document.getElementById('studentAnswerPdf');
+  document.getElementById('uploadStudentPdf')?.addEventListener('click',async()=>{
+    const file=studentPdfInput?.files?.[0];
+    if(!file){if(studentPdfStatus)studentPdfStatus.textContent='ابتدا فایل PDF پاسخ را انتخاب کنید.';return;}
+    if(file.size>20*1024*1024){if(studentPdfStatus)studentPdfStatus.textContent='حجم فایل نباید بیشتر از ۲۰ مگابایت باشد.';return;}
+    const form=new FormData();form.append('file',file);
+    const button=document.getElementById('uploadStudentPdf');
+    uploadingPdf=true;if(button)button.disabled=true;
+    if(studentPdfStatus)studentPdfStatus.textContent='در حال بارگذاری...';
+    try{
+      const result=await api.request(`/exam-files/attempts/${encodeURIComponent(attemptId)}`,{method:'POST',body:form});
+      if(studentPdfStatus)studentPdfStatus.textContent=`بارگذاری شد: ${result.fileName}`;
+      toast('فایل پاسخ با موفقیت بارگذاری شد.','ok');
+    }catch(error){
+      if(studentPdfStatus)studentPdfStatus.textContent=error.message||'بارگذاری فایل ناموفق بود.';
+      toast(error.message||'بارگذاری فایل ناموفق بود.','danger');
+    }finally{uploadingPdf=false;if(button)button.disabled=false;}
+  });
 
   try{
     if(!api||!examId||!attemptId)throw new Error('شناسه آزمون یا تلاش معتبر نیست.');
@@ -158,6 +182,7 @@
     const saved=data.savedAnswers||{};
     Object.entries(saved).forEach(([id,json])=>{try{answers.set(Number(id),JSON.parse(json));}catch{}});
     if(!questions.length)throw new Error('برای این آزمون سؤالی تعریف نشده است.');
+    if(studentPdfBox)studentPdfBox.hidden=false;
     renderNav();render();startClock();
   }catch(error){
     if(root)root.innerHTML='<div class="alert alert-danger">'+esc(error.message||'بارگذاری آزمون ناموفق بود.')+'</div><a class="btn btn-outline mt-16" href="dashboard-student.html">بازگشت به داشبورد</a>';
