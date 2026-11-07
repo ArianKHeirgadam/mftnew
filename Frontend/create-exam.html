@@ -91,6 +91,7 @@
 (async function(){
  const $=id=>document.getElementById(id), api=window.MftApi;
  const selectedIds=new Set();let lookups={categories:[],skills:[]},questions=[];
+ let pendingExamId=null,pendingPdfUploaded=false;
  const escapeHtml=value=>String(value??'').replace(/[&<>"']/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
  const typeNames={MultipleChoice:'چهارگزینه‌ای',Essay:'تشریحی',Matching:'وصل‌کردنی'};
  const steps=['مشخصات آزمون','سؤال‌ها','بررسی و انتشار'];let current=1;
@@ -150,14 +151,23 @@
   const baseWeight=groups.length?100/groups.length:0;let usedMinutes=0;
   const sections=groups.map(([skillId,questionIds],i)=>{const minutes=i===groups.length-1?duration-usedMinutes:Math.max(1,Math.floor(duration/groups.length));usedMinutes+=minutes;return{skillId,durationMinutes:minutes,weightPercent:i===groups.length-1?100-baseWeight*(groups.length-1):baseWeight,questionIds};});
   const startAt=new Date($('examStart').value),endAt=new Date($('examEnd').value),button=$('createExam');
-  button.disabled=true;$('createStatus').textContent='در حال ساخت آزمون...';
-  let created;
+  button.disabled=true;
   try{
-   created=await api.request('/canonical/exams',{method:'POST',body:JSON.stringify({title:$('examTitle').value.trim(),examCategoryId:Number($('examCategory').value),departmentId,classId,startAt:startAt.toISOString(),endAt:endAt.toISOString(),durationMinutes:duration,isPublished:false,pdfOnly:isPdfOnly,sections})});
-   if(file){$('createStatus').textContent='آزمون ساخته شد؛ در حال بارگذاری PDF...';const form=new FormData();form.append('file',file);await api.request('/exam-files/exams/'+encodeURIComponent(created.id),{method:'POST',body:form});}
-   $('createStatus').textContent='در حال انتشار آزمون...';await api.request('/canonical/exams/'+encodeURIComponent(created.id)+'/publish',{method:'POST'});
+   if(!pendingExamId){
+    $('createStatus').textContent='در حال ساخت آزمون...';
+    const created=await api.request('/canonical/exams',{method:'POST',body:JSON.stringify({title:$('examTitle').value.trim(),examCategoryId:Number($('examCategory').value),departmentId,classId,startAt:startAt.toISOString(),endAt:endAt.toISOString(),durationMinutes:duration,isPublished:false,pdfOnly:isPdfOnly,sections})});
+    pendingExamId=created.id;
+   }
+   if(file&&!pendingPdfUploaded){
+    $('createStatus').textContent='آزمون ساخته شد؛ در حال بارگذاری PDF...';
+    const form=new FormData();form.append('file',file);
+    await api.request('/exam-files/exams/'+encodeURIComponent(pendingExamId),{method:'POST',body:form});
+    pendingPdfUploaded=true;
+   }
+   $('createStatus').textContent='در حال انتشار آزمون...';
+   await api.request('/canonical/exams/'+encodeURIComponent(pendingExamId)+'/publish',{method:'POST'});
    $('createStatus').textContent='آزمون با موفقیت ساخته و منتشر شد.';window.showToast?.('آزمون با موفقیت منتشر شد.','ok');setTimeout(()=>location.href='dashboard-teacher.html',900);
-  }catch(e){$('createStatus').textContent=(created?'آزمون ذخیره شد اما بارگذاری فایل یا انتشار کامل نشد: ':'ساخت آزمون ناموفق بود: ')+(e.message||'خطای نامشخص');button.disabled=false;}
+  }catch(e){$('createStatus').textContent=(pendingExamId?'آزمون ذخیره شد؛ برای ادامه دوباره روی انتشار بزنید: ':'ساخت آزمون ناموفق بود: ')+(e.message||'خطای نامشخص');button.disabled=false;}
  });
  try{await loadData();}catch(e){$('questionList').innerHTML='<div class="question-empty">'+escapeHtml(e.message||'دریافت اطلاعات اولیه ناموفق بود.')+'</div>';window.showToast?.(e.message||'دریافت اطلاعات اولیه ناموفق بود.','danger');}
  const now=new Date(),later=new Date(now.getTime()+60*60*1000);const localValue=d=>{const z=n=>String(n).padStart(2,'0');return d.getFullYear()+'-'+z(d.getMonth()+1)+'-'+z(d.getDate())+'T'+z(d.getHours())+':'+z(d.getMinutes());};
