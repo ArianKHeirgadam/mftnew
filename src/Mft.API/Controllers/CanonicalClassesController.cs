@@ -238,15 +238,21 @@ public sealed class CanonicalClassesController(
         var name = request.Name?.Trim();
         if (string.IsNullOrWhiteSpace(name) || name.Length > 200)
             return BadRequest(new { message = "نام کلاس الزامی و حداکثر ۲۰۰ کاراکتر است." });
+        if (request.Capacity < 1 || request.Capacity > 100000)
+            return BadRequest(new { message = "ظرفیت باید بین ۱ تا ۱۰۰۰۰۰ نفر باشد." });
         var schedule = request.Schedule?.Trim();
         if (!string.IsNullOrEmpty(schedule) && schedule.Length > 200)
             return BadRequest(new { message = "زمان برگزاری حداکثر ۲۰۰ کاراکتر است." });
         if (await academic.Classes.AnyAsync(x => x.Id != id && x.DepartmentId == entity.DepartmentId && x.Name == name, ct))
             return Conflict(new { message = "کلاسی با این نام در این دپارتمان وجود دارد." });
+        var currentMembers = await academic.ClassMembers.CountAsync(x => x.ClassId == id, ct);
+        if (request.Capacity < currentMembers)
+            return BadRequest(new { message = "ظرفیت نمی‌تواند از تعداد دانشجویان فعلی کلاس کمتر باشد." });
         entity.Name = name;
+        entity.Capacity = request.Capacity;
         entity.Schedule = string.IsNullOrWhiteSpace(schedule) ? null : schedule;
         await academic.SaveChangesAsync(ct);
-        return Ok(new { id = entity.Id, name = entity.Name, schedule = entity.Schedule });
+        return Ok(new { id = entity.Id, name = entity.Name, capacity = entity.Capacity, schedule = entity.Schedule });
     }
 
     [HttpDelete("{id:long}")]
