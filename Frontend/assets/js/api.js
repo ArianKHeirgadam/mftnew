@@ -151,7 +151,7 @@
   async function loadQuestions() {
     if (!$('body[data-active="bank"]')) return;
     const search = $('body[data-active="bank"] .search-box input')?.value.trim();
-    const rows = await request(`/canonical/questions${search ? `?search=${encodeURIComponent(search)}` : ''}`);
+    const rows = await request(`/questions${search ? `?search=${encodeURIComponent(search)}` : ''}`);
     const typeNames = { MultipleChoice: 'چهارگزینه‌ای', Essay: 'تشریحی', Matching: 'وصل‌کردنی' };
     const difficultyNames = { 1: 'آسان', 2: 'متوسط', 3: 'سخت' };
     renderRows('body[data-active="bank"] table tbody', rows, row => `<tr>
@@ -781,8 +781,8 @@
     if (!document.body.matches('[data-active="exams"]') || !$('#wizardSteps')) return;
     const [departments, lookups, questions, me, classes] = await Promise.all([
       request('/departments').catch(() => []),
-      request('/canonical/questions/lookups'),
-      request('/canonical/questions'),
+      request('/questions/lookups'),
+      request('/questions'),
       request('/auth/me').catch(() => null),
       request('/canonical/classes').catch(() => [])
     ]);
@@ -917,7 +917,7 @@
           await openUserEditor(target.dataset.userEdit, target.dataset.userRole || 'Student');
         } else if (target.dataset.questionDelete) {
           if (!confirm('این سؤال حذف شود؟')) return;
-          await request(`/canonical/questions/${target.dataset.questionDelete}`, { method: 'DELETE' });
+          await request(`/questions/${target.dataset.questionDelete}`, { method: 'DELETE' });
           await loadQuestions();
         } else if (target.dataset.questionEdit) {
           await editQuestion(target.dataset.questionEdit);
@@ -1143,8 +1143,8 @@
 
   async function editQuestion(id) {
     const [question, lookups] = await Promise.all([
-      request(`/canonical/questions/${encodeURIComponent(id)}`),
-      request('/canonical/questions/lookups')
+      request(`/questions/${encodeURIComponent(id)}`),
+      request('/questions/lookups')
     ]);
     const modal = $('#questionModal');
     if (!modal) return;

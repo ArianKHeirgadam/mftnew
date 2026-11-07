@@ -8,7 +8,7 @@ using Mft.Infrastructure.Persistence;
 namespace Mft.API.Controllers;
 
 [ApiController]
-[Route("api/canonical/questions")]
+[Route("api/questions")]
 [Authorize(Policy = "TeacherOrAbove")]
 public sealed class CanonicalQuestionsController(
     CanonicalAcademicDbContext academic,
