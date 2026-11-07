@@ -701,11 +701,13 @@
     if (id) existing = await request(`/users/${id}`);
     if (nameField) nameField.value = existing?.fullName || '';
     const departmentField = $('[data-department-field]', modal);
-    if (departmentField && existing?.departmentId) departmentField.value = String(existing.departmentId);
+    if (departmentField) departmentField.value = existing?.departmentId == null ? '' : String(existing.departmentId);
     const activeField = $('[data-user-active]', modal);
     if (activeField) activeField.checked = existing ? Boolean(existing.isActive) : true;
     const usernameField = fields.find(field => field.hasAttribute('data-username-field'));
-    if (usernameField) usernameField.value = existing?.username || '';
+    if (usernameField) { usernameField.value = existing?.username || ''; usernameField.readOnly = Boolean(id); }
+    const passwordField = fields.find(field => field.type === 'password');
+    if (passwordField) passwordField.value = '';
     const email = fields.find(field => field.type === 'email');
     const mobile = fields.find(field => field.type === 'tel');
     if (email) email.value = existing?.email || '';
@@ -725,7 +727,6 @@
     const mobile = fields.find(field => field.type === 'tel')?.value.trim() || null;
     const id = modal.dataset.editId;
     if (!fullName) return notify('نام و نام خانوادگی الزامی است.', 'warn');
-    if (!mobile) return notify('شماره تماس الزامی است.', 'warn');
     if (!id && !username) return notify('نام کاربری الزامی است.', 'warn');
     if (!id && (!password || password.length < 8)) return notify('رمز عبور باید حداقل ۸ کاراکتر باشد.', 'warn');
     await safe(async () => {
@@ -830,7 +831,8 @@
       delete modal.dataset.editId;
       if (modal.id === 'teacherModal') modal.dataset.editRole = 'Teacher';
       if (modal.id === 'studentModal') modal.dataset.editRole = 'Student';
-      $$('input, textarea', modal).forEach(field => { if (!['radio', 'checkbox', 'file'].includes(field.type)) field.value = ''; });
+      $('input, textarea', modal).forEach(field => { if (!['radio', 'checkbox', 'file'].includes(field.type)) field.value = ''; });
+      $('[data-username-field]', modal).forEach(field => { field.readOnly = false; });
       $$('input[type="radio"]', modal).forEach((field, index) => { field.checked = index === 0; });
       $$('select', modal).forEach(select => { select.selectedIndex = 0; });
       const activeField = $('[data-user-active]', modal);
