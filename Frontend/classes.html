@@ -75,6 +75,7 @@
   const $ = selector => document.querySelector(selector);
   const esc = value => String(value ?? '').replace(/[&<>"']/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
   let classes = [], students = [], selectedIds = new Set(), currentClass = null, me = null;
+  const isSuperAdmin = () => String(me?.role || '').toLowerCase() === 'superadmin';
   const notify = (message, type = 'info') => window.showToast?.(message, type);
   const api = () => window.MftApi;
 
@@ -131,7 +132,7 @@
     const departments = await api().request('/departments');
     const departmentSelect = $('#classDepartment');
     const departmentField = $('#classDepartmentField');
-    if (String(me.role || '').toLowerCase() !== 'superadmin') {
+    if (!isSuperAdmin()) {
       departmentField.hidden = true;
     } else {
       departmentSelect.innerHTML = '<option value="">انتخاب دپارتمان</option>' + departments.filter(d => d.isActive !== false)
@@ -142,7 +143,7 @@
 
   $('#classCreate').addEventListener('click', async () => {
     const name = $('#className').value.trim();
-    const departmentId = me?.role === 'superadmin' ? Number($('#classDepartment').value || 0) : Number(me?.departmentId || 0);
+    const departmentId = isSuperAdmin() ? Number($('#classDepartment').value || 0) : Number(me?.departmentId || 0);
     if (!name) return notify('نام کلاس را وارد کنید.', 'warn');
     if (!departmentId) return notify('دپارتمان معتبر انتخاب نشده است.', 'warn');
     try {
