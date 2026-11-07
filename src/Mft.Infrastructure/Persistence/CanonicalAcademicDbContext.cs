@@ -25,6 +25,8 @@ public sealed class CanonicalAcademicDbContext(
     public DbSet<CanonicalExamAttempt> ExamAttempts => Set<CanonicalExamAttempt>();
     public DbSet<CanonicalExamAttemptStatus> ExamAttemptStatuses => Set<CanonicalExamAttemptStatus>();
     public DbSet<CanonicalStudentAnswer> StudentAnswers => Set<CanonicalStudentAnswer>();
+    public DbSet<CanonicalExamDocument> ExamDocuments => Set<CanonicalExamDocument>();
+    public DbSet<CanonicalExamSubmissionDocument> ExamSubmissionDocuments => Set<CanonicalExamSubmissionDocument>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -179,6 +181,31 @@ public sealed class CanonicalAcademicDbContext(
             e.HasOne<CanonicalExamQuestion>().WithMany().HasForeignKey(x => x.ExamQuestionId).OnDelete(DeleteBehavior.NoAction);
             e.HasOne<CanonicalUser>().WithMany().HasForeignKey(x => x.GradedByUserId).OnDelete(DeleteBehavior.NoAction);
         });
+
+        modelBuilder.Entity<CanonicalExamDocument>(e =>
+        {
+            e.ToTable("ExamDocuments"); e.HasKey(x => x.Id);
+            e.Property(x => x.Id).HasColumnType("bigint").UseIdentityColumn();
+            e.Property(x => x.StoredFileName).HasMaxLength(100).IsRequired();
+            e.Property(x => x.OriginalFileName).HasMaxLength(255).IsRequired();
+            e.Property(x => x.UploadedAt).HasColumnType("datetime2").HasDefaultValueSql("sysutcdatetime()");
+            e.HasIndex(x => x.ExamId).IsUnique();
+            e.HasIndex(x => x.UploadedByUserId);
+            e.HasOne<CanonicalExam>().WithMany().HasForeignKey(x => x.ExamId).OnDelete(DeleteBehavior.Cascade);
+            e.HasOne<CanonicalUser>().WithMany().HasForeignKey(x => x.UploadedByUserId).OnDelete(DeleteBehavior.NoAction);
+        });
+        modelBuilder.Entity<CanonicalExamSubmissionDocument>(e =>
+        {
+            e.ToTable("ExamSubmissionDocuments"); e.HasKey(x => x.Id);
+            e.Property(x => x.Id).HasColumnType("bigint").UseIdentityColumn();
+            e.Property(x => x.StoredFileName).HasMaxLength(100).IsRequired();
+            e.Property(x => x.OriginalFileName).HasMaxLength(255).IsRequired();
+            e.Property(x => x.UploadedAt).HasColumnType("datetime2").HasDefaultValueSql("sysutcdatetime()");
+            e.HasIndex(x => x.AttemptId).IsUnique();
+            e.HasIndex(x => x.UploadedByUserId);
+            e.HasOne<CanonicalExamAttempt>().WithMany().HasForeignKey(x => x.AttemptId).OnDelete(DeleteBehavior.Cascade);
+            e.HasOne<CanonicalUser>().WithMany().HasForeignKey(x => x.UploadedByUserId).OnDelete(DeleteBehavior.NoAction);
+        });
     }
 }
 
@@ -198,3 +225,25 @@ public sealed class CanonicalExamQuestion { public long Id { get; set; } public 
 public sealed class CanonicalExamAttemptStatus { public byte Id { get; set; } public string Code { get; set; } = ""; }
 public sealed class CanonicalExamAttempt { public long Id { get; set; } public long ExamId { get; set; } public long StudentUserId { get; set; } public DateTime StartedAt { get; set; } public DateTime? SubmittedAt { get; set; } public byte StatusId { get; set; } public decimal? AutoGradedScore { get; set; } public decimal? FinalScore { get; set; } }
 public sealed class CanonicalStudentAnswer { public long Id { get; set; } public long ExamAttemptId { get; set; } public long ExamQuestionId { get; set; } public string AnswerJson { get; set; } = ""; public bool IsAutoGraded { get; set; } public decimal? Score { get; set; } public long? GradedByUserId { get; set; } public DateTime? GradedAt { get; set; } }
+
+public sealed class CanonicalExamDocument
+{
+    public long Id { get; set; }
+    public long ExamId { get; set; }
+    public string StoredFileName { get; set; } = "";
+    public string OriginalFileName { get; set; } = "";
+    public long FileSize { get; set; }
+    public long UploadedByUserId { get; set; }
+    public DateTime UploadedAt { get; set; }
+}
+
+public sealed class CanonicalExamSubmissionDocument
+{
+    public long Id { get; set; }
+    public long AttemptId { get; set; }
+    public string StoredFileName { get; set; } = "";
+    public string OriginalFileName { get; set; } = "";
+    public long FileSize { get; set; }
+    public long UploadedByUserId { get; set; }
+    public DateTime UploadedAt { get; set; }
+}
