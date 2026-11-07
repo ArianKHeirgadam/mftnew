@@ -156,7 +156,7 @@ public sealed class CanonicalExamAttemptController(
             }).ToListAsync(ct);
         var hasExamPdfForSubmission = await academic.ExamDocuments.AnyAsync(x => x.ExamId == examId, ct);
         var hasSubmissionPdfForExam = await academic.ExamSubmissionDocuments.AnyAsync(x => x.AttemptId == attemptId, ct);
-        if (examQuestions.Count > 0 && hasExamPdfForSubmission && !hasSubmissionPdfForExam)
+        if (examQuestions.Count > 0 && hasExamPdfForSubmission && !hasSubmissionPdfForExam && !request.AutoSubmit)
             return BadRequest(new { message = "برای این آزمون، فایل PDF پاسخ‌نامه الزامی است؛ ابتدا آن را بارگذاری کنید." });
         if (examQuestions.Count == 0)
         {
