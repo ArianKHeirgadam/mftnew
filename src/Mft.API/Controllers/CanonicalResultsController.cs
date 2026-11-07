@@ -135,6 +135,8 @@ public sealed class CanonicalResultsController(
         var pendingEssaySections = essaySections.Count(section => !gradedEssaySectionIds.Contains(section.Id));
         var student = await identity.Users.AsNoTracking().Where(x => x.Id == attempt.StudentUserId)
             .Select(x => new { x.FullName, x.Username }).FirstOrDefaultAsync(ct);
+        var autoMaxScore = answers.Where(x => x.IsAutoGraded)
+            .Sum(x => x.PointsOverride ?? x.Points);
         var maxScore = isPdfOnly ? 100m :
             answers.Sum(x => x.PointsOverride ?? x.Points) +
             essaySections.Sum(section => section.TotalPoints ?? 100m);
@@ -180,7 +182,7 @@ public sealed class CanonicalResultsController(
             autoScore = isStudent && !exam.ResultsPublished
                 ? (hasAutoGradedAnswers ? attempt.AutoGradedScore : null)
                 : attempt.AutoGradedScore,
-            maxScore, pendingManualCount = pending,
+            maxScore, autoMaxScore, pendingManualCount = pending,
             status = exam.ResultsPublished ? StatusCodeName(attempt.StatusId) : "AwaitingPublication",
             resultsPublished = exam.ResultsPublished,
             answers = isStudent ? payload.Where(x => x.isAutoGraded).ToList() : payload
