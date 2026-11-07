@@ -230,7 +230,7 @@
       }
       info.textContent = 'این استادان به آزمون‌های کلاس و پاسخ‌های ارسالی آن دسترسی دارند:';
       host.innerHTML = teachers.map((teacher, index) => {
-        const initials = String(teacher.fullName || teacher.username || 'استاد').trim().split(/\\s+/).slice(0,2).map(part => part[0] || '').join('');
+        const initials = String(teacher.fullName || teacher.username || 'استاد').trim().split(/\s+/).slice(0,2).map(part => part[0] || '').join('');
         return '<div class="choice-card selected" data-teacher-id="' + Number(teacher.id) + '"><div class="mohr sm"><div class="mohr-inner"><b>' + escapeExamHtml(initials) + '</b></div></div><b>' + escapeExamHtml(teacher.fullName || teacher.username || 'استاد') + '</b></div>';
       }).join('');
     } catch (error) {
