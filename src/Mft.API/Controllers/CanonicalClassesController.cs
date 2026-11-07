@@ -339,6 +339,7 @@ public sealed class CanonicalClassRequest
 public sealed class CanonicalClassUpdateRequest
 {
     public string Name { get; set; } = "";
+    public int Capacity { get; set; }
     public string? Schedule { get; set; }
 }
 
