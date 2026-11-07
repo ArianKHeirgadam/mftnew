@@ -123,8 +123,8 @@
   if(!$('examStart').value||$('examStart').value==='')return 'زمان شروع را مشخص کنید.';
   if(!$('examEnd').value||Number.isNaN(end.getTime())||Number.isNaN(start.getTime())||end<=start)return 'زمان پایان باید بعد از زمان شروع باشد.';
   const file=$('examPdfFile').files[0];if(file&&(file.size>20*1024*1024||!(/\.pdf$/i.test(file.name))))return 'فایل صورت آزمون باید PDF و حداکثر ۲۰ مگابایت باشد.';
-   const essayFile=$('essaySectionPdfFile').files[0];if(essayFile&&(essayFile.size>20*1024*1024||!(/\.pdf$/i.test(essayFile.name))))return 'فایل بخش تشریحی باید PDF و حداکثر ۲۰ مگابایت باشد.';
    const maxPdfSizeMb=Number($('examMaxPdfSizeMb').value);if(!Number.isInteger(maxPdfSizeMb)||maxPdfSizeMb<1||maxPdfSizeMb>100)return 'حداکثر حجم PDF باید بین ۱ تا ۱۰۰ مگابایت باشد.';
+   const essayFile=$('essaySectionPdfFile').files[0];if(essayFile&&(essayFile.size>maxPdfSizeMb*1024*1024||!(/\.pdf$/i.test(essayFile.name))))return 'فایل بخش تشریحی باید PDF و در محدوده حجم تنظیم‌شده باشد.';
   return null;
  }
  function showSummary(){
