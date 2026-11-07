@@ -3,6 +3,9 @@
   Run once against the configured canonical database after reviewing the target.
   Safe to re-run; existing questions remain unassigned (ImportBatchId = NULL).
 */
+IF DB_NAME() <> N'MftDb_Canonical'
+    THROW 51402, 'Run this patch against the Canonical database configured for the API (expected MftDb_Canonical).', 1;
+
 SET XACT_ABORT ON;
 BEGIN TRANSACTION;
 
