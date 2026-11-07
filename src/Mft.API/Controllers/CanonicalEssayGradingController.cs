@@ -303,7 +303,7 @@ public sealed class CanonicalEssayGradingController(
     {
         if (TeacherId is null) return null;
 
-        var attempt = await academic.ExamAttempts.AsNoTracking()
+        var attempt = await academic.ExamAttempts
             .FirstOrDefaultAsync(item => item.Id == attemptId, ct);
         if (attempt is null) return null;
 
