@@ -331,7 +331,8 @@
         const pendingManualCount = Number(result.pendingManualCount || 0);
         const scoreLabel = result.isPdfOnly && result.score == null
           ? 'پاسخنامه PDF در انتظار تصحیح استاد'
-          : isStudentView && result.autoScore != null && !result.resultsPublished
+          : isStudentView && result.autoScore != null && !result.resultsPublished &&
+              Number(result.autoMaxScore ?? result.maxScore) < Number(result.maxScore)
             ? `نمره خودکار تستی و وصل‌کردنی: ${faNumber(result.autoScore)} از ${faNumber(result.autoMaxScore ?? result.maxScore)} — ${pendingManualCount > 0 ? `${faNumber(pendingManualCount)} بخش تشریحی در انتظار تصحیح` : 'نمره نهایی پس از انتشار رسمی استاد'}`
             : result.score != null
               ? `${faNumber(result.score)} از ${faNumber(result.maxScore)}`
