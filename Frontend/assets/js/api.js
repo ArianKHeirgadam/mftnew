@@ -1340,6 +1340,17 @@
     } catch (error) { tab.close(); throw error; }
   }
 
+  async function objectUrl(path) {
+    const headers = new Headers();
+    if (token()) headers.set('Authorization', `Bearer ${token()}`);
+    const response = await fetch(`${API_BASE}${path}`, { headers });
+    if (!response.ok) {
+      const payload = await response.json().catch(() => null);
+      throw new Error(payload?.message || `خطای دریافت فایل (${response.status})`);
+    }
+    return URL.createObjectURL(await response.blob());
+  }
+
   async function download(path) {
     const headers = new Headers();
     if (token()) headers.set('Authorization', `Bearer ${token()}`);
@@ -1363,6 +1374,7 @@
     request,
     download,
     preview,
+    objectUrl,
     logout() { clearSession(); location.href = 'login.html'; },
     refresh: init
   };
