@@ -50,7 +50,11 @@
             </div>
             <div class="field">
               <label for="className">نام کلاس</label>
-              <input class="input" id="className" maxlength="200" placeholder="مثلاً گروه کامپیوتر ۱۴۰۵">\n            </div>\n            <div class="field">\n              <label for="classCapacity">ظرفیت پذیرش کلاس (نفر)</label>\n              <input class="input" id="classCapacity" type="number" min="1" max="100000" step="1" placeholder="مثلاً ۳۰" required>
+              <input class="input" id="className" maxlength="200" placeholder="مثلاً گروه کامپیوتر ۱۴۰۵">
+            </div>
+            <div class="field">
+              <label for="classCapacity">ظرفیت پذیرش کلاس (نفر)</label>
+              <input class="input" id="classCapacity" type="number" min="1" max="100000" step="1" placeholder="مثلاً ۳۰" required>
             </div>
             <button class="btn btn-primary" id="classCreate">ایجاد کلاس</button>
             <div class="divider" style="margin:20px 0"></div>
@@ -68,7 +72,8 @@
           <p class="text-soft text-sm" id="classSummary">کلاسی انتخاب نشده است.</p>
           <div class="flex gap-8 items-center" style="margin-top:16px;flex-wrap:wrap">
             <span class="badge badge-muted" id="memberCount">۰ دانشجو</span>
-            <span class="badge badge-muted" id="teacherCount">۰ استاد</span>\n            <button type="button" class="badge badge-muted" id="classCapacitySummary" title="برای تغییر ظرفیت کلیک کنید">ظرفیت: تعریف‌نشده</button>
+            <span class="badge badge-muted" id="teacherCount">۰ استاد</span>
+            <button type="button" class="badge badge-muted" id="classCapacitySummary" title="برای تغییر ظرفیت کلیک کنید">ظرفیت: تعریف‌نشده</button>
             <button class="btn btn-primary" id="openRosterModal" disabled>مدیریت دانشجویان و استادان</button>
           </div>
           <p class="text-soft text-sm" style="margin-top:14px">برای انتخاب یا حذف اعضا، یک کلاس انتخاب کنید و پنجره مدیریت اعضا را باز کنید.</p>
@@ -217,7 +222,8 @@
     selectedTeacherIds = new Set((teacherResult.teachers || []).map(item => Number(item.id)));
     $('#classSummary').textContent = currentClass.name + ' — ' +
       (currentClass.department || me?.department || 'دپارتمان') +
-      ' — ' + selectedIds.size + ' دانشجو و ' + selectedTeacherIds.size + ' استاد';\n    $('#classCapacitySummary').textContent = 'ظرفیت: ' + (currentClass.capacity ? Number(currentClass.capacity) + ' نفر' : 'تعریف‌نشده');
+      ' — ' + selectedIds.size + ' دانشجو و ' + selectedTeacherIds.size + ' استاد';
+    $('#classCapacitySummary').textContent = 'ظرفیت: ' + (currentClass.capacity ? Number(currentClass.capacity) + ' نفر' : 'تعریف‌نشده');
     $('#rosterModalSubtitle').textContent = currentClass.name + ' · ' + (currentClass.department || '');
     $('#openRosterModal').disabled = false;
     $('#saveMembers').disabled = false;
@@ -241,13 +247,16 @@
   $('#classCreate').addEventListener('click', async () => {
     const name = $('#className').value.trim();
     const departmentId = isSuperAdmin() ? Number($('#classDepartment').value || 0) : Number(me?.departmentId || 0);
-    const capacity = Number($('#classCapacity').value || 0);\n    if (!name) return notify('نام کلاس را وارد کنید.', 'warn');\n    if (!Number.isInteger(capacity) || capacity < 1 || capacity > 100000) return notify('ظرفیت کلاس را بین ۱ تا ۱۰۰۰۰۰ نفر وارد کنید.', 'warn');
+    const capacity = Number($('#classCapacity').value || 0);
+    if (!name) return notify('نام کلاس را وارد کنید.', 'warn');
+    if (!Number.isInteger(capacity) || capacity < 1 || capacity > 100000) return notify('ظرفیت کلاس را بین ۱ تا ۱۰۰۰۰۰ نفر وارد کنید.', 'warn');
     if (!departmentId) return notify('دپارتمان معتبر انتخاب نشده است.', 'warn');
     try {
       const created = await api().request('/canonical/classes', {
         method: 'POST', body: JSON.stringify({ name, departmentId, capacity })
       });
       $('#className').value = '';
+      $('#classCapacity').value = '';
       await loadClasses(created.id);
       notify('کلاس ایجاد شد.', 'ok');
     } catch (error) { notify(error.message || 'ایجاد کلاس ناموفق بود.', 'danger'); }
