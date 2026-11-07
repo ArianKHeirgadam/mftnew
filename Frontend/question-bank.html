@@ -103,6 +103,15 @@
           <div class="search-box"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.2-3.2"/></svg><input type="text" placeholder="جستجو در متن سوال..."></div>
           <select class="select" style="width:auto"><option>همه دسته‌بندی‌ها</option><option>الگوریتم</option><option>ساختمان داده</option><option>پایگاه داده</option></select>
           <select class="select" style="width:auto"><option>همه سطوح دشواری</option><option>آسان</option><option>متوسط</option><option>سخت</option></select>
+          <select class="select" id="questionFolderFilter" style="width:auto" aria-label="فیلتر پوشه">
+            <option value="__all__">همه سؤال‌ها</option>
+            <option value="__unfiled__">سؤال‌های بدون پوشه</option>
+          </select>
+        </div>
+        <div class="flex gap-8 items-center" style="flex-wrap:wrap;margin:12px 0">
+          <span class="text-soft text-sm" id="selectedQuestionCount">۰ سؤال انتخاب شده</span>
+          <select class="select" id="bulkQuestionFolder" style="width:auto;min-width:190px"><option value="">انتقال به بدون پوشه</option></select>
+          <button class="btn btn-outline btn-sm" id="moveSelectedQuestions" type="button">انتقال سؤال‌های انتخاب‌شده</button>
         </div>
 
         <div id="tabAll" class="tab-panel active">
@@ -180,6 +189,9 @@
  const searchField=document.querySelector('.table-toolbar .search-box input');
  const categoryFilter=document.querySelectorAll('.table-toolbar select')[0];
  const difficultyFilter=document.querySelectorAll('.table-toolbar select')[1];
+ const folderFilter=document.getElementById('questionFolderFilter');
+ let questionFolders=[];
+ const selectedQuestionIds=new Set();
  const typeLabel=code=>({MultipleChoice:'چهارگزینه‌ای',Essay:'تشریحی',Matching:'وصل‌کردنی'}[code]||code||'—');
  const difficultyLabel=value=>({1:'آسان',2:'متوسط',3:'سخت',Easy:'آسان',Medium:'متوسط',Hard:'سخت'}[value]||'—');
  const renderQuestions=()=>{
@@ -187,7 +199,7 @@
   const category=categoryFilter?.value||'';
   const difficulty=difficultyFilter?.value||'';
   const fv=folderFilter?.value||'__unfiled__';
-  const rows=questionRows.filter(q=>(fv==='__all__'||(fv==='__unfiled__'?!q.folderId&&!q.importBatchId:Number(q.folderId)===Number(fv)))&&
+  const rows=questionRows.filter(q=>(fv==='__all__'||(fv==='__unfiled__'?(q.folderId===null||q.folderId===undefined||q.folderId===0):Number(q.folderId)===Number(fv)))&&
    (!term||String(q.text||'').toLocaleLowerCase().includes(term))&&
    (!category||category==='همه دسته‌بندی‌ها'||q.categoryName===category)&&
    (!difficulty||difficulty==='همه سطوح دشواری'||difficultyLabel(q.difficultyLevel)===difficulty));
@@ -232,7 +244,8 @@
   const opts=questionFolders.map(x=>'<option value="'+x.id+'">'+esc(x.name)+'</option>').join('');
   document.getElementById('newQuestionFolderParent').innerHTML='<option value="">پوشه اصلی</option>'+opts;
   document.getElementById('bulkQuestionFolder').innerHTML='<option value="">انتقال به بدون پوشه</option>'+opts;
-  document.getElementById('questionFolderFilter').innerHTML='<option value="__unfiled__">سؤال‌های بدون پوشه مستقل</option><option value="__all__">همه سؤال‌ها</option>'+opts;
+  document.getElementById('questionFolderFilter').innerHTML='<option value="__all__">همه سؤال‌ها</option><option value="__unfiled__">سؤال‌های بدون پوشه</option>'+opts;
+  if(folderFilter)folderFilter.value=folderFilter.value||'__all__';
   document.getElementById('questionFolderCount').textContent=questionFolders.length.toLocaleString('fa-IR')+' پوشه';
   const children=new Map();questionFolders.forEach(x=>{const k=String(x.parentFolderId||'root');if(!children.has(k))children.set(k,[]);children.get(k).push(x);});
   const tree=(parent=null,depth=0)=>(children.get(String(parent||'root'))||[]).map(x=>'<article class="question-folder-card" style="margin-right:'+Math.min(depth*14,56)+'px"><b>📁 '+esc(x.name)+'</b><small>'+Number(x.questionCount||0).toLocaleString('fa-IR')+' سؤال · '+esc(x.ownerName||'')+'</small><div class="flex gap-8"><button class="btn btn-outline btn-sm" data-folder-filter="'+x.id+'">نمایش سؤال‌ها</button><button class="btn btn-outline btn-sm" data-folder-rename="'+x.id+'">تغییر نام</button><button class="btn btn-danger btn-sm" data-folder-delete="'+x.id+'">حذف</button></div></article>'+tree(x.id,depth+1)).join('');
