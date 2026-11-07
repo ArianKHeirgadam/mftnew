@@ -132,6 +132,15 @@
         <select class="select" id="importSkillCategory">
           <option value="">در حال دریافت دسته‌بندی‌ها...</option>
         </select>
+        <button type="button" class="btn btn-outline btn-sm mt-8" id="toggleImportCategoryForm">+ تعریف دسته‌بندی جدید</button>
+      </div>
+      <div class="field mt-12" id="importCategoryForm" hidden>
+        <label for="importCategoryName">نام دسته‌بندی جدید</label>
+        <input class="input" id="importCategoryName" maxlength="150" placeholder="نام دسته‌بندی را وارد کنید">
+        <div class="flex gap-8 mt-8">
+          <button type="button" class="btn btn-primary btn-sm" id="saveImportCategory">ذخیره دسته‌بندی</button>
+          <button type="button" class="btn btn-outline btn-sm" id="cancelImportCategory">انصراف</button>
+        </div>
       </div>
       <div class="field mt-16">
         <label for="importSkillName">نام مهارت</label>
@@ -166,18 +175,38 @@
     skillModal.classList.remove('show');
     skillModal.setAttribute('aria-hidden', 'true');
   };
-  async function loadSkillCategories() {
+  async function loadSkillCategories(selectedId = 0) {
     try {
       const lookups = await api.request('/questions/lookups');
       const categories = Array.isArray(lookups?.categories) ? lookups.categories : [];
       $('#importSkillCategory').innerHTML = '<option value="">انتخاب دسته‌بندی</option>' +
         categories.map(category => '<option value="' + Number(category.id) + '">' + esc(category.name) + '</option>').join('');
-      if (!categories.length) $('#importSkillStatus').textContent = 'ابتدا باید یک دسته‌بندی آزمون در بانک اطلاعاتی وجود داشته باشد.';
+      if (selectedId && categories.some(category => Number(category.id) === Number(selectedId))) $('#importSkillCategory').value = String(selectedId);
+      if (!categories.length) $('#importSkillStatus').textContent = 'ابتدا یک دسته‌بندی جدید تعریف کنید.';
     } catch (error) {
       $('#importSkillCategory').innerHTML = '<option value="">دریافت دسته‌بندی ناموفق بود</option>';
       $('#importSkillStatus').textContent = error.message || 'دریافت دسته‌بندی‌ها ناموفق بود.';
     }
   }
+  $('#toggleImportCategoryForm').addEventListener('click', () => {
+    $('#importCategoryForm').hidden = !$('#importCategoryForm').hidden;
+    if (!$('#importCategoryForm').hidden) $('#importCategoryName').focus();
+  });
+  $('#cancelImportCategory').addEventListener('click', () => { $('#importCategoryForm').hidden = true; $('#importCategoryName').value = ''; });
+  $('#saveImportCategory').addEventListener('click', async () => {
+    const name = $('#importCategoryName').value.trim();
+    if (!name) return $('#importSkillStatus').textContent = 'نام دسته‌بندی را وارد کنید.';
+    const button = $('#saveImportCategory'); button.disabled = true;
+    $('#importSkillStatus').textContent = 'در حال ذخیره دسته‌بندی...';
+    try {
+      const created = await api.request('/questions/lookups/categories', { method: 'POST', body: JSON.stringify({ name }) });
+      await loadSkillCategories(created.id);
+      $('#importCategoryForm').hidden = true; $('#importCategoryName').value = '';
+      $('#importSkillStatus').textContent = 'دسته‌بندی ذخیره شد؛ اکنون نام مهارت را وارد کنید.';
+      message('دسته‌بندی جدید ذخیره شد.', 'success');
+    } catch (error) { $('#importSkillStatus').textContent = error.message || 'ذخیره دسته‌بندی ناموفق بود.'; }
+    finally { button.disabled = false; }
+  });
   $('#openImportSkillModal').addEventListener('click', () => {
     $('#importSkillName').value = '';
     $('#importSkillStatus').textContent = '';
