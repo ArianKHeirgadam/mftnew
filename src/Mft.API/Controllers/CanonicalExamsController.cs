@@ -92,7 +92,7 @@ public sealed class CanonicalExamsController(
             Title = request.Title.Trim(), ExamCategoryId = request.ExamCategoryId,
             DepartmentId = departmentId.Value, ClassId = request.ClassId, CreatedByUserId = CurrentUserId.Value,
             StartAt = request.StartAt, EndAt = request.EndAt,
-            DurationMinutes = request.DurationMinutes, MaxPdfFileSizeBytes = request.MaxPdfFileSizeBytes, IsPublished = request.PdfOnly || request.Sections.Any(s => string.Equals(s.SectionType, "Essay", StringComparison.OrdinalIgnoreCase)) ? false : request.IsPublished
+            DurationMinutes = request.DurationMinutes, MaxPdfFileSizeBytes = request.Sections.Any(s => string.Equals(s.SectionType, "Essay", StringComparison.OrdinalIgnoreCase)) ? request.MaxPdfFileSizeBytes : null, IsPublished = request.PdfOnly || request.Sections.Any(s => string.Equals(s.SectionType, "Essay", StringComparison.OrdinalIgnoreCase)) ? false : request.IsPublished
         };
         academic.Exams.Add(exam);
         await academic.SaveChangesAsync(ct);
@@ -117,7 +117,7 @@ public sealed class CanonicalExamsController(
         exam.StartAt = request.StartAt;
         exam.EndAt = request.EndAt;
         exam.DurationMinutes = request.DurationMinutes;
-        exam.MaxPdfFileSizeBytes = request.MaxPdfFileSizeBytes;
+        exam.MaxPdfFileSizeBytes = request.Sections.Any(s => string.Equals(s.SectionType, "Essay", StringComparison.OrdinalIgnoreCase)) ? request.MaxPdfFileSizeBytes : null;
         exam.IsPublished = request.Sections.Any(s => string.Equals(s.SectionType, "Essay", StringComparison.OrdinalIgnoreCase)) ? false : request.IsPublished;
         await academic.SaveChangesAsync(ct);
         await ReplaceSections(id, request.Sections, ct);
@@ -201,9 +201,10 @@ public sealed class CanonicalExamsController(
             (r.PdfOnly ? r.Sections.Count != 0 : r.Sections.Count == 0) ||
             r.Sections.SelectMany(x => x.QuestionIds).Distinct().Count() != r.Sections.Sum(x => x.QuestionIds.Count))
             return BadRequest(new { message = "عنوان، زمان‌بندی، مدت آزمون و فهرست بخش‌ها/سؤال‌ها معتبر نیست." });
-        if (r.MaxPdfFileSizeBytes.HasValue &&
-            (r.MaxPdfFileSizeBytes.Value < 1024 * 1024 || r.MaxPdfFileSizeBytes.Value > 100L * 1024 * 1024))
-            return BadRequest(new { message = "حداکثر حجم PDF باید بین ۱ تا ۱۰۰ مگابایت باشد." });
+        var hasEssaySection = r.Sections.Any(x => string.Equals(x.SectionType, "Essay", StringComparison.OrdinalIgnoreCase));
+        if (hasEssaySection && (!r.MaxPdfFileSizeBytes.HasValue ||
+            r.MaxPdfFileSizeBytes.Value < 1024 * 1024 || r.MaxPdfFileSizeBytes.Value > 100L * 1024 * 1024))
+            return BadRequest(new { message = "برای بخش Essay، حداکثر حجم PDF باید بین ۱ تا ۱۰۰ مگابایت باشد." });
         if (!await academic.ExamCategories.AnyAsync(x => x.Id == r.ExamCategoryId, ct))
             return BadRequest(new { message = "دسته‌بندی آزمون معتبر نیست." });
         if (!departmentId.HasValue || !await academic.Classes.AnyAsync(x =>
