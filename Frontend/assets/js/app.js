@@ -50,7 +50,7 @@ const NAV_BY_ROLE = {
       section: "سامانه", items: [
         { key: "reports", label: "گزارش‌ها", href: "reports.html", icon: ICON.report },
         { key: "notifications", label: "اعلان‌ها", href: "notifications.html", icon: ICON.bell },
-        { key: "settings", label: "تنظیمات", href: "settings.html", icon: ICON.settings },
+
       ]
     },
   ],
@@ -244,7 +244,7 @@ function renderTopbar() {
           </div>
           <div class="dropdown-menu" id="profileDrop">
             <a href="profile.html">${ICON.profile} پروفایل من</a>
-            <a href="settings.html">${ICON.settings} تنظیمات</a>
+            ${role === "superadmin" ? `<a href="settings.html">${ICON.settings} تنظیمات</a>` : ""}
             <hr>
             <a href="login.html" style="color:var(--danger)">${ICON.logout} خروج از حساب</a>
           </div>
