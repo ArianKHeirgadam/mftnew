@@ -144,9 +144,9 @@ public sealed class QuestionImportController(
         return Ok(new
         {
             totalRows = rows.Count,
-            validRows = result.ValidRows.Count,
-            invalidRows = result.Errors.Count,
-            canImport = result.Errors.Count == 0,
+            validRows = result.PreviewRows.Count(x => x.Errors.Count == 0),
+            invalidRows = result.PreviewRows.Count(x => x.Errors.Count > 0),
+            canImport = result.PreviewRows.All(x => x.Errors.Count == 0),
             rows = result.PreviewRows
         });
     }
@@ -209,11 +209,11 @@ public sealed class QuestionImportController(
                 normalized.Add(new NormalizedQuestion(row.RowNumber, skill.Id, type.Id, typeCode, text,
                     row.Points, difficulty!.Value, options, row.CorrectOption, pairs));
             }
-            result.PreviewRows.Add(new
+            result.PreviewRows.Add(new ImportPreviewRow
             {
-                row.RowNumber, Category = categoryName, Skill = skillName,
-                Type = typeCode, Text = text, row.Points, Difficulty = row.Difficulty,
-                Options = options, row.CorrectOption, MatchingPairs = pairs,
+                RowNumber = row.RowNumber, Category = categoryName, Skill = skillName,
+                Type = typeCode, Text = text, Points = row.Points, Difficulty = row.Difficulty,
+                Options = options, CorrectOption = row.CorrectOption, MatchingPairs = pairs,
                 Errors = errors
             });
             if (errors.Count > 0)
@@ -221,7 +221,39 @@ public sealed class QuestionImportController(
         }
 
         result.ValidRows = normalized;
+
+        // Surface duplicates during preview, not only after the teacher presses Confirm.
+        var seenKeys = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var item in normalized)
+        {
+            var key = $"{item.SkillId}|{Normalize(item.Text)}";
+            if (!seenKeys.Add(key))
+                AddPreviewError(result, item.RowNumber, "این سؤال در همین فایل بیش از یک بار تکرار شده است.");
+        }
+
+        var candidateSkillIds = normalized.Select(x => x.SkillId).Distinct().ToArray();
+        if (candidateSkillIds.Length > 0)
+        {
+            var existingQuestions = await academic.Questions.AsNoTracking()
+                .Where(q => candidateSkillIds.Contains(q.SkillId))
+                .Select(q => new { q.SkillId, q.Text }).ToListAsync(ct);
+            var existingKeys = existingQuestions
+                .Select(x => $"{x.SkillId}|{Normalize(x.Text)}")
+                .ToHashSet(StringComparer.OrdinalIgnoreCase);
+            foreach (var item in normalized)
+                if (existingKeys.Contains($"{item.SkillId}|{Normalize(item.Text)}"))
+                    AddPreviewError(result, item.RowNumber, "این سؤال قبلاً در بانک سؤال ثبت شده است.");
+        }
+
         return result;
+    }
+
+    private static void AddPreviewError(ValidationResult result, int rowNumber, string message)
+    {
+        var preview = result.PreviewRows.FirstOrDefault(x => x.RowNumber == rowNumber);
+        if (preview is null) return;
+        preview.Errors.Add(message);
+        result.Errors.Add(new { rowNumber, Errors = new[] { message } });
     }
 
     private static List<ImportQuestionRow> ReadWorksheet(IXLWorksheet sheet)
@@ -332,7 +364,7 @@ public sealed class QuestionImportController(
     {
         public List<NormalizedQuestion> ValidRows { get; set; } = new();
         public List<object> Errors { get; } = new();
-        public List<object> PreviewRows { get; } = new();
+        public List<ImportPreviewRow> PreviewRows { get; } = new();
     }
 
     private sealed record NormalizedQuestion(int RowNumber, long SkillId, long QuestionTypeId, string TypeCode,
@@ -356,3 +388,18 @@ public sealed class ImportQuestionRow
     public List<ImportMatchingPair> MatchingPairs { get; set; } = new();
 }
 public sealed class ImportMatchingPair { public string LeftItem { get; set; } = ""; public string RightItem { get; set; } = ""; }
+
+public sealed class ImportPreviewRow
+{
+    public int RowNumber { get; set; }
+    public string Category { get; set; } = "";
+    public string Skill { get; set; } = "";
+    public string Type { get; set; } = "";
+    public string Text { get; set; } = "";
+    public decimal Points { get; set; }
+    public string Difficulty { get; set; } = "";
+    public List<string> Options { get; set; } = new();
+    public int? CorrectOption { get; set; }
+    public List<ImportMatchingPair> MatchingPairs { get; set; } = new();
+    public List<string> Errors { get; set; } = new();
+}
