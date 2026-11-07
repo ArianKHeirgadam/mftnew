@@ -146,6 +146,8 @@
  const notify=(m,t='info')=>window.showToast?.(m,t);
  const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
  let lookups=null, questionRows=[];
+ const editQuestionId=new URLSearchParams(location.search).get('editQuestion');
+ let editAutoOpened=false;
  const searchField=document.querySelector('.table-toolbar .search-box input');
  const categoryFilter=document.querySelectorAll('.table-toolbar select')[0];
  const difficultyFilter=document.querySelectorAll('.table-toolbar select')[1];
@@ -155,7 +157,7 @@
   const term=(searchField?.value||'').trim().toLocaleLowerCase();
   const category=categoryFilter?.value||'';
   const difficulty=difficultyFilter?.value||'';
-  const rows=questionRows.filter(q=>!q.importBatchId&&(!term||String(q.text||'').toLocaleLowerCase().includes(term))&&
+  const rows=questionRows.filter(q=>(!q.importBatchId||String(q.id)===editQuestionId)&&(!term||String(q.text||'').toLocaleLowerCase().includes(term))&&
    (!category||category==='همه دسته‌بندی‌ها'||q.categoryName===category)&&
    (!difficulty||difficulty==='همه سطوح دشواری'||difficultyLabel(q.difficultyLevel)===difficulty));
   document.getElementById('questionRows').innerHTML=rows.length?rows.map(q=>'<tr>'+
@@ -192,6 +194,7 @@
    ).join('')+'</div></section>'
   ).join(''):'<div class="question-empty">هنوز پوشه ورود گروهی ثبت نشده است. هنگام Import، عنوان آزمون را وارد کنید.</div>';
   renderQuestions();
+  if(editQuestionId&&!editAutoOpened){editAutoOpened=true;document.querySelector('[data-question-edit="'+CSS.escape(editQuestionId)+'"]')?.click();}
  }
  async function loadCanonicalLookups(){
   try{
