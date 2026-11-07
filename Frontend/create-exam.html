@@ -228,12 +228,9 @@
     if (!Number.isInteger(durationMinutes) || durationMinutes < 1 || durationMinutes > 600) return showToast("مدت آزمون باید بین ۱ تا ۶۰۰ دقیقه باشد.", "warn");
     if (!classId || !departmentId) return showToast("کلاس معتبر برای آزمون انتخاب نشده است.", "warn");
 
-    let selected = [...document.querySelectorAll('#manualPick input[type="checkbox"]:checked')];
-    if (!document.getElementById("randomToggle").checked && selected.length === 0) {
-      const selectedIds = new Set(selectedManualQuestions());
-      selected = [...document.querySelectorAll('#manualPick input[type="checkbox"][value]')]
-        .filter(input => selectedIds.has(String(input.value)));
-    }
+    const selectedIds = new Set(selectedManualQuestions());
+    let selected = [...document.querySelectorAll('#manualPick input[type="checkbox"][value]')]
+      .filter(input => selectedIds.has(String(input.value)));
     if (document.getElementById("randomToggle").checked) {
       const pool = [...document.querySelectorAll('#manualPick input[type="checkbox"]')];
       const mcqCount = Math.max(0, Number(document.getElementById("randomMcqCount").value) || 0);
