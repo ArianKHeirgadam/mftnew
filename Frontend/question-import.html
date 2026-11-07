@@ -41,7 +41,7 @@
         <div>
           <div class="breadcrumb">سامانه سنجش <span>/</span> <a href="question-bank.html">بانک سؤالات</a> <span>/</span> <b>ورود گروهی</b></div>
           <h1>ورود گروهی سؤالات</h1>
-          <p class="text-soft text-sm">فایل Excel/CSV بارگذاری کنید یا داده‌ها را از صفحه‌گسترده Paste کنید؛ قبل از ثبت، پیش‌نمایش و اعتبارسنجی انجام می‌شود.</p>
+          <p class="text-soft text-sm">فایل Excel/CSV یا Word بارگذاری کنید؛ قبل از ثبت، پیش‌نمایش و اعتبارسنجی انجام می‌شود.</p>
         </div>
         <a class="btn btn-outline" href="question-bank.html">بازگشت به بانک سؤالات</a>
       </div>
@@ -60,6 +60,7 @@
           <div class="import-tabs">
             <button type="button" class="import-tab active" data-import-tab="file">بارگذاری Excel / CSV</button>
             <button type="button" class="import-tab" data-import-tab="paste">Paste از Excel</button>
+            <button type="button" class="import-tab" data-import-tab="word">بارگذاری Word</button>
           </div>
           <div class="import-pane" id="filePane">
             <div class="drop-zone">
@@ -77,6 +78,39 @@
               <textarea class="textarea" id="pasteData" rows="10" placeholder="Category	Skill	Type	Text	Points	Difficulty	Option1	Option2	Option3	Option4	CorrectOption"></textarea>
             </div>
             <button type="button" class="btn btn-primary" id="previewPaste">بررسی و پیش‌نمایش متن</button>
+          </div>
+
+          <div class="import-pane" id="wordPane" hidden>
+            <div class="field">
+              <label for="wordCategory">دسته‌بندی</label>
+              <input class="input" id="wordCategory" maxlength="150" placeholder="نام دسته‌بندی ثبت‌شده">
+            </div>
+            <div class="field mt-12">
+              <label for="wordSkill">مهارت</label>
+              <input class="input" id="wordSkill" maxlength="100" placeholder="نام دقیق مهارت ثبت‌شده">
+            </div>
+            <div class="flex gap-8 mt-12" style="flex-wrap:wrap">
+              <div class="field" style="flex:1;min-width:130px">
+                <label for="wordDifficulty">سطح دشواری</label>
+                <select class="select" id="wordDifficulty">
+                  <option value="Easy">آسان (Easy)</option>
+                  <option value="Medium" selected>متوسط (Medium)</option>
+                  <option value="Hard">سخت (Hard)</option>
+                </select>
+              </div>
+              <div class="field" style="flex:1;min-width:130px">
+                <label for="wordPoints">نمره هر سؤال</label>
+                <input class="input" id="wordPoints" type="number" min="1" max="9999" step="0.25" value="1">
+              </div>
+            </div>
+            <div class="drop-zone mt-12">
+              <h3 style="margin-bottom:8px">انتخاب فایل Word</h3>
+              <p class="text-soft text-sm">فقط فایل DOCX · حداکثر ۵ مگابایت و ۵۰۰ سؤال</p>
+              <input id="wordFile" type="file" accept=".docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document">
+            </div>
+            <div class="flex gap-8 mt-16">
+              <button type="button" class="btn btn-primary" id="previewWord">تشخیص و پیش‌نمایش سؤالات Word</button>
+            </div>
           </div>
           <div id="previewArea" hidden style="margin-top:22px">
             <div class="flex" style="justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap">
@@ -99,8 +133,15 @@
         </section>
 
         <aside class="card import-panel">
-          <h3 style="margin-bottom:12px">قالب فایل ورودی</h3>
+          <h3 style="margin-bottom:12px">راهنمای ورود سؤالات</h3>
           <p class="import-help">ردیف اول باید عنوان ستون‌ها باشد. نام مهارت باید دقیقاً با مهارت ثبت‌شده در بانک اطلاعاتی یکسان باشد. اگر نام مهارت در چند دسته تکراری است، Category را هم وارد کنید.</p>
+          <p class="import-help"><b>قالب Word:</b> هر سؤال را با شماره و نقطه شروع کنید. چهار خط بعدی گزینه‌ها هستند و پاسخ درست باید با <code>(صحیح)</code> مشخص شود.</p>
+          <code>۱. متن سؤال</code>
+          <code>گزینه اول</code>
+          <code>گزینه دوم (صحیح)</code>
+          <code>گزینه سوم</code>
+          <code>گزینه چهارم</code>
+          <p class="import-help">برای Word، دسته‌بندی، مهارت، دشواری و نمره یک‌بار در فرم وارد می‌شوند. فعلاً Word فقط سؤالات چهارگزینه‌ای را با این قالب می‌خواند.</p>
           <div class="import-help">
             <b>ستون‌های مشترک</b>
             <code>Category, Skill, Type, Text, Points, Difficulty</code>
@@ -246,6 +287,7 @@
     document.querySelectorAll('[data-import-tab]').forEach(x => x.classList.toggle('active', x === button));
     $('#filePane').hidden = button.dataset.importTab !== 'file';
     $('#pastePane').hidden = button.dataset.importTab !== 'paste';
+    $('#wordPane').hidden = button.dataset.importTab !== 'word';
     clearPreview();
   }));
 
@@ -297,6 +339,24 @@
     const data = new FormData();
     data.append('file', file);
     runPreview('/questions/import/preview/file', {method:'POST',body:data});
+  });
+
+
+  $('#previewWord').addEventListener('click', () => {
+    const file = $('#wordFile').files[0];
+    const category = $('#wordCategory').value.trim();
+    const skill = $('#wordSkill').value.trim();
+    const points = $('#wordPoints').value;
+    if (!file) return message('ابتدا فایل Word با پسوند DOCX را انتخاب کنید.', 'error');
+    if (!category || !skill) return message('دسته‌بندی و مهارت را وارد کنید.', 'error');
+    if (!points || Number(points) <= 0 || Number(points) > 9999) return message('نمره باید بین ۱ تا ۹۹۹۹ باشد.', 'error');
+    const data = new FormData();
+    data.append('file', file);
+    data.append('category', category);
+    data.append('skill', skill);
+    data.append('difficulty', $('#wordDifficulty').value);
+    data.append('points', points);
+    runPreview('/questions/import/preview/word', {method:'POST',body:data});
   });
 
   $('#previewPaste').addEventListener('click', () => {
