@@ -254,7 +254,7 @@ public sealed class CanonicalEssayGradingController(
         if (allSectionsGraded)
         {
             var finalStatus = await academic.ExamAttemptStatuses.AsNoTracking()
-                .SingleOrDefaultAsync(item => item.Code == "Final", ct);
+                .SingleOrDefaultAsync(item => item.Id == 4 && item.Code == "FullyGraded", ct);
             if (finalStatus is null)
                 return Conflict(new { message = "وضعیت Final در جدول ExamAttemptStatuses تعریف نشده است؛ نمره ذخیره نشد." });
 
