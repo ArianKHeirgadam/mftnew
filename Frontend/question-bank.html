@@ -120,13 +120,13 @@
    '<tr><td colspan="5" style="text-align:center;padding:24px">سؤالی برای نمایش وجود ندارد.</td></tr>';
  };
  async function loadQuestions(){
-  const rows=await api.request('/canonical/questions');
+  const rows=await api.request('/questions');
   questionRows=Array.isArray(rows)?rows:[];
   renderQuestions();
  }
  async function loadCanonicalLookups(){
   try{
-   lookups=await api.request('/canonical/questions/lookups');
+   lookups=await api.request('/questions/lookups');
    skill.innerHTML='<option value="">انتخاب مهارت</option>'+lookups.skills.map(x=>'<option value="'+x.id+'">'+esc(x.name)+' — '+esc(lookups.categories.find(c=>Number(c.id)===Number(x.examCategoryId))?.name||'')+'</option>').join('');
    if(categoryFilter)categoryFilter.innerHTML='<option value="">همه دسته‌بندی‌ها</option>'+lookups.categories.map(x=>'<option value="'+esc(x.name)+'">'+esc(x.name)+'</option>').join('');
    if(!lookups.skills.length) notify('هیچ مهارتی در بانک اطلاعاتی ثبت نشده است؛ ابتدا دسته‌بندی و مهارت‌ها باید در دیتابیس تعریف شوند.','warn');
@@ -155,7 +155,7 @@
    matchingPairs:type==='Matching'?pairs:[],criteria:[]};
   try{
    const id=modal.dataset.editId;
-   await api.request(id?'/canonical/questions/'+encodeURIComponent(id):'/canonical/questions',{method:id?'PUT':'POST',body:JSON.stringify(body)});
+   await api.request(id?'/questions/'+encodeURIComponent(id):'/questions',{method:id?'PUT':'POST',body:JSON.stringify(body)});
    delete modal.dataset.editId; modal.classList.remove('show');
    document.querySelector('[data-question-text]').value='';
    document.querySelectorAll('[data-question-option],[data-match-left],[data-match-right]').forEach(x=>x.value='');
@@ -171,7 +171,7 @@
   const remove=event.target.closest('[data-question-delete]');
   if(edit){
    try{
-    const q=await api.request('/canonical/questions/'+encodeURIComponent(edit.dataset.questionEdit));
+    const q=await api.request('/questions/'+encodeURIComponent(edit.dataset.questionEdit));
     modal.dataset.editId=q.id;
     document.querySelector('[data-question-text]').value=q.text||'';
     skill.value=String(q.skillId);
@@ -190,7 +190,7 @@
   }
   if(remove){
    if(!confirm('این سؤال حذف شود؟'))return;
-   try{await api.request('/canonical/questions/'+encodeURIComponent(remove.dataset.questionDelete),{method:'DELETE'});notify('سؤال حذف شد.','ok');await loadQuestions();}
+   try{await api.request('/questions/'+encodeURIComponent(remove.dataset.questionDelete),{method:'DELETE'});notify('سؤال حذف شد.','ok');await loadQuestions();}
    catch(e){notify(e.message,'danger');}
   }
  });
