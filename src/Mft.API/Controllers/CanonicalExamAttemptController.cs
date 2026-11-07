@@ -26,7 +26,10 @@ public sealed class CanonicalExamAttemptController(
             do
             {
                 var bytes = RandomNumberGenerator.GetBytes(8);
-                token = BitConverter.ToInt64(bytes) & long.MaxValue;
+                // The browser currently transports these opaque IDs as JavaScript Numbers.
+                // Keep them within Number.MAX_SAFE_INTEGER so JSON round-trips preserve
+                // the exact Int64 value used by the scoring map.
+                token = BitConverter.ToInt64(bytes) & 0x001FFFFFFFFFFFFF;
             } while (token == 0 || !usedTokens.Add(token));
             result.Add(new MatchingRightMapItem(pairId, token));
         }
