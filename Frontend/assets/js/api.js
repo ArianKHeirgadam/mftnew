@@ -12,6 +12,12 @@
   const $$ = (selector, root = document) => [...root.querySelectorAll(selector)];
   const escapeHtml = value => String(value ?? '').replace(/[&<>"']/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[ch]);
   const faNumber = value => Number(value || 0).toLocaleString('fa-IR');
+  if (!document.querySelector('script[data-mft-persian-picker]')) {
+    const pickerScript = document.createElement('script');
+    pickerScript.src = 'assets/js/persian-date-picker.js';
+    pickerScript.dataset.mftPersianPicker = 'true';
+    document.head.appendChild(pickerScript);
+  }
   const nativeFaDate = Date.prototype.toLocaleDateString, nativeFaDateTime = Date.prototype.toLocaleString;
   if (!Date.prototype.__mftFaPersianCalendar) {
     Date.prototype.toLocaleDateString = function(l,o) { return String(l || '').toLowerCase().startsWith('fa') ? nativeFaDate.call(this,l,{calendar:'persian',numberingSystem:'arabext',...(o || {})}) : nativeFaDate.call(this,l,o); };
