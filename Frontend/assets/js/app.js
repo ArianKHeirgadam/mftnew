@@ -157,7 +157,7 @@ function renderSidebar() {
   const groups = NAV_BY_ROLE[role] || NAV_BY_ROLE.student;
 
   const navHtml = groups.map(g => `
-    <div class="nav-section-title">${g.section}</div>
+    <div class="nav-section-title" ${role === "department" && g.section === "دپارتمان مهندسی کامپیوتر" ? "data-department-nav-title" : ""}>${g.section}</div>
     <div class="nav-list">
       ${g.items.map(it => `
         <a class="nav-link ${it.key === active ? "active" : ""}" href="${it.href}">
