@@ -202,7 +202,7 @@ public sealed class CanonicalClassesController(
         var name = request.Name?.Trim();
         if (request.Capacity.HasValue && request.Capacity.Value <= 0)
             return BadRequest(new { message = "ظرفیت کلاس باید عددی بزرگ‌تر از صفر باشد." });
-        if (request.Schedule?.Trim().Length > 200)
+        if (request.Schedule is { } createSchedule && createSchedule.Trim().Length > 200)
             return BadRequest(new { message = "زمان برگزاری حداکثر ۲۰۰ کاراکتر است." });
         if (string.IsNullOrWhiteSpace(name) || name.Length > 200)
             return BadRequest(new { message = "نام کلاس الزامی و حداکثر ۲۰۰ کاراکتر است." });
@@ -239,7 +239,7 @@ public sealed class CanonicalClassesController(
         if (string.IsNullOrWhiteSpace(name) || name.Length > 200)
             return BadRequest(new { message = "نام کلاس الزامی و حداکثر ۲۰۰ کاراکتر است." });
         var schedule = request.Schedule?.Trim();
-        if (schedule?.Length > 200)
+        if (!string.IsNullOrEmpty(schedule) && schedule.Length > 200)
             return BadRequest(new { message = "زمان برگزاری حداکثر ۲۰۰ کاراکتر است." });
         if (await academic.Classes.AnyAsync(x => x.Id != id && x.DepartmentId == entity.DepartmentId && x.Name == name, ct))
             return Conflict(new { message = "کلاسی با این نام در این دپارتمان وجود دارد." });
