@@ -57,7 +57,7 @@
     <section class="exam-panel" id="panel2">
      <div class="flex justify-between items-center gap-8" style="flex-wrap:wrap">
       <div><h3>۲. سؤال‌های آزمون</h3><p class="text-soft text-sm mt-8">سؤال‌ها را از بانک انتخاب کنید. نوع هر سؤال هنگام تعریف همان سؤال مشخص می‌شود.</p></div>
-      <div class="flex gap-8" style="flex-wrap:wrap"><button class="btn btn-outline btn-sm" id="openSkillModal" type="button">+ تعریف مهارت</button><a class="btn btn-outline btn-sm" href="question-bank.html" target="_blank" rel="noopener">+ تعریف سؤال جدید در بانک</a></div>
+      <a class="btn btn-outline btn-sm" href="question-bank.html" target="_blank" rel="noopener">+ تعریف سؤال جدید در بانک</a>
      </div>
      <div class="question-tools">
       <input class="input" id="questionSearch" type="search" placeholder="جستجو در سؤال‌ها...">
@@ -86,24 +86,13 @@
   </main>
  </div>
 </div>
-<div class="modal-overlay" id="createSkillModal" aria-hidden="true">
- <div class="modal-box" role="dialog" aria-modal="true" aria-labelledby="createSkillTitle">
-  <div class="modal-head"><h3 id="createSkillTitle">تعریف مهارت جدید</h3><button class="icon-btn" type="button" data-skill-modal-close aria-label="بستن">×</button></div>
-  <div class="modal-body">
-   <div class="field"><label>دسته‌بندی آزمون</label><input class="input" id="skillCategoryName" type="text" readonly></div>
-   <div class="field mt-16"><label for="newSkillName">نام مهارت</label><input class="input" id="newSkillName" maxlength="100" placeholder="نام مهارت را وارد کنید"></div>
-   <p class="text-soft text-sm mt-8" id="skillCreateStatus" aria-live="polite"></p>
-  </div>
-  <div class="modal-foot"><button class="btn btn-primary" type="button" id="saveNewSkill">ذخیره مهارت</button><button class="btn btn-outline" type="button" data-skill-modal-close>انصراف</button></div>
- </div>
-</div>
 <script src="assets/js/theme.js"></script>
 <script src="assets/js/app.js"></script>
 <script src="assets/js/api.js"></script>
 <script>
 (async function(){
  const $=id=>document.getElementById(id), api=window.MftApi;
- const selectedIds=new Set();let lookups={categories:[],skills:[]},questions=[];let preferredEssaySkillId=0;
+ const selectedIds=new Set();let lookups={categories:[],skills:[]},questions=[];
  let pendingExamId=null,pendingPdfUploaded=false,pendingEssaySectionId=null,pendingEssayPdfUploaded=false;
  const escapeHtml=value=>String(value??'').replace(/[&<>"']/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
  const typeNames={MultipleChoice:'چهارگزینه‌ای',Essay:'تشریحی',Matching:'وصل‌کردنی'};
@@ -130,28 +119,6 @@
   const value=raw===''?20:Number(raw);
   return Number.isInteger(value)&&value>=1&&value<=100?value:NaN;
  }
- function closeSkillModal(){ $('createSkillModal').classList.remove('show'); $('createSkillModal').setAttribute('aria-hidden','true'); }
- $('openSkillModal').addEventListener('click',()=>{
-  if(!$('examCategory').value)return window.showToast?.('ابتدا دسته‌بندی آزمون را انتخاب کنید.','warn');
-  $('skillCategoryName').value=$('examCategory').selectedOptions[0]?.textContent||'';
-  $('skillCreateStatus').textContent='';$('newSkillName').value='';
-  $('createSkillModal').classList.add('show');$('createSkillModal').setAttribute('aria-hidden','false');$('newSkillName').focus();
- });
- document.querySelectorAll('[data-skill-modal-close]').forEach(button=>button.addEventListener('click',closeSkillModal));
- $('createSkillModal').addEventListener('click',event=>{if(event.target===$('createSkillModal'))closeSkillModal();});
- $('saveNewSkill').addEventListener('click',async()=>{
-  const name=$('newSkillName').value.trim(),categoryId=Number($('examCategory').value);
-  if(!name)return $('skillCreateStatus').textContent='نام مهارت را وارد کنید.';
-  const button=$('saveNewSkill');button.disabled=true;$('skillCreateStatus').textContent='در حال ذخیره مهارت...';
-  try{
-   const created=await api.request('/questions/lookups/skills',{method:'POST',body:JSON.stringify({name,examCategoryId:categoryId})});
-   const skill={id:Number(created.id),name:created.name||name,examCategoryId:Number(created.examCategoryId||categoryId)};
-   lookups.skills.push(skill);preferredEssaySkillId=skill.id;
-   $('skillCreateStatus').textContent='مهارت با موفقیت ذخیره شد.';window.showToast?.('مهارت ذخیره شد و در بانک مهارت‌ها در دسترس است.','ok');
-   setTimeout(closeSkillModal,450);
-  }catch(error){$('skillCreateStatus').textContent=error.message||'ذخیره مهارت ناموفق بود.';}
-  finally{button.disabled=false;}
- });
  function validateDetails(){
   const title=$('examTitle').value.trim(),classId=Number($('examClass').value),categoryId=Number($('examCategory').value),duration=Number($('examDuration').value);
   const start=new Date($('examStart').value),end=new Date($('examEnd').value);
@@ -194,7 +161,7 @@
    if(!departmentId)return window.showToast?.('دپارتمان کلاس معتبر نیست.','warn');
    const grouped=new Map();chosen.forEach(q=>{const id=Number(q.skillId);if(!grouped.has(id))grouped.set(id,[]);grouped.get(id).push(Number(q.id));});
    const groups=[...grouped.entries()],duration=Number($('examDuration').value);
-   const essaySkillId=essayFile?(preferredEssaySkillId||(groups.length?groups[0][0]:Number(lookups.skills.find(s=>Number(s.examCategoryId)===Number($('examCategory').value))?.id||0))):0;
+   const essaySkillId=essayFile?((groups.length?groups[0][0]:Number(lookups.skills.find(s=>Number(s.examCategoryId)===Number($('examCategory').value))?.id||0))):0;
    if(essayFile&&!essaySkillId)return window.showToast?.('برای ساخت بخش Essay باید حداقل یک مهارت در دسته‌بندی انتخاب‌شده تعریف شده باشد.','warn');
    const sectionCount=groups.length+(essayFile?1:0);
    if(!isPdfOnly&&duration<sectionCount)return window.showToast?.('مدت آزمون باید حداقل به تعداد بخش‌های آزمون دقیقه باشد.','warn');
