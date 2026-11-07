@@ -232,7 +232,7 @@
       const canGrade = ['teacher', 'department', 'superadmin'].includes(role);
       if (body) {
         if (result.isPdfOnly) {
-          body.innerHTML = `<tr><td>۱</td><td>آزمون PDFمحور</td><td>فایل پاسخ به‌صورت PDF ارسال شده است.</td><td>—</td><td>${canGrade && !result.resultsPublished ? `<div class="flex gap-8 mt-8"><input class="input" type="number" min="0" max="100" step="0.01" value="${Number(result.score ?? 0)}" data-pdf-grade-score style="max-width:110px" aria-label="نمره از ۱۰۰"><button class="btn btn-primary btn-sm" id="savePdfGrade">ثبت نمره</button></div><small class="text-soft">نمره کلی از ۱۰۰</small>` : (result.score == null ? 'در انتظار تصحیح' : `${faNumber(result.score)} از ۱۰۰`)}</td></tr>`;
+          body.innerHTML = `<tr><td>۱</td><td>آزمون PDFمحور</td><td>فایل پاسخ به‌صورت PDF ارسال شده است.</td><td>—</td><td>${canGrade && !result.resultsPublished ? `<div class="flex gap-8 mt-8"><input class="input" type="number" min="0" max="100" step="0.01" value="${result.score == null ? '': Number(result.score)}" placeholder="نمره" data-pdf-grade-score style="max-width:110px" aria-label="نمره از ۱۰۰"><button class="btn btn-primary btn-sm" id="savePdfGrade">ثبت نمره</button></div><small class="text-soft">نمره کلی از ۱۰۰</small>` : (result.score == null ? 'در انتظار تصحیح' : `${faNumber(result.score)} از ۱۰۰`)}</td></tr>`;
           if (canGrade && !result.resultsPublished) $('#savePdfGrade')?.addEventListener('click', async event => {
             const button=event.currentTarget;const score=Number($('[data-pdf-grade-score]')?.value);
             if(!Number.isFinite(score)||score<0||score>100)return notify('نمره باید بین ۰ تا ۱۰۰ باشد.','warn');
