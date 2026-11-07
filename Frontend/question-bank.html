@@ -175,12 +175,21 @@
   questionRows=Array.isArray(rows)?rows:[];
   const folders=Array.isArray(batches)?batches:[];
   const title=document.getElementById('importFoldersTitle');
-  if(title)title.textContent=user?.fullName?'پوشه‌های سؤالات استاد '+user.fullName:'پوشه‌های ورود گروهی';
+  const isTeacher=String(user?.role||'').toLowerCase()==='teacher';
+  if(title)title.textContent=isTeacher&&user?.fullName?'پوشه‌های سؤالات استاد '+user.fullName:'پوشه‌های سؤالات بر اساس استاد';
   document.getElementById('importFolderCount').textContent=folders.length.toLocaleString('fa-IR')+' پوشه';
-  document.getElementById('importFolderGrid').innerHTML=folders.length?folders.map(batch=>
-   '<article class="import-folder-card"><div class="flex justify-between items-center gap-8"><b>'+esc(batch.title)+'</b><span class="badge badge-info">'+Number(batch.questionCount||0).toLocaleString('fa-IR')+' سؤال</span></div>'+
-   '<div class="folder-meta"><span>استاد: '+esc(batch.teacherName||user?.fullName||'—')+'</span><span>'+esc(new Date(batch.createdAt).toLocaleDateString('fa-IR'))+'</span></div>'+
-   '<a class="btn btn-outline btn-sm folder-open" href="question-bank-folder.html?batchId='+encodeURIComponent(batch.id)+'">نمایش سؤال‌ها</a></article>'
+  const groupedFolders=new Map();
+  folders.forEach(batch=>{
+   const key=String(batch.teacherUserId);
+   if(!groupedFolders.has(key))groupedFolders.set(key,{name:batch.teacherName||'استاد',items:[]});
+   groupedFolders.get(key).items.push(batch);
+  });
+  document.getElementById('importFolderGrid').innerHTML=folders.length?[...groupedFolders.values()].map(group=>
+   '<section style="grid-column:1/-1"><h4 style="margin:4px 0 10px">استاد: '+esc(group.name)+'</h4><div class="import-folder-grid">'+group.items.map(batch=>
+    '<article class="import-folder-card"><div class="flex justify-between items-center gap-8"><b>'+esc(batch.title)+'</b><span class="badge badge-info">'+Number(batch.questionCount||0).toLocaleString('fa-IR')+' سؤال</span></div>'+
+    '<div class="folder-meta"><span>'+esc(new Date(batch.createdAt).toLocaleDateString('fa-IR'))+'</span></div>'+
+    '<a class="btn btn-outline btn-sm folder-open" href="question-bank-folder.html?batchId='+encodeURIComponent(batch.id)+'">نمایش سؤال‌ها</a></article>'
+   ).join('')+'</div></section>'
   ).join(''):'<div class="question-empty">هنوز پوشه ورود گروهی ثبت نشده است. هنگام Import، عنوان آزمون را وارد کنید.</div>';
   renderQuestions();
  }
