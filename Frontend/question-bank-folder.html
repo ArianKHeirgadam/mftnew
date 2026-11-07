@@ -51,6 +51,20 @@
  const id=Number(new URLSearchParams(location.search).get('batchId'));
  const typeName={MultipleChoice:'چهارگزینه‌ای',Essay:'تشریحی',Matching:'وصل‌کردنی'};
  const difficultyName={1:'آسان',2:'متوسط',3:'سخت'};
+ $('folderQuestions').addEventListener('click',async event=>{
+  const button=event.target.closest('[data-folder-delete]');
+  if(!button)return;
+  if(!confirm('این سؤال از بانک سؤال حذف شود؟'))return;
+  button.disabled=true;
+  try{
+   await api.request('/questions/'+encodeURIComponent(button.dataset.folderDelete),{method:'DELETE'});
+   window.showToast?.('سؤال حذف شد.','ok');
+   location.reload();
+  }catch(error){
+   button.disabled=false;
+   window.showToast?.(error.message||'حذف سؤال ناموفق بود.','danger');
+  }
+ });
  if(!Number.isSafeInteger(id)||id<=0){$('folderTitle').textContent='شناسه پوشه معتبر نیست';$('folderQuestions').textContent='از بانک سؤال یک پوشه معتبر انتخاب کنید.';return;}
  try{
   const [batches,questions]=await Promise.all([
@@ -67,7 +81,7 @@
    const options=(q.options||[]).map((o,j)=>'<p>'+(j+1)+'. '+esc(o.optionText)+(o.isCorrect?' <b class="text-success">✓ پاسخ صحیح</b>':'')+'</p>').join('');
    const pairs=(q.matchingPairs||[]).map(p=>'<p>'+esc(p.leftItem)+' ← '+esc(p.rightItem)+'</p>').join('');
    const details=options||pairs;
-   return '<article class="folder-question"><div class="folder-question-head"><b>سؤال '+(i+1).toLocaleString('fa-IR')+'</b><div class="folder-question-meta"><span class="badge badge-info">'+esc(typeName[q.questionTypeCode]||q.questionTypeName||'سؤال')+'</span><span class="badge badge-muted">بارم: '+Number(q.points||0).toLocaleString('fa-IR')+'</span><span class="badge badge-muted">'+esc(difficultyName[q.difficultyLevel]||'—')+'</span></div></div><div class="folder-question-text">'+esc(q.text)+'</div>'+(details?'<div class="folder-question-details">'+details+'</div>':'')+'</article>';
+   return '<article class="folder-question"><div class="folder-question-head"><b>سؤال '+(i+1).toLocaleString('fa-IR')+'</b><div class="folder-question-meta"><span class="badge badge-info">'+esc(typeName[q.questionTypeCode]||q.questionTypeName||'سؤال')+'</span><span class="badge badge-muted">بارم: '+Number(q.points||0).toLocaleString('fa-IR')+'</span><span class="badge badge-muted">'+esc(difficultyName[q.difficultyLevel]||'—')+'</span></div></div><div class="folder-question-text">'+esc(q.text)+'</div>'+(details?'<div class="folder-question-details">'+details+'</div>':'')+'<div class="flex gap-8 mt-12"><a class="btn btn-outline btn-sm" href="question-bank.html?editQuestion='+encodeURIComponent(q.id)+'">ویرایش</a><button class="btn btn-danger btn-sm" type="button" data-folder-delete="'+q.id+'">حذف</button></div></article>';
   }).join(''):'<div class="question-empty">در این پوشه سؤالی برای نمایش وجود ندارد.</div>';
  }catch(e){$('folderTitle').textContent='خطا در دریافت پوشه';$('folderQuestions').textContent=e.message||'دریافت اطلاعات ناموفق بود.';}
 })();
