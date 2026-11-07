@@ -1135,7 +1135,7 @@
       if (questionWrap) questionWrap.innerHTML = available.map(question => {
         const type = question.questionTypeCode || '';
         const typeName = ({ MultipleChoice: 'چهارگزینه‌ای', Essay: 'تشریحی', Matching: 'وصل‌کردنی' })[type] || question.questionTypeName || type;
-        return `<label class="qpick-row"><input type="checkbox" data-question-type="${escapeHtml(type)}" data-skill-id="${question.skillId}" value="${question.id}"><span style="flex:1">${escapeHtml(question.text)}</span><span class="badge badge-info">${escapeHtml(question.skillName || 'مهارت')}</span><span class="badge badge-muted">${escapeHtml(typeName)}</span></label>`;
+        return `<label class="qpick-row"><input type="checkbox" data-question-type="${escapeHtml(type)}" data-skill-id="${question.skillId}" value="${question.id}"><span style="flex:1">${escapeHtml(question.text)}</span><span class="badge badge-muted">${escapeHtml(typeName)}</span></label>`;
       }).join('') || '<p class="text-soft">برای این دسته‌بندی هنوز سؤالی در بانک canonical ثبت نشده است.</p>';
     };
     if (categorySelect) categorySelect.onchange = renderQuestions;
