@@ -23,23 +23,25 @@ builder.Services.AddDbContext<AppDbContext>(options =>
     options.UseSqlServer(
         builder.Configuration.GetConnectionString("DefaultConnection")));
 
+var canonicalConnectionString = builder.Configuration.GetConnectionString("CanonicalConnection")
+    ?? throw new InvalidOperationException(
+        "Configure ConnectionStrings:CanonicalConnection for the canonical bigint database.");
+
+
  // Canonical identity mappings use bigint IDs and normalized UserRoles/Roles.
  // The legacy AppDbContext remains temporarily for modules not yet cut over.
 builder.Services.AddDbContext<CanonicalIdentityDbContext>(options =>
-    options.UseSqlServer(
-        builder.Configuration.GetConnectionString("DefaultConnection")));
+    options.UseSqlServer(canonicalConnectionString));
 
 // Canonical question-bank and exam tables use bigint identity keys and the
 // normalized relational schema. Legacy feature endpoints are not switched
 // until their controllers and dependent workflows are migrated together.
 builder.Services.AddDbContext<CanonicalAcademicDbContext>(options =>
-    options.UseSqlServer(
-        builder.Configuration.GetConnectionString("DefaultConnection")));
+    options.UseSqlServer(canonicalConnectionString));
 
  // Operational feature tables also use canonical bigint identifiers.
 builder.Services.AddDbContext<CanonicalOperationsDbContext>(options =>
-    options.UseSqlServer(
-        builder.Configuration.GetConnectionString("DefaultConnection")));
+    options.UseSqlServer(canonicalConnectionString));
 
 builder.Services.AddScoped<IAuthService, AuthService>();
 builder.Services.AddScoped<ITokenService, TokenService>();
