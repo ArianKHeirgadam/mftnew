@@ -128,6 +128,7 @@
   try{
    lookups=await api.request('/canonical/questions/lookups');
    skill.innerHTML='<option value="">انتخاب مهارت</option>'+lookups.skills.map(x=>'<option value="'+x.id+'">'+esc(x.name)+' — '+esc(lookups.categories.find(c=>Number(c.id)===Number(x.examCategoryId))?.name||'')+'</option>').join('');
+   if(categoryFilter)categoryFilter.innerHTML='<option value="">همه دسته‌بندی‌ها</option>'+lookups.categories.map(x=>'<option value="'+esc(x.name)+'">'+esc(x.name)+'</option>').join('');
    if(!lookups.skills.length) notify('هیچ مهارتی در بانک اطلاعاتی ثبت نشده است؛ ابتدا دسته‌بندی و مهارت‌ها باید در دیتابیس تعریف شوند.','warn');
   }catch(e){skill.innerHTML='<option value="">دریافت مهارت‌ها ناموفق بود</option>';notify(e.message,'danger');}
  }
