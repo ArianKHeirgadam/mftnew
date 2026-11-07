@@ -442,7 +442,7 @@
     if (header) header.innerHTML = '<th>#</th><th>آزمون</th><th>دانشجو</th><th>وضعیت</th><th>نمره</th>';
     renderRows('body[data-active="results"] table tbody', rows, row => `<tr>
       <td><a href="results.html?attemptId=${encodeURIComponent(row.id)}">${escapeHtml(String(row.id).slice(0, 8))}</a></td><td>${escapeHtml(row.examTitle)}</td><td>${escapeHtml(row.studentName || '—')}<div class="text-soft text-sm">شماره دانشجویی: ${escapeHtml(row.studentNumber || 'ثبت نشده')}</div></td>
-      <td>${row.status === 'InProgress' ? 'در حال برگزاری' : row.status === 'Submitted' ? 'تصحیح خودکار انجام شد' : row.status === 'PartiallyGraded' ? (row.hasAutoGradedAnswers ? 'نمره تستی آماده — تشریحی در انتظار تصحیح' : 'در انتظار تصحیح تشریحی') : row.status === 'FullyGraded' ? 'تصحیح کامل' : 'در انتظار بررسی'}</td>
+      <td>${row.status === 'InProgress' ? 'در حال برگزاری' : row.isPdfOnly && row.status !== 'FullyGraded' ? 'پاسخنامه PDF در انتظار تصحیح استاد' : row.status === 'Submitted' ? 'تصحیح خودکار انجام شد' : row.status === 'PartiallyGraded' ? (row.hasAutoGradedAnswers ? 'نمره تستی آماده — تشریحی در انتظار تصحیح' : 'در انتظار تصحیح تشریحی') : row.status === 'FullyGraded' ? 'تصحیح کامل' : 'در انتظار بررسی'}</td>
       <td>${row.score == null ? (row.resultsPublished ? 'در انتظار تصحیح' : 'منتشر نشده') : faNumber(row.score)}</td></tr>`, 5);
 
     const publishButton = $('#publishExamResults');
