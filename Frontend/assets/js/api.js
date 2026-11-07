@@ -330,6 +330,7 @@
       const isStudentView = role === 'student';
       const pendingManualCount = Number(result.pendingManualCount || 0);
       const hasHiddenManualScore = Number(result.maxScore || 0) > Number(result.autoMaxScore || 0);
+      const scoreOutOf100 = (score, maximum) => Number.isFinite(Number(score)) && Number(maximum) > 0 ? Math.round((Number(score) / Number(maximum)) * 10000) / 100 : null;
       if (heading) {
         const scoreLabel = result.isPdfOnly && result.score == null
           ? 'پاسخنامه PDF در انتظار تصحیح استاد'
@@ -338,9 +339,9 @@
             : isStudentView && result.autoScore != null && !result.resultsPublished && hasHiddenManualScore
               ? `نمره خودکار تستی و وصل‌کردنی: ${faNumber(result.autoScore)} از ${faNumber(result.autoMaxScore ?? result.maxScore)} — ${pendingManualCount > 0 ? `${faNumber(pendingManualCount)} بخش تشریحی در انتظار تصحیح` : 'نمره نهایی پس از انتشار رسمی استاد'}`
               : result.score != null
-              ? `${faNumber(result.score)} از ${faNumber(result.maxScore)}`
+              ? `${faNumber(scoreOutOf100(result.score, result.maxScore))} از ۱۰۰`
               : result.autoScore != null
-                ? `نمره خودکار: ${faNumber(result.autoScore)} از ${faNumber(result.maxScore)}`
+                ? `نمره خودکار: ${faNumber(scoreOutOf100(result.autoScore, result.maxScore))} از ۱۰۰`
                 : (result.resultsPublished ? 'در انتظار تکمیل تصحیح' : 'هنوز نمره‌ای ثبت نشده');
         heading.textContent = `نتیجه آزمون: ${result.exam} — ${scoreLabel}`;
         const studentInfo = $('#resultStudentInfo');
@@ -613,7 +614,7 @@
       return `<tr>
       <td><a href="results.html?attemptId=${encodeURIComponent(row.id)}">${escapeHtml(String(row.id).slice(0, 8))}</a></td><td>${escapeHtml(row.examTitle)}</td><td>${escapeHtml(row.studentName || '—')}<div class="text-soft text-sm">شماره دانشجویی: ${escapeHtml(row.studentNumber || 'ثبت نشده')}</div></td>
       <td>${row.status === 'InProgress' ? 'در حال برگزاری' : row.isPdfOnly && row.status !== 'FullyGraded' ? 'پاسخنامه PDF در انتظار تصحیح استاد' : row.status === 'Submitted' ? 'تصحیح خودکار انجام شد' : row.status === 'PartiallyGraded' ? (row.hasAutoGradedAnswers ? 'نمره تستی آماده — تشریحی در انتظار تصحیح' : 'در انتظار تصحیح تشریحی') : row.status === 'FullyGraded' ? 'تصحیح کامل' : 'در انتظار بررسی'}</td>
-      <td>${row.score == null ? (row.resultsPublished ? 'در انتظار تصحیح' : 'منتشر نشده') : faNumber(row.score)}</td><td>${publicationAction}</td></tr>`;
+      <td>${row.score == null ? (row.resultsPublished ? 'در انتظار تصحیح' : 'منتشر نشده') : (faNumber(Number(row.maxScore) > 0 ? Math.round(Number(row.score) / Number(row.maxScore) * 10000) / 100 : Number(row.score)) + ' از ۱۰۰')}</td><td>${publicationAction}</td></tr>`;
     }, 6);
     if (manageableRole) {
       $('[data-publish-exam]').forEach(button => button.addEventListener('click', async () => {
@@ -669,7 +670,7 @@
       const scored = attempts.filter(attempt => attempt.score !== null && attempt.score !== undefined && Number.isFinite(Number(attempt.score)))
         .sort((a, b) => new Date(a.submittedAt || a.startedAt || 0) - new Date(b.submittedAt || b.startedAt || 0));
       window.MftChartData = { ...(window.MftChartData || {}), performance: scored.map((attempt, index) => ({
-        label: attempt.examTitle || `آزمون ${index + 1}`, score: Number(attempt.score)
+        label: attempt.examTitle || `آزمون ${index + 1}`, score: Number(attempt.maxScore) > 0 ? Math.round(Number(attempt.score) / Number(attempt.maxScore) * 10000) / 100 : Number(attempt.score)
       })) };
       if (host) host.dataset.performanceLoad = scored.length ? 'loaded' : 'empty';
       document.dispatchEvent(new Event('mft:data-ready'));
