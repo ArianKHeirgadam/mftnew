@@ -324,11 +324,13 @@
       }
       const heading = $('body[data-active="results"] h1');
       if (heading) {
-        const scoreLabel = result.score != null
-          ? `${faNumber(result.score)} از ${faNumber(result.maxScore)}`
-          : result.autoScore != null
-            ? `نمره موقت ${faNumber(result.autoScore)} از ${faNumber(result.maxScore)} — در انتظار تصحیح ${faNumber(result.pendingManualCount)} سؤال تشریحی`
-            : (result.resultsPublished ? 'در انتظار تکمیل تصحیح' : 'منتشر نشده');
+        const scoreLabel = result.status === 'PartiallyGraded' && result.autoScore != null
+          ? `نمره موقت تستی ${faNumber(result.autoScore)} — ${faNumber(result.pendingManualCount)} سؤال تشریحی در انتظار تصحیح`
+          : result.score != null
+            ? `${faNumber(result.score)} از ${faNumber(result.maxScore)}`
+            : result.autoScore != null
+              ? `نمره تستی ${faNumber(result.autoScore)} از ${faNumber(result.maxScore)}`
+              : (result.resultsPublished ? 'در انتظار تکمیل تصحیح' : 'هنوز نمره‌ای ثبت نشده');
         heading.textContent = `نتیجه آزمون: ${result.exam} — ${scoreLabel}`;
       }
       const body = $('body[data-active="results"] .card table tbody');
@@ -413,7 +415,7 @@
     if (header) header.innerHTML = '<th>#</th><th>آزمون</th><th>دانشجو</th><th>وضعیت</th><th>نمره</th>';
     renderRows('body[data-active="results"] table tbody', rows, row => `<tr>
       <td><a href="results.html?attemptId=${encodeURIComponent(row.id)}">${escapeHtml(String(row.id).slice(0, 8))}</a></td><td>${escapeHtml(row.examTitle)}</td><td>${escapeHtml(row.studentName || '—')}</td>
-      <td>${row.status === 'InProgress' ? 'در حال برگزاری' : row.status === 'AwaitingPublication' ? 'آماده انتشار نتیجه' : row.status === 'Submitted' ? 'ثبت شده / در انتظار تصحیح' : 'تصحیح شده'}</td>
+      <td>${row.status === 'InProgress' ? 'در حال برگزاری' : row.status === 'Submitted' ? 'تصحیح خودکار انجام شد' : row.status === 'PartiallyGraded' ? 'نمره تستی آماده — تشریحی در انتظار تصحیح' : row.status === 'FullyGraded' ? 'تصحیح کامل' : 'در انتظار بررسی'}</td>
       <td>${row.score == null ? (row.resultsPublished ? 'در انتظار تصحیح' : 'منتشر نشده') : faNumber(row.score)}</td></tr>`, 5);
 
     const publishButton = $('#publishExamResults');
