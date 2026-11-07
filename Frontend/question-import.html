@@ -83,11 +83,16 @@
           <div class="import-pane" id="wordPane" hidden>
             <div class="field">
               <label for="wordCategory">دسته‌بندی</label>
-              <input class="input" id="wordCategory" maxlength="150" placeholder="نام دسته‌بندی ثبت‌شده">
+              <select class="select" id="wordCategory" required>
+                <option value="">در حال دریافت دسته‌بندی‌ها...</option>
+              </select>
             </div>
             <div class="field mt-12">
               <label for="wordSkill">مهارت</label>
-              <input class="input" id="wordSkill" maxlength="100" placeholder="نام دقیق مهارت ثبت‌شده">
+              <select class="select" id="wordSkill" required disabled>
+                <option value="">ابتدا دسته‌بندی را انتخاب کنید</option>
+              </select>
+              <small class="text-soft">فقط مهارت‌های ثبت‌شده در دسته‌بندی انتخاب‌شده نمایش داده می‌شوند.</small>
             </div>
             <div class="flex gap-8 mt-12" style="flex-wrap:wrap">
               <div class="field" style="flex:1;min-width:130px">
@@ -229,6 +234,46 @@
       $('#importSkillStatus').textContent = error.message || 'دریافت دسته‌بندی‌ها ناموفق بود.';
     }
   }
+
+  let wordLookupData = { categories: [], skills: [] };
+  function populateWordSkills(categoryId, selectedSkillId = 0) {
+    const select = $('#wordSkill');
+    const skills = wordLookupData.skills.filter(item => Number(item.examCategoryId) === Number(categoryId));
+    select.innerHTML = '<option value="">انتخاب مهارت</option>' +
+      skills.map(item => '<option value="' + Number(item.id) + '">' + esc(item.name) + '</option>').join('');
+    select.disabled = !categoryId || skills.length === 0;
+    if (selectedSkillId && skills.some(item => Number(item.id) === Number(selectedSkillId)))
+      select.value = String(selectedSkillId);
+    if (categoryId && skills.length === 0)
+      select.innerHTML = '<option value="">برای این دسته‌بندی مهارتی ثبت نشده است</option>';
+  }
+
+  async function loadWordLookups() {
+    const categorySelect = $('#wordCategory');
+    const skillSelect = $('#wordSkill');
+    try {
+      const lookups = await api.request('/questions/lookups');
+      wordLookupData = {
+        categories: Array.isArray(lookups?.categories) ? lookups.categories : [],
+        skills: Array.isArray(lookups?.skills) ? lookups.skills : []
+      };
+      categorySelect.innerHTML = '<option value="">انتخاب دسته‌بندی</option>' +
+        wordLookupData.categories.map(item => '<option value="' + Number(item.id) + '">' + esc(item.name) + '</option>').join('');
+      skillSelect.innerHTML = '<option value="">ابتدا دسته‌بندی را انتخاب کنید</option>';
+      skillSelect.disabled = true;
+      if (!wordLookupData.categories.length)
+        categorySelect.innerHTML = '<option value="">هیچ دسته‌بندی ثبت نشده است</option>';
+    } catch (error) {
+      categorySelect.innerHTML = '<option value="">دریافت دسته‌بندی‌ها ناموفق بود</option>';
+      skillSelect.innerHTML = '<option value="">دریافت مهارت‌ها ناموفق بود</option>';
+      skillSelect.disabled = true;
+      message(error.message || 'دریافت فهرست مهارت‌ها ناموفق بود.', 'error');
+    }
+  }
+
+  $('#wordCategory').addEventListener('change', () => {
+    populateWordSkills($('#wordCategory').value);
+  });
   $('#toggleImportCategoryForm').addEventListener('click', () => {
     $('#importCategoryForm').hidden = !$('#importCategoryForm').hidden;
     if (!$('#importCategoryForm').hidden) $('#importCategoryName').focus();
@@ -282,6 +327,7 @@
     }
   });
   loadSkillCategories();
+  loadWordLookups();
 
   document.querySelectorAll('[data-import-tab]').forEach(button => button.addEventListener('click', () => {
     document.querySelectorAll('[data-import-tab]').forEach(x => x.classList.toggle('active', x === button));
@@ -344,16 +390,16 @@
 
   $('#previewWord').addEventListener('click', () => {
     const file = $('#wordFile').files[0];
-    const category = $('#wordCategory').value.trim();
-    const skill = $('#wordSkill').value.trim();
+    const categoryId = Number($('#wordCategory').value);
+    const skillId = Number($('#wordSkill').value);
     const points = $('#wordPoints').value;
     if (!file) return message('ابتدا فایل Word با پسوند DOCX را انتخاب کنید.', 'error');
-    if (!category || !skill) return message('دسته‌بندی و مهارت را وارد کنید.', 'error');
+    if (!categoryId || !skillId) return message('دسته‌بندی و مهارت را از فهرست انتخاب کنید.', 'error');
     if (!points || Number(points) <= 0 || Number(points) > 9999) return message('نمره باید بین ۱ تا ۹۹۹۹ باشد.', 'error');
     const data = new FormData();
     data.append('file', file);
-    data.append('category', category);
-    data.append('skill', skill);
+    data.append('categoryId', String(categoryId));
+    data.append('skillId', String(skillId));
     data.append('difficulty', $('#wordDifficulty').value);
     data.append('points', points);
     runPreview('/questions/import/preview/word', {method:'POST',body:data});
