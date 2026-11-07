@@ -63,6 +63,36 @@ public sealed class CanonicalClassesController(
         return Ok(new { classInfo.Id, classInfo.Name, classInfo.DepartmentId, members });
     }
 
+    [HttpGet("{id:long}/available-members")]
+    public async Task<IActionResult> AvailableMembers(long id, CancellationToken ct)
+    {
+        var classInfo = await academic.Classes.AsNoTracking()
+            .Where(x => x.Id == id).Select(x => new { x.Id, x.DepartmentId }).FirstOrDefaultAsync(ct);
+        if (classInfo is null) return NotFound();
+        if (!CanManageDepartment(classInfo.DepartmentId)) return Forbid();
+
+        var users = identity.Users.AsNoTracking().Include(x => x.Department)
+            .Include(x => x.UserRoles).ThenInclude(x => x.Role)
+            .Where(x => x.IsActive && x.UserRoles.Any(ur =>
+                ur.Role.Name == CanonicalRoleNames.Student || ur.Role.Name == CanonicalRoleNames.Teacher));
+        if (!User.IsInRole("SuperAdmin"))
+            users = users.Where(x => x.DepartmentId == classInfo.DepartmentId);
+
+        var rows = await users.OrderBy(x => x.FullName).Select(x => new
+        {
+            id = x.Id, username = x.Username, fullName = x.FullName,
+            departmentId = x.DepartmentId, department = x.Department == null ? null : x.Department.Name,
+            isStudent = x.UserRoles.Any(ur => ur.Role.Name == CanonicalRoleNames.Student),
+            isTeacher = x.UserRoles.Any(ur => ur.Role.Name == CanonicalRoleNames.Teacher)
+        }).ToListAsync(ct);
+
+        return Ok(new
+        {
+            students = rows.Where(x => x.isStudent).Select(x => new { x.id, x.username, x.fullName, x.departmentId, x.department, isActive = true }),
+            teachers = rows.Where(x => x.isTeacher).Select(x => new { x.id, x.username, x.fullName, x.departmentId, x.department, isActive = true })
+        });
+    }
+
     [HttpGet("{id:long}/teachers")]
     public async Task<IActionResult> Teachers(long id, CancellationToken ct)
     {
