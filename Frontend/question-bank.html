@@ -346,7 +346,8 @@
   catch(e){notify(e.message||'ذخیره برچسب‌ها ناموفق بود.','danger');}
  });
  if(searchField)searchField.addEventListener('input',renderQuestions);
- [categoryFilter,difficultyFilter,folderFilter].forEach(x=>x?.addEventListener('change',renderQuestions));
+ [categoryFilter,difficultyFilter].forEach(x=>x?.addEventListener('change',renderQuestions));
+ folderFilter?.addEventListener('change',()=>{selectedQuestionIds.clear();renderQuestions();});
  document.getElementById('questionRows').addEventListener('click',async event=>{
   const edit=event.target.closest('[data-question-edit]');
   const remove=event.target.closest('[data-question-delete]');
