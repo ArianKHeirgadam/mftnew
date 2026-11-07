@@ -44,39 +44,53 @@
         </section>
 
         <section class="card card-pad">
-          <div class="flex items-center justify-between gap-8" style="margin-bottom:12px">
-            <h3>اعضای کلاس</h3>
-            <span class="text-soft text-sm" id="memberCount">۰ دانشجو</span>
+          <h3 style="margin-bottom:10px">اعضای کلاس انتخاب‌شده</h3>
+          <p class="text-soft text-sm" id="classSummary">کلاسی انتخاب نشده است.</p>
+          <div class="flex gap-8 items-center" style="margin-top:16px;flex-wrap:wrap">
+            <span class="badge badge-muted" id="memberCount">۰ دانشجو</span>
+            <span class="badge badge-muted" id="teacherCount">۰ استاد</span>
+            <button class="btn btn-primary" id="openRosterModal" disabled>مدیریت دانشجویان و استادان</button>
           </div>
-          <div class="field">
-            <label for="studentSearch">جستجوی دانشجو</label>
-            <input class="input" id="studentSearch" placeholder="نام یا نام کاربری دانشجو">
-          </div>
-          <div class="flex items-center justify-between gap-8" style="margin-bottom:12px">
-            <label class="checkbox-row"><input type="checkbox" id="selectAllStudents"> انتخاب همه نتایج</label>
-            <span class="text-soft text-sm" id="selectedCount">۰ انتخاب‌شده</span>
-          </div>
-          <div id="classStudents" class="flex flex-col gap-8" style="max-height:420px;overflow:auto">
-            <p class="text-soft">ابتدا یک کلاس انتخاب کنید.</p>
-          </div>
-          <div class="flex justify-end" style="margin-top:18px">
-            <button class="btn btn-primary" id="saveMembers" disabled>ذخیره اعضای کلاس</button>
-          </div>
+          <p class="text-soft text-sm" style="margin-top:14px">برای انتخاب یا حذف اعضا، یک کلاس انتخاب کنید و پنجره مدیریت اعضا را باز کنید.</p>
         </section>
       </div>
 
-      <section class="card card-pad" style="margin-top:18px">
-        <h3 style="margin-bottom:8px">ثبت‌نام دانشجو در کلاس</h3>
-        <p class="text-soft text-sm" style="margin-bottom:14px">این بخش برای افزودن سریع یک دانشجو به کلاس انتخاب‌شده است؛ اعضای قبلی کلاس حفظ می‌شوند.</p>
-        <div class="grid-2" style="align-items:end">
-          <div class="field">
-            <label for="singleStudentSelect">دانشجوی موردنظر</label>
-            <select class="select" id="singleStudentSelect" disabled><option value="">ابتدا یک کلاس انتخاب کنید</option></select>
+      <div class="modal-overlay" id="classRosterModal">
+        <div class="modal-box" style="width:min(1100px,100%);max-height:90vh">
+          <div class="modal-head">
+            <div><h3 style="font-size:16px">مدیریت اعضای کلاس</h3><p class="text-soft text-sm" id="rosterModalSubtitle"></p></div>
+            <button class="icon-btn" type="button" data-roster-close>✕</button>
           </div>
-          <button class="btn btn-primary" id="addSingleStudent" disabled>ثبت دانشجو در کلاس</button>
+          <div class="modal-body">
+            <div class="grid-2" style="grid-template-columns:minmax(0,1.6fr) minmax(240px,1fr);align-items:start">
+              <div class="flex flex-col gap-16">
+                <section>
+                  <div class="flex items-center justify-between gap-8"><h4>دانشجویان دپارتمان</h4><span class="text-soft text-sm" id="selectedCount">۰ انتخاب‌شده</span></div>
+                  <div class="field" style="margin-top:8px"><input class="input" id="studentSearch" placeholder="جستجوی نام یا نام کاربری دانشجو"></div>
+                  <label class="checkbox-row" style="margin:8px 0"><input type="checkbox" id="selectAllStudents"> انتخاب همه نتایج</label>
+                  <div id="classStudents" class="flex flex-col gap-8" style="max-height:260px;overflow:auto"></div>
+                </section>
+                <section>
+                  <div class="flex items-center justify-between gap-8"><h4>استادان دپارتمان</h4><span class="text-soft text-sm" id="selectedTeacherCount">۰ انتخاب‌شده</span></div>
+                  <div class="field" style="margin-top:8px"><input class="input" id="teacherSearch" placeholder="جستجوی نام یا نام کاربری استاد"></div>
+                  <div id="classTeachers" class="flex flex-col gap-8" style="max-height:220px;overflow:auto"></div>
+                </section>
+              </div>
+              <aside class="card card-pad" style="background:var(--surface-2);position:sticky;top:0">
+                <h4>اعضای انتخاب‌شده کلاس</h4>
+                <p class="text-soft text-sm" style="margin:6px 0 12px">پیش‌نمایش اعضا پیش از ذخیره</p>
+                <div><b class="text-sm">دانشجویان</b><div id="rosterStudentPreview" class="flex flex-col gap-6" style="margin-top:8px"></div></div>
+                <div class="divider" style="margin:14px 0"></div>
+                <div><b class="text-sm">استادان</b><div id="rosterTeacherPreview" class="flex flex-col gap-6" style="margin-top:8px"></div></div>
+              </aside>
+            </div>
+          </div>
+          <div class="modal-foot">
+            <button class="btn btn-primary" id="saveMembers" disabled>ذخیره اعضای کلاس</button>
+            <button class="btn btn-outline" type="button" data-roster-close>انصراف</button>
+          </div>
         </div>
-        <p id="singleEnrollmentMessage" class="text-soft text-sm" role="status" aria-live="polite"></p>
-      </section>
+      </div>
     </main>
   </div>
 </div>
