@@ -63,9 +63,11 @@ public sealed class CanonicalResultsController(
             studentName = names.GetValueOrDefault(x.StudentUserId),
             startedAt = x.StartedAt, submittedAt = x.SubmittedAt,
             score = isStudent
-                ? (x.StatusId == 4 ? (x.ResultsPublished ? x.FinalScore : null) : x.AutoGradedScore)
+                ? (x.StatusId == 4 ? (x.ResultsPublished ? x.FinalScore : null) :
+                    (x.HasAutoGradedAnswers ? x.AutoGradedScore : null))
                 : x.FinalScore ?? x.AutoGradedScore,
             status = StatusCodeName(x.StatusId),
+            hasAutoGradedAnswers = x.HasAutoGradedAnswers,
             resultsPublished = x.ResultsPublished
         }));
     }
