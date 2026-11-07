@@ -35,14 +35,14 @@
     const value=valueFor(q);
     if (/multiplechoice/i.test(q.type)) return value.selectedOptionId ? (q.options.find(o=>o.id===value.selectedOptionId)?.optionText || '—') : 'بدون پاسخ';
     if (/matching/i.test(q.type)) return (value.pairs || []).filter(p=>p.rightItem).length ? 'جفت‌ها انتخاب شده‌اند' : 'بدون پاسخ';
-    if (/essay/i.test(q.type)) return uploadedPdf ? 'پاسخ در فایل PDF بارگذاری شده' : 'فایل PDF پاسخ بارگذاری نشده';
+    if (/essay/i.test(q.type)) return String(value.text || '').trim() || 'بدون پاسخ';
     return value.text || 'بدون پاسخ';
   }
   function answered(q) {
     const v=valueFor(q);
     if (/multiplechoice/i.test(q.type)) return !!v.selectedOptionId;
     if (/matching/i.test(q.type)) return (v.pairs || []).some(p=>p.rightItem);
-    if (/essay/i.test(q.type)) return uploadedPdf;
+    if (/essay/i.test(q.type)) return !!String(v.text || '').trim();
     return !!String(v.text || '').trim() || (!!exam?.examPdfAvailable && uploadedPdf);
   }
   function updateProgress() {
@@ -87,9 +87,11 @@
         wrap.append(label,select);add(wrap);
       });
     } else if (/essay/i.test(q.type)) {
-      const note=document.createElement('div');note.className='alert alert-info mt-16';
-      note.textContent='پاسخ این سؤال باید فقط در قالب فایل PDF بارگذاری شود. امکان تایپ پاسخ یا انتخاب گزینه وجود ندارد.';
-      add(note);
+      const field=document.createElement('div');field.className='field mt-16';
+      const label=document.createElement('label');label.textContent='پاسخ تشریحی';
+      const textarea=document.createElement('textarea');textarea.className='input';textarea.rows=7;textarea.style.width='100%';textarea.placeholder='پاسخ خود را اینجا بنویسید...';textarea.value=String(v.text||'');
+      textarea.addEventListener('input',()=>{answers.set(q.examQuestionId,{text:textarea.value});changed();});
+      field.append(label,textarea);add(field);
     } else {
       const note=document.createElement('div');note.className='alert alert-warn mt-16';note.textContent='نوع این سؤال در سامانه پشتیبانی نمی‌شود.';add(note);
     }
@@ -132,7 +134,7 @@
   async function submit(auto=false){
     if(finished||finalizing)return;
     if(uploadingPdf){toast('تا پایان بارگذاری فایل پاسخ صبر کنید.','warn');return;}
-    if((exam?.examPdfAvailable || questions.some(q=>/essay/i.test(q.type))) && !uploadedPdf && !auto){toast('برای پاسخ به سؤال تشریحی، ابتدا فایل PDF پاسخ‌نامه را بارگذاری کنید.','warn');studentPdfInput?.focus();return;}
+    if(exam?.isPdfOnly && !uploadedPdf && !auto){toast('برای ثبت نهایی، ابتدا فایل PDF پاسخ را بارگذاری کنید.','warn');studentPdfInput?.focus();return;}
     if(!auto&&!confirm('پس از ثبت نهایی، امکان شرکت مجدد در این آزمون وجود ندارد. پاسخ‌ها ثبت نهایی شوند؟'))return;
     finalizing=true;clearTimeout(saveTimer);clearInterval(timer);
     const button=document.getElementById('confirmFinishBtn');if(button){button.disabled=true;button.textContent='در حال ثبت...';}
@@ -195,9 +197,9 @@
       if(frame)frame.src=await api.objectUrl(`/exam-files/exams/${encodeURIComponent(examId)}`);
     }
     const hasEssayQuestions=questions.some(q=>/essay/i.test(q.type));
-    if(studentPdfBox)studentPdfBox.hidden=!(exam.examPdfAvailable||hasEssayQuestions);
-    if(exam.examPdfAvailable||hasEssayQuestions){
-      const label=studentPdfBox?.querySelector('label');if(label)label.textContent='بارگذاری پاسخ‌نامه PDF (حداکثر ۲۰ مگابایت) — برای سؤال تشریحی الزامی است';
+    if(studentPdfBox)studentPdfBox.hidden=!exam.isPdfOnly;
+    if(exam.isPdfOnly){
+      const label=studentPdfBox?.querySelector('label');if(label)label.textContent='فایل پاسخ آزمون (PDF، حداکثر ۲۰ مگابایت؛ برای ثبت نهایی الزامی)';
       try{const info=await api.request(`/exam-files/attempts/${encodeURIComponent(attemptId)}/info`);uploadedPdf=true;if(studentPdfStatus)studentPdfStatus.textContent=`فایل ثبت‌شده: ${info.fileName}`;}catch{uploadedPdf=false;}
     }
     deadline=new Date(data.deadline).getTime();
