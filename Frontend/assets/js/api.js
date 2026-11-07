@@ -396,18 +396,20 @@
       const pdfBox = $('#submissionPdfBox');
       if (pdfBox && canGrade) {
         try {
-          const info = await request(`/exam-files/attempts/${encodeURIComponent(attemptId)}/info`);
+          // Metadata is useful but not required to display the stored document.
+          // Some older attempts have a valid submission row while /info is unavailable.
+          const info = await request(`/exam-files/attempts/${encodeURIComponent(attemptId)}/info`).catch(() => null);
+          const metadata = info || result.submissionPdf || null;
+          const submissionRoute = `/exam-files/attempts/${encodeURIComponent(attemptId)}`;
+          const submissionUrl = await window.MftApi.objectUrl(submissionRoute);
           pdfBox.hidden = false;
-          pdfBox.innerHTML = `<div class="section-title"><h3>${result.isPdfOnly ? 'فایل پاسخ آزمون PDFمحور' : 'پاسخ‌نامه تشریحی دانشجو'}</h3></div><p class="text-soft text-sm">${escapeHtml(info.fileName)} — ${faNumber(Math.ceil(info.size / 1024))} کیلوبایت</p><iframe id="submissionPdfFrame" title="پاسخ‌نامه PDF دانشجو" style="width:100%;height:620px;border:1px solid var(--border);border-radius:12px;background:#fff" loading="lazy"></iframe><div class="flex gap-8 mt-12"><button type="button" class="btn btn-outline" id="previewSubmissionPdf">بازکردن در زبانه جدید</button> <button type="button" class="btn btn-outline" id="downloadSubmissionPdf">دریافت فایل</button></div>`;
-          const submissionUrl = await window.MftApi.objectUrl(`/exam-files/attempts/${encodeURIComponent(attemptId)}`);
+          pdfBox.innerHTML = `<div class="section-title"><h3>${result.isPdfOnly ? 'فایل پاسخ آزمون PDFمحور' : 'پاسخ‌نامه تشریحی دانشجو'}</h3></div><p class="text-soft text-sm">${metadata?.fileName || metadata?.originalFileName || 'فایل پاسخ دانشجو'}${metadata?.size ? ' — ' + faNumber(Math.ceil(metadata.size / 1024)) + ' کیلوبایت' : ''}</p><iframe id="submissionPdfFrame" title="پاسخ‌نامه PDF دانشجو" style="width:100%;height:620px;border:1px solid var(--border);border-radius:12px;background:#fff" loading="lazy"></iframe><div class="flex gap-8 mt-12"><button type="button" class="btn btn-outline" id="previewSubmissionPdf">بازکردن در زبانه جدید</button> <button type="button" class="btn btn-outline" id="downloadSubmissionPdf">دریافت فایل</button></div>`;
           $('#submissionPdfFrame').src = submissionUrl;
-          $('#previewSubmissionPdf')?.addEventListener('click', () => window.MftApi.preview(`/exam-files/attempts/${encodeURIComponent(attemptId)}`).catch(error => notify(error.message, 'danger')));
-          $('#downloadSubmissionPdf')?.addEventListener('click', () => window.MftApi.download(`/exam-files/attempts/${encodeURIComponent(attemptId)}`).catch(error => notify(error.message, 'danger')));
-        } catch {
-          if (result.examPdfAvailable) {
-            pdfBox.hidden = false;
-            pdfBox.innerHTML = '<div class="section-title"><h3>پاسخ‌نامه PDF دانشجو</h3></div><p class="text-soft">دانشجو هنوز فایل PDF پاسخ‌نامه را بارگذاری نکرده است.</p>';
-          } else { pdfBox.hidden = true; pdfBox.innerHTML = ''; }
+          $('#previewSubmissionPdf')?.addEventListener('click', () => window.MftApi.preview(submissionRoute).catch(error => notify(error.message, 'danger')));
+          $('#downloadSubmissionPdf')?.addEventListener('click', () => window.MftApi.download(submissionRoute).catch(error => notify(error.message, 'danger')));
+        } catch (error) {
+          pdfBox.hidden = false;
+          pdfBox.innerHTML = `<div class="section-title"><h3>پاسخ‌نامه PDF دانشجو</h3></div><p class="text-soft">فایل در اطلاعات تلاش پیدا نشد یا دسترسی به آن ممکن نیست: ${escapeHtml(error.message || 'خطای دریافت فایل')}</p>`;
         }
       } else if (pdfBox) { pdfBox.hidden = true; pdfBox.innerHTML = ''; }
 
@@ -560,40 +562,43 @@
     }
     const rows = await request(`/canonical/results${examId ? `?examId=${encodeURIComponent(examId)}` : ''}`);
     const header = $('body[data-active="results"] table thead tr');
-    if (header) header.innerHTML = '<th>#</th><th>آزمون</th><th>دانشجو</th><th>وضعیت</th><th>نمره</th>';
-    renderRows('body[data-active="results"] table tbody', rows, row => `<tr>
+    if (header) header.innerHTML = '<th>#</th><th>آزمون</th><th>دانشجو</th><th>وضعیت</th><th>نمره</th><th>انتشار</th>';
+    const manageableRole = ['teacher', 'department', 'superadmin'].includes(role);
+    const firstExamRow = new Set();
+    renderRows('body[data-active="results"] table tbody', rows, row => {
+      const firstForExam = !firstExamRow.has(String(row.examId));
+      firstExamRow.add(String(row.examId));
+      const publicationAction = !manageableRole ? '—' : row.resultsPublished
+        ? '<span class="badge badge-ok">منتشر شده</span>'
+        : (firstForExam
+          ? `<button type="button" class="btn btn-primary btn-sm" data-publish-exam="${row.examId}">انتشار نتایج این آزمون</button>`
+          : '<span class="text-soft text-sm">—</span>');
+      return `<tr>
       <td><a href="results.html?attemptId=${encodeURIComponent(row.id)}">${escapeHtml(String(row.id).slice(0, 8))}</a></td><td>${escapeHtml(row.examTitle)}</td><td>${escapeHtml(row.studentName || '—')}<div class="text-soft text-sm">شماره دانشجویی: ${escapeHtml(row.studentNumber || 'ثبت نشده')}</div></td>
       <td>${row.status === 'InProgress' ? 'در حال برگزاری' : row.isPdfOnly && row.status !== 'FullyGraded' ? 'پاسخنامه PDF در انتظار تصحیح استاد' : row.status === 'Submitted' ? 'تصحیح خودکار انجام شد' : row.status === 'PartiallyGraded' ? (row.hasAutoGradedAnswers ? 'نمره تستی آماده — تشریحی در انتظار تصحیح' : 'در انتظار تصحیح تشریحی') : row.status === 'FullyGraded' ? 'تصحیح کامل' : 'در انتظار بررسی'}</td>
-      <td>${row.score == null ? (row.resultsPublished ? 'در انتظار تصحیح' : 'منتشر نشده') : faNumber(row.score)}</td></tr>`, 5);
+      <td>${row.score == null ? (row.resultsPublished ? 'در انتظار تصحیح' : 'منتشر نشده') : faNumber(row.score)}</td><td>${publicationAction}</td></tr>`;
+    }, 6);
+    if (manageableRole) {
+      $('[data-publish-exam]').forEach(button => button.addEventListener('click', async () => {
+        const id = button.dataset.publishExam;
+        if (!id || button.disabled) return;
+        if (!window.confirm('نتایج همه تلاش‌های این آزمون پس از تکمیل تصحیح برای دانشجویان منتشر شود؟')) return;
+        button.disabled = true;
+        try {
+          await request(`/canonical/results/exams/${encodeURIComponent(id)}/publish`, { method: 'POST' });
+          notify('نتایج آزمون با موفقیت منتشر شد.', 'ok');
+          await loadResults();
+        } catch (error) {
+          notify(error.message || 'انتشار نتایج ناموفق بود.', 'danger');
+          button.disabled = false;
+        }
+      }));
+    }
 
     const publishButton = $('#publishExamResults');
-    if (publishButton) {
-      publishButton.hidden = !examId || role === 'student' || rows.some(row => row.resultsPublished);
-      publishButton.onclick = async () => {
-        if (!examId || publishButton.disabled) return;
-        publishButton.disabled = true;
-        try {
-          await request(`/canonical/results/exams/${encodeURIComponent(examId)}/publish`, { method: 'POST' });
-          notify('نتایج آزمون منتشر شد.', 'ok');
-          await loadResults();
-        } catch (error) { notify(error.message || 'انتشار نتایج ناموفق بود.', 'danger'); }
-        finally { publishButton.disabled = false; }
-      };
-    }
+    if (publishButton) publishButton.hidden = true;
     const unpublishButton = $('#unpublishExamResults');
-    if (unpublishButton) {
-      unpublishButton.hidden = !examId || role === 'student' || !rows.some(row => row.resultsPublished);
-      unpublishButton.onclick = async () => {
-        if (!examId || unpublishButton.disabled) return;
-        unpublishButton.disabled = true;
-        try {
-          await request(`/canonical/results/exams/${encodeURIComponent(examId)}/unpublish`, { method: 'POST' });
-          notify('انتشار نتایج لغو شد؛ می‌توانید نمرات را اصلاح کنید.', 'ok');
-          await loadResults();
-        } catch (error) { notify(error.message || 'لغو انتشار ناموفق بود.', 'danger'); }
-        finally { unpublishButton.disabled = false; }
-      };
-    }
+    if (unpublishButton) unpublishButton.hidden = true;
   }
 
   async function loadTeacherGrades() {
