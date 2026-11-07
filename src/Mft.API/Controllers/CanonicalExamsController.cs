@@ -29,7 +29,8 @@ public sealed class CanonicalExamsController(
         else if (User.IsInRole("Department"))
             q = q.Where(x => x.DepartmentId == CurrentDepartmentId);
         else if (User.IsInRole("Teacher"))
-            q = q.Where(x => x.CreatedByUserId == CurrentUserId);
+            q = q.Where(x => x.CreatedByUserId == CurrentUserId ||
+                (x.ClassId.HasValue && academic.ClassTeachers.Any(t => t.ClassId == x.ClassId.Value && t.TeacherUserId == CurrentUserId)));
         var rows = await q.OrderByDescending(x => x.Id).Select(x => new {
             x.Id, x.Title, x.ExamCategoryId, x.DepartmentId, x.ClassId, x.CreatedByUserId,
             x.StartAt, x.EndAt, x.DurationMinutes, x.IsPublished,
@@ -56,7 +57,7 @@ public sealed class CanonicalExamsController(
         var isEnrolledStudent = User.IsInRole("Student") && exam.IsPublished &&
             exam.DepartmentId == CurrentDepartmentId && exam.ClassId.HasValue &&
             await academic.ClassMembers.AnyAsync(m => m.ClassId == exam.ClassId.Value && m.StudentUserId == CurrentUserId, ct);
-        if (!CanManage(exam) && !isEnrolledStudent)
+        if (!await CanManage(exam, ct) && !isEnrolledStudent)
             return Forbid();
         var sections = await academic.ExamSections.AsNoTracking().Where(x => x.ExamId == id)
             .OrderBy(x => x.DisplayOrder).Select(x => new {
@@ -97,7 +98,7 @@ public sealed class CanonicalExamsController(
     {
         var exam = await academic.Exams.FirstOrDefaultAsync(x => x.Id == id, ct);
         if (exam is null) return NotFound();
-        if (!CanManage(exam)) return Forbid();
+        if (!await CanManage(exam, ct)) return Forbid();
         if (await academic.ExamAttempts.AnyAsync(x => x.ExamId == id, ct))
             return Conflict(new { message = "پس از ثبت اولین تلاش دانشجو، ساختار آزمون و سؤال‌های آن قابل تغییر نیستند تا سوابق پاسخ‌ها مخدوش نشوند." });
         var validation = await Validate(request, exam.DepartmentId, ct);
@@ -120,7 +121,7 @@ public sealed class CanonicalExamsController(
     {
         var exam = await academic.Exams.FirstOrDefaultAsync(x => x.Id == id, ct);
         if (exam is null) return NotFound();
-        if (!CanManage(exam)) return Forbid();
+        if (!await CanManage(exam, ct)) return Forbid();
         var sectionCount = await academic.ExamSections.CountAsync(x => x.ExamId == id, ct);
         if (sectionCount == 0 && !await academic.ExamDocuments.AnyAsync(x => x.ExamId == id, ct))
             return BadRequest(new { message = "برای انتشار آزمون PDFمحور، ابتدا فایل PDF صورت آزمون را بارگذاری کنید." });
@@ -143,7 +144,7 @@ public sealed class CanonicalExamsController(
 
         var exam = await academic.Exams.FirstOrDefaultAsync(x => x.Id == id, ct);
         if (exam is null) return NotFound();
-        if (!CanManage(exam)) return Forbid();
+        if (!await CanManage(exam, ct)) return Forbid();
 
         if (exam.ClassId.HasValue)
             return Conflict(new { message = "این آزمون قبلاً به کلاس متصل شده است؛ تخصیص مجدد از این مسیر مجاز نیست." });
@@ -172,7 +173,7 @@ public sealed class CanonicalExamsController(
     {
         var exam = await academic.Exams.FirstOrDefaultAsync(x => x.Id == id, ct);
         if (exam is null) return NotFound();
-        if (!CanManage(exam)) return Forbid();
+        if (!await CanManage(exam, ct)) return Forbid();
         // ExamAttempts have NO_ACTION FK to Exams; never cascade/delete historical attempts.
         return Conflict(new { message = "حذف آزمون از طریق این API انجام نمی‌شود؛ ابتدا باید سیاست نگهداری سوابق آزمون و تلاش‌های دانشجویان مشخص شود." });
     }
@@ -240,10 +241,13 @@ public sealed class CanonicalExamsController(
         await academic.SaveChangesAsync(ct);
     }
 
-    private bool CanManage(CanonicalExam exam)
+    private async Task<bool> CanManage(CanonicalExam exam, CancellationToken ct)
     {
         if (User.IsInRole("SuperAdmin")) return true;
-        if (User.IsInRole("Teacher")) return exam.CreatedByUserId == CurrentUserId;
+        if (User.IsInRole("Teacher"))
+            return exam.CreatedByUserId == CurrentUserId ||
+                (exam.ClassId.HasValue && await academic.ClassTeachers.AnyAsync(
+                    x => x.ClassId == exam.ClassId.Value && x.TeacherUserId == CurrentUserId, ct));
         return User.IsInRole("Department") && exam.DepartmentId == CurrentDepartmentId;
     }
 }
