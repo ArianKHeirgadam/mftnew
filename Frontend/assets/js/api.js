@@ -386,7 +386,12 @@
           $('#submissionPdfFrame').src = submissionUrl;
           $('#previewSubmissionPdf')?.addEventListener('click', () => window.MftApi.preview(`/exam-files/attempts/${encodeURIComponent(attemptId)}`).catch(error => notify(error.message, 'danger')));
           $('#downloadSubmissionPdf')?.addEventListener('click', () => window.MftApi.download(`/exam-files/attempts/${encodeURIComponent(attemptId)}`).catch(error => notify(error.message, 'danger')));
-        } catch { pdfBox.hidden = true; pdfBox.innerHTML = ''; }
+        } catch {
+          if (result.examPdfAvailable) {
+            pdfBox.hidden = false;
+            pdfBox.innerHTML = '<div class="section-title"><h3>پاسخ‌نامه PDF دانشجو</h3></div><p class="text-soft">دانشجو هنوز فایل PDF پاسخ‌نامه را بارگذاری نکرده است.</p>';
+          } else { pdfBox.hidden = true; pdfBox.innerHTML = ''; }
+        }
       } else if (pdfBox) { pdfBox.hidden = true; pdfBox.innerHTML = ''; }
 
       const publishButton = $('#publishExamResults');
