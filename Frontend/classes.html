@@ -277,11 +277,9 @@
     const button = $('#saveMembers');
     button.disabled = true;
     try {
-      await api().request('/canonical/classes/' + currentClass.id + '/members', {
-        method: 'PUT', body: JSON.stringify({ studentIds: [...selectedIds] })
-      });
-      await api().request('/canonical/classes/' + currentClass.id + '/teachers', {
-        method: 'PUT', body: JSON.stringify({ teacherIds: [...selectedTeacherIds] })
+      await api().request('/canonical/classes/' + currentClass.id + '/roster', {
+        method: 'PUT',
+        body: JSON.stringify({ studentIds: [...selectedIds], teacherIds: [...selectedTeacherIds] })
       });
       await loadClasses(currentClass.id);
       modal().classList.remove('show');
