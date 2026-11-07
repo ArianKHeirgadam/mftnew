@@ -90,8 +90,12 @@ public sealed class CanonicalExamAttemptController(
             }).ToListAsync(ct);
         var saved = await academic.StudentAnswers.AsNoTracking().Where(x => x.ExamAttemptId == attemptId)
             .ToDictionaryAsync(x => x.ExamQuestionId, x => x.AnswerJson, ct);
-        var isPdfOnly = sections.Count == 0 && await academic.ExamDocuments.AnyAsync(x => x.ExamId == examId, ct);
-        return Ok(new { attempt.Id, StartedAtUtc = DateTime.SpecifyKind(attempt.StartedAt, DateTimeKind.Utc), Deadline = deadline, ServerNowUtc = DateTime.UtcNow, IsPdfOnly = isPdfOnly, Sections = sections, SavedAnswers = saved });
+        var examPdf = await academic.ExamDocuments.AsNoTracking().Where(x => x.ExamId == examId)
+            .Select(x => new { x.OriginalFileName, x.FileSize }).FirstOrDefaultAsync(ct);
+        var isPdfOnly = sections.Count == 0 && examPdf is not null;
+        return Ok(new { attempt.Id, StartedAtUtc = DateTime.SpecifyKind(attempt.StartedAt, DateTimeKind.Utc), Deadline = deadline,
+            ServerNowUtc = DateTime.UtcNow, IsPdfOnly = isPdfOnly, ExamPdfAvailable = examPdf is not null,
+            ExamPdfFileName = examPdf?.OriginalFileName, Sections = sections, SavedAnswers = saved });
     }
 
     [HttpPut("{attemptId:long}/answers")]
@@ -150,12 +154,14 @@ public sealed class CanonicalExamAttemptController(
                 x.Id, x.QuestionId, Points = x.PointsOverride ?? academic.Questions.Where(q => q.Id == x.QuestionId).Select(q => q.Points).FirstOrDefault(),
                 TypeCode = academic.QuestionTypes.Where(t => t.Id == academic.Questions.Where(q => q.Id == x.QuestionId).Select(q => q.QuestionTypeId).FirstOrDefault()).Select(t => t.Code).FirstOrDefault()
             }).ToListAsync(ct);
+        var hasExamPdfForSubmission = await academic.ExamDocuments.AnyAsync(x => x.ExamId == examId, ct);
+        var hasSubmissionPdfForExam = await academic.ExamSubmissionDocuments.AnyAsync(x => x.AttemptId == attemptId, ct);
+        if (examQuestions.Count > 0 && hasExamPdfForSubmission && !hasSubmissionPdfForExam)
+            return BadRequest(new { message = "برای این آزمون، فایل PDF پاسخ‌نامه الزامی است؛ ابتدا آن را بارگذاری کنید." });
         if (examQuestions.Count == 0)
         {
-            var hasExamPdf = await academic.ExamDocuments.AnyAsync(x => x.ExamId == examId, ct);
-            var hasSubmissionPdf = await academic.ExamSubmissionDocuments.AnyAsync(x => x.AttemptId == attemptId, ct);
-            if (!hasExamPdf) return Conflict(new { message = "فایل PDF صورت آزمون موجود نیست." });
-            if (!hasSubmissionPdf) return BadRequest(new { message = "برای ثبت نهایی، ابتدا فایل PDF پاسخ خود را بارگذاری کنید." });
+            if (!hasExamPdfForSubmission) return Conflict(new { message = "فایل PDF صورت آزمون موجود نیست." });
+            if (!hasSubmissionPdfForExam) return BadRequest(new { message = "برای ثبت نهایی، ابتدا فایل PDF پاسخ خود را بارگذاری کنید." });
             var submittedStatus = await academic.ExamAttemptStatuses.SingleOrDefaultAsync(x => x.Id == 2 && x.Code == "Submitted", ct);
             if (submittedStatus is null) return StatusCode(500, new { message = "وضعیت Submitted در جدول مرجع تعریف نشده است." });
             attempt.SubmittedAt = DateTime.UtcNow;
