@@ -735,7 +735,8 @@
     if (!id && (!password || password.length < 8)) return notify('رمز عبور باید حداقل ۸ کاراکتر باشد.', 'warn');
     await safe(async () => {
       const departmentField = $('[data-department-field]', modal);
-      const departmentId = departmentField?.value || null;
+      const departmentIdValue = departmentField?.value || '';
+      const departmentId = departmentIdValue ? Number(departmentIdValue) : null;
       const isActive = $('[data-user-active]', modal)?.checked ?? true;
       if (id) await request(`/users/${id}`, { method: 'PUT', body: JSON.stringify({ fullName, email, mobile, departmentId, isActive }) });
       else {
@@ -1098,7 +1099,7 @@
     if (!values) return;
     const { fullName, username } = values;
     const department = $('#deptChoices .choice-card.selected');
-    const departmentId = department?.dataset.id || null;
+    const departmentId = department?.dataset.id ? Number(department.dataset.id) : null;
     if (role === 'superadmin' && !departmentId) return notify('ابتدا دپارتمان مقصد را انتخاب یا ایجاد کنید.', 'warn');
     const created = await request('/users', {
       method: 'POST',
