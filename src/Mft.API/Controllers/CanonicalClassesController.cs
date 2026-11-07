@@ -26,7 +26,7 @@ public sealed class CanonicalClassesController(
 
         var rows = await query.OrderBy(x => x.Name).Select(x => new
         {
-            x.Id, x.Name, x.DepartmentId,
+            x.Id, x.Name, x.DepartmentId, x.Capacity,
             MemberCount = academic.ClassMembers.Count(m => m.ClassId == x.Id)
         }).ToListAsync(ct);
 
@@ -39,6 +39,7 @@ public sealed class CanonicalClassesController(
         {
             id = x.Id, name = x.Name, departmentId = x.DepartmentId,
             department = departments.GetValueOrDefault(x.DepartmentId),
+            capacity = x.Capacity,
             memberCount = x.MemberCount
         }));
     }
@@ -196,6 +197,8 @@ public sealed class CanonicalClassesController(
     {
         if (User.IsInRole("Teacher")) return Forbid();
         var name = request.Name?.Trim();
+        if (request.Capacity.HasValue && request.Capacity.Value <= 0)
+            return BadRequest(new { message = "ظرفیت کلاس باید عددی بزرگ‌تر از صفر باشد." });
         if (string.IsNullOrWhiteSpace(name) || name.Length > 200)
             return BadRequest(new { message = "نام کلاس الزامی و حداکثر ۲۰۰ کاراکتر است." });
 
@@ -211,12 +214,29 @@ public sealed class CanonicalClassesController(
         {
             Name = name,
             DepartmentId = departmentId.Value,
+            Capacity = request.Capacity,
             CreatedAt = DateTime.UtcNow
         };
         academic.Classes.Add(entity);
         await academic.SaveChangesAsync(ct);
         return CreatedAtAction(nameof(Members), new { id = entity.Id },
-            new { id = entity.Id, name = entity.Name, departmentId = entity.DepartmentId, memberCount = 0 });
+            new { id = entity.Id, name = entity.Name, departmentId = entity.DepartmentId, capacity = entity.Capacity, memberCount = 0 });
+    }
+
+    [HttpPut("{id:long}/capacity")]
+    public async Task<IActionResult> UpdateCapacity(long id, CanonicalClassCapacityRequest request, CancellationToken ct)
+    {
+        var entity = await academic.Classes.FirstOrDefaultAsync(x => x.Id == id, ct);
+        if (entity is null) return NotFound();
+        if (!CanManageDepartment(entity.DepartmentId)) return Forbid();
+        if (request.Capacity <= 0 || request.Capacity > 100000)
+            return BadRequest(new { message = "ظرفیت باید بین ۱ تا ۱۰۰۰۰۰ نفر باشد." });
+        var currentMembers = await academic.ClassMembers.CountAsync(x => x.ClassId == id, ct);
+        if (request.Capacity < currentMembers)
+            return BadRequest(new { message = "ظرفیت نمی‌تواند از تعداد دانشجویان فعلی کلاس کمتر باشد." });
+        entity.Capacity = request.Capacity;
+        await academic.SaveChangesAsync(ct);
+        return Ok(new { classId = id, capacity = entity.Capacity, memberCount = currentMembers });
     }
 
     [HttpPut("{id:long}/members")]
@@ -262,6 +282,12 @@ public sealed class CanonicalClassRequest
 {
     public string Name { get; set; } = "";
     public long? DepartmentId { get; set; }
+    public int? Capacity { get; set; }
+}
+
+public sealed class CanonicalClassCapacityRequest
+{
+    public int Capacity { get; set; }
 }
 
 public sealed class CanonicalClassMembersRequest
