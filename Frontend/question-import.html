@@ -48,6 +48,11 @@
 
       <div class="import-layout">
         <section class="card import-panel">
+          <div class="field">
+            <label for="importBatchTitle">عنوان آزمون برای نام پوشه</label>
+            <input class="input" id="importBatchTitle" maxlength="200" placeholder="مثلاً امتحان شنبه سال ۱۴۰۲" required>
+            <small class="text-soft">تمام سؤال‌های این نوبت ورود گروهی با این عنوان در یک پوشه جدا ذخیره می‌شوند.</small>
+          </div>
           <div class="import-tabs">
             <button type="button" class="import-tab active" data-import-tab="file">بارگذاری Excel / CSV</button>
             <button type="button" class="import-tab" data-import-tab="paste">Paste از Excel</button>
@@ -192,13 +197,15 @@
 
   $('#confirmImport').addEventListener('click', async () => {
     if (!previewRows.length || previewRows.some(row => (row.errors || []).length)) return;
-    if (!confirm('تمام سؤال‌های پیش‌نمایش‌شده در بانک سؤال ثبت شوند؟')) return;
+    const batchTitle = $('#importBatchTitle').value.trim();
+    if (!batchTitle) return message('عنوان آزمون را برای ساخت پوشه وارد کنید.', 'error');
+    if (!confirm('تمام سؤال‌های پیش‌نمایش‌شده در پوشه «' + batchTitle + '» ثبت شوند؟')) return;
     $('#confirmImport').disabled = true;
     message('در حال ثبت گروهی سؤالات...');
     try {
       const result = await api.request('/questions/import/confirm', {
         method:'POST',
-        body:JSON.stringify({rows:previewRows})
+        body:JSON.stringify({batchTitle,rows:previewRows})
       });
       message(result.message || 'ثبت گروهی با موفقیت انجام شد.', 'success');
       previewRows = [];
