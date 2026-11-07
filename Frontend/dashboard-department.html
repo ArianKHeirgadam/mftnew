@@ -49,10 +49,10 @@
         </div>
         <div class="card card-pad">
           <div class="section-title"><h3>وضعیت کلی دپارتمان</h3></div>
-          <ul style="display:flex;flex-direction:column;gap:16px">
-            <li><div class="flex justify-between text-sm mt-8"><span>ظرفیت پذیرش تکمیل‌شده</span><b>—</b></div><div class="progress mt-8"><i style="width:0%"></i></div></li>
-            <li><div class="flex justify-between text-sm"><span>نرخ قبولی آزمون‌های ترم</span><b>—</b></div><div class="progress mt-8"><i style="width:0%;background:var(--gold-500)"></i></div></li>
-            <li><div class="flex justify-between text-sm"><span>پیشرفت تصحیح برگه‌های تشریحی</span><b>—</b></div><div class="progress mt-8"><i style="width:0%"></i></div></li>
+          <ul id="departmentOverviewMetrics" style="display:flex;flex-direction:column;gap:16px">
+            <li data-department-metric="capacity"><div class="flex justify-between text-sm mt-8"><span>ظرفیت پذیرش تکمیل‌شده</span><b data-metric-value>—</b></div><div class="progress mt-8"><i data-metric-bar style="width:0%"></i></div><small data-metric-note class="text-soft">در حال دریافت اطلاعات ظرفیت...</small></li>
+            <li data-department-metric="passRate"><div class="flex justify-between text-sm"><span>نرخ قبولی آزمون‌های ترم</span><b data-metric-value>—</b></div><div class="progress mt-8"><i data-metric-bar style="width:0%;background:var(--gold-500)"></i></div><small data-metric-note class="text-soft">در حال محاسبه...</small></li>
+            <li data-department-metric="grading"><div class="flex justify-between text-sm"><span>پیشرفت تصحیح برگه‌های تشریحی</span><b data-metric-value>—</b></div><div class="progress mt-8"><i data-metric-bar style="width:0%"></i></div><small data-metric-note class="text-soft">در حال دریافت وضعیت تصحیح...</small></li>
           </ul>
         </div>
       </div>
