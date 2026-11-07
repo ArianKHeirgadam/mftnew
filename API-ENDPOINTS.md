@@ -150,3 +150,18 @@ Canonical exams are assigned to one canonical class. Student access is checked a
 - Use `database/audit-unassigned-canonical-exams.sql` for a read-only inventory of unassigned exams and candidate-class coverage. Exams with attempts are deliberately rejected by the API assignment endpoint; consider a separate controlled database operation only after confirming every historical attempt owner belongs to the intended class (`MissingAttemptedStudents = 0`) and reviewing the impact on access to historical work. Do not bulk-assign these exams automatically.
 - Run `database/patch-canonical-exam-class-targeting.sql` after canonical `Users`, `Departments`, and `Exams` exist with bigint keys. It creates the isolated `CanonicalClasses` and `CanonicalClassMembers` tables, then adds nullable `Exams.ClassId`, its foreign key, and an index without deleting or rewriting existing exam records. The separate names intentionally avoid collision with the legacy GUID-based `Classes` and `ClassMembers` tables.
 - `Frontend/classes.html` provides class creation and roster management; the class-management link is available to SuperAdmin, DepartmentAdmin, and Teacher roles.
+
+## Bulk question import
+
+The canonical question bank supports a preview-first bulk import for MultipleChoice and Matching questions. Essay questions are deliberately excluded.
+
+- `POST /api/questions/import/preview/file` — multipart form upload with field `file`; accepts `.xlsx` and `.csv` files up to 5 MB.
+- `POST /api/questions/import/preview/paste` — JSON body `{ "content": "..." }`; accepts tab-separated content copied from a spreadsheet or comma-separated CSV text.
+- `POST /api/questions/import/confirm` — JSON body `{ "rows": [...] }` using the normalized rows returned by preview. The server validates them again and inserts the batch in one transaction. If any row is invalid or duplicates an existing question, the batch is rejected.
+- Each import is limited to 500 rows. The first row must contain headers. Required shared headers: `Skill`, `Type`, and `Text`; optional shared headers: `Category`, `Points`, and `Difficulty`.
+- MultipleChoice columns: `Option1` through `Option4`, and `CorrectOption` (1-based index among non-empty options).
+- Matching columns: `Left1`/`Right1` through `Left10`/`Right10`.
+- `Type` values: `MultipleChoice` (or `MCQ`) and `Matching`. `Difficulty`: `Easy`, `Medium`, or `Hard`.
+- Skill names must match an existing skill. Include `Category` when skill names are not unique.
+- The teacher question bank links to `Frontend/question-import.html`. The preview does not write to the database; confirmation revalidates all rows before committing.
+
