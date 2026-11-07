@@ -129,6 +129,7 @@
             <li class="flex justify-between" style="border-bottom:1px solid var(--border);padding-bottom:8px"><span class="text-soft">دپارتمان</span><b id="prevDept">—</b></li>
             <li class="flex justify-between" style="border-bottom:1px solid var(--border);padding-bottom:8px"><span class="text-soft">استاد</span><b id="prevTeacher">—</b></li>
             <li class="flex justify-between" style="border-bottom:1px solid var(--border);padding-bottom:8px"><span class="text-soft">تعداد سوالات</span><b id="prevQuestionCount">۰ سوال</b></li>
+            <li><span class="text-soft">سؤال‌های انتخاب‌شده</span><ul id="prevSelectedQuestions" style="margin:8px 0 12px;padding-right:22px;display:grid;gap:6px"></ul></li>
             <li class="flex justify-between"><span class="text-soft">مدت زمان</span><b id="prevDuration">۴۵ دقیقه</b></li>
           </ul>
         </div>
@@ -148,6 +149,17 @@
 <script>
   const STEPS = ["دپارتمان", "استاد", "سوالات", "اطلاعات آزمون", "زمان‌بندی", "پیش‌نمایش"];
   let current = 1;
+  const selectedQuestionIds = new Set();
+  function syncSelectedQuestions() {
+    document.querySelectorAll('#manualPick input[type="checkbox"][value]').forEach(input => {
+      if (input.checked) selectedQuestionIds.add(String(input.value));
+      else selectedQuestionIds.delete(String(input.value));
+    });
+  }
+  function selectedManualQuestions() {
+    syncSelectedQuestions();
+    return [...selectedQuestionIds];
+  }
   function renderSteps() {
     document.getElementById("wizardSteps").innerHTML = STEPS.map((label, index) => {
       const number = index + 1;
@@ -165,8 +177,19 @@
       const randomMode = document.getElementById("randomToggle").checked;
       const selectedCount = randomMode
         ? Number(document.getElementById("randomMcqCount").value || 0) + Number(document.getElementById("randomEssayCount").value || 0) + Number(document.getElementById("randomMatchingCount").value || 0)
-        : document.querySelectorAll('#manualPick input[type=checkbox]:checked').length;
+        : selectedManualQuestions().length;
       document.getElementById("prevQuestionCount").textContent = selectedCount + " سوال" + (randomMode ? " (تصادفی)" : "");
+      const previewList = document.getElementById("prevSelectedQuestions");
+      if (previewList) {
+        const selectedSet = new Set(selectedManualQuestions());
+        const titles = [...document.querySelectorAll('#manualPick input[type="checkbox"][value]')]
+          .filter(input => selectedSet.has(String(input.value)))
+          .map(input => input.closest('.qpick-row')?.querySelector('span')?.textContent?.trim())
+          .filter(Boolean);
+        previewList.innerHTML = randomMode
+          ? '<span class="text-soft">سؤال‌ها هنگام انتشار به‌صورت تصادفی از بانک انتخاب می‌شوند.</span>'
+          : (titles.length ? titles.map(title => '<li>' + title.replace(/[&<>"]/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[ch])) + '</li>').join('') : '<li class="text-soft">هنوز سؤالی انتخاب نشده است.</li>');
+      }
       document.getElementById("prevDuration").textContent = `${document.getElementById("examDuration").value || 0} دقیقه`;
     }
   }
@@ -206,6 +229,11 @@
     if (!classId || !departmentId) return showToast("کلاس معتبر برای آزمون انتخاب نشده است.", "warn");
 
     let selected = [...document.querySelectorAll('#manualPick input[type="checkbox"]:checked')];
+    if (!document.getElementById("randomToggle").checked && selected.length === 0) {
+      const selectedIds = new Set(selectedManualQuestions());
+      selected = [...document.querySelectorAll('#manualPick input[type="checkbox"][value]')]
+        .filter(input => selectedIds.has(String(input.value)));
+    }
     if (document.getElementById("randomToggle").checked) {
       const pool = [...document.querySelectorAll('#manualPick input[type="checkbox"]')];
       const mcqCount = Math.max(0, Number(document.getElementById("randomMcqCount").value) || 0);
@@ -284,6 +312,9 @@
     } catch (error) {
       showToast(error.message || "ذخیره آزمون ناموفق بود.", "danger");
     }
+  });
+  document.getElementById("manualPick").addEventListener("change", event => {
+    if (event.target.matches('input[type="checkbox"][value]')) syncSelectedQuestions();
   });
   showStep(1);
 </script>
