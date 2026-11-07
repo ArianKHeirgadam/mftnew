@@ -102,6 +102,84 @@
     });
   }
 
+  function attachGlobalSearch() {
+    const field = $('.topbar .search-box input');
+    if (!field || field.dataset.globalSearchReady) return;
+    field.dataset.globalSearchReady = 'true';
+    const host = field.closest('.search-box');
+    host.style.position = 'relative';
+    const panel = document.createElement('div');
+    panel.id = 'globalSearchResults';
+    panel.className = 'dropdown-menu';
+    panel.style.cssText = 'display:none;position:absolute;top:calc(100% + 8px);right:0;left:0;z-index:1200;max-height:420px;overflow:auto;min-width:280px;padding:8px;background:var(--surface);border:1px solid var(--border);box-shadow:var(--shadow-lg);border-radius:12px';
+    host.appendChild(panel);
+    let timer;
+    const close = () => { panel.style.display = 'none'; };
+    const showMessage = message => {
+      panel.innerHTML = '';
+      const row = document.createElement('div');
+      row.className = 'text-soft text-sm';
+      row.style.padding = '12px';
+      row.textContent = message;
+      panel.appendChild(row);
+      panel.style.display = 'block';
+    };
+    field.addEventListener('input', () => {
+      clearTimeout(timer);
+      const term = field.value.trim();
+      if (term.length < 2) return close();
+      showMessage('در حال جستجو...');
+      timer = setTimeout(async () => {
+        try {
+          const tasks = await Promise.allSettled([
+            request('/users?search=' + encodeURIComponent(term)),
+            request('/departments?search=' + encodeURIComponent(term)),
+            request('/canonical/classes')
+          ]);
+          const users = tasks[0].status === 'fulfilled' ? tasks[0].value : [];
+          const departments = tasks[1].status === 'fulfilled' ? tasks[1].value : [];
+          const classes = tasks[2].status === 'fulfilled' ? tasks[2].value : [];
+          const results = [];
+          users.filter(item => (item.fullName || '').toLocaleLowerCase().includes(term.toLocaleLowerCase()) ||
+            (item.username || '').toLocaleLowerCase().includes(term.toLocaleLowerCase()))
+            .slice(0, 8).forEach(item => {
+              const role = String(item.role || '').toLowerCase();
+              const isTeacher = role === 'teacher' || (item.roles || []).some(value => String(value).toLowerCase() === 'teacher');
+              const isStudent = role === 'student' || (item.roles || []).some(value => String(value).toLowerCase() === 'student');
+              if (!isTeacher && !isStudent) return;
+              results.push({ title: item.fullName || item.username, detail: (isTeacher ? 'استاد' : 'دانشجو') + ' · ' + (item.department || 'بدون دپارتمان'), href: isTeacher ? 'teachers.html' : 'students.html' });
+            });
+          departments.filter(item => (item.name || '').toLocaleLowerCase().includes(term.toLocaleLowerCase()))
+            .slice(0, 4).forEach(item => results.push({ title: item.name, detail: 'دپارتمان', href: 'departments.html' }));
+          classes.filter(item => (item.name || '').toLocaleLowerCase().includes(term.toLocaleLowerCase()))
+            .slice(0, 4).forEach(item => results.push({ title: item.name, detail: 'کلاس · ' + (item.department || ''), href: 'classes.html' }));
+          panel.innerHTML = '';
+          if (!results.length) return showMessage('نتیجه‌ای برای جستجوی شما پیدا نشد.');
+          results.slice(0, 12).forEach(item => {
+            const link = document.createElement('a');
+            link.href = item.href;
+            link.style.cssText = 'display:flex;flex-direction:column;gap:3px;padding:10px 12px;border-radius:8px;text-decoration:none;color:var(--text)';
+            const title = document.createElement('b');
+            title.textContent = item.title;
+            const detail = document.createElement('small');
+            detail.className = 'text-soft';
+            detail.textContent = item.detail;
+            link.append(title, detail);
+            link.addEventListener('mouseenter', () => { link.style.background = 'var(--surface-2)'; });
+            link.addEventListener('mouseleave', () => { link.style.background = 'transparent'; });
+            panel.appendChild(link);
+          });
+          panel.style.display = 'block';
+        } catch (error) {
+          showMessage(error.message || 'جستجو ناموفق بود.');
+        }
+      }, 300);
+    });
+    field.addEventListener('focus', () => { if (panel.childElementCount && field.value.trim().length >= 2) panel.style.display = 'block'; });
+    document.addEventListener('click', event => { if (!host.contains(event.target)) close(); });
+    field.addEventListener('keydown', event => { if (event.key === 'Escape') close(); });
+  }
+
   async function loadUsers() {
     const studentBody = $('#studentsBody');
     const teacherBody = $('#teachersBody') || $('body[data-active="teachers"] table tbody');
@@ -1203,6 +1281,7 @@
       if (document.body.dataset.active === 'teachers') attachSearch('body[data-active="teachers"] .search-box input', loadUsers);
       if (document.body.dataset.active === 'departments') attachSearch('body[data-active="departments"] .search-box input', loadDepartments);
       if (document.body.dataset.active === 'bank') attachSearch('body[data-active="bank"] .search-box input', loadQuestions);
+      attachGlobalSearch();
     });
   }
 
