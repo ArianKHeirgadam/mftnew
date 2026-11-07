@@ -12,6 +12,7 @@
   const $$ = (selector, root = document) => [...root.querySelectorAll(selector)];
   const escapeHtml = value => String(value ?? '').replace(/[&<>"']/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[ch]);
   const faNumber = value => Number(value || 0).toLocaleString('fa-IR');
+  const parseUtcDate = value => { if (!value) return null; const raw=String(value); const normalized=/(?:Z|[+-]\\d{2}:?\\d{2})$/i.test(raw)?raw:raw+'Z'; const date=new Date(normalized); return Number.isNaN(date.getTime())?null:date; };
   if (!document.querySelector('script[data-mft-persian-picker]')) {
     const pickerScript = document.createElement('script');
     pickerScript.src = 'assets/js/persian-date-picker.js';
@@ -256,13 +257,14 @@
     const role = (document.body.dataset.role || currentUser()?.role || '').toLowerCase();
     if (role !== 'student' || document.body.dataset.active !== 'dashboard') return;
     const rows = await request('/canonical/exams');
-    const now = Date.now();
-    const nextExam = rows.filter(row => row.isPublished && row.hasAttempt !== true &&
-      (!row.endAt || new Date(row.endAt).getTime() >= now))
-      .sort((a,b) => (a.startAt ? new Date(a.startAt).getTime() : now) - (b.startAt ? new Date(b.startAt).getTime() : now))[0];
+    const serverNow = parseUtcDate(rows[0]?.serverNowUtc)?.getTime() ?? Date.now();
+    const monotonicAtSync = window.performance?.now?.() ?? Date.now();
+    const now = () => serverNow + ((window.performance?.now?.() ?? Date.now()) - monotonicAtSync);
+    const nextExam = rows.filter(row => row.isPublished && row.hasAttempt !== true && (!row.endAt || (parseUtcDate(row.endAt)?.getTime() ?? 0) >= now()))
+      .sort((a,b) => (parseUtcDate(a.startAt)?.getTime() ?? now()) - (parseUtcDate(b.startAt)?.getTime() ?? now()))[0];
 
     renderRows('body[data-active="dashboard"] tbody', rows, row => {
-      const already = row.hasAttempt === true, starts = row.startAt ? new Date(row.startAt) : null, ends = row.endAt ? new Date(row.endAt) : null, current = Date.now();
+      const already = row.hasAttempt === true, starts = parseUtcDate(row.startAt), ends = parseUtcDate(row.endAt), current = now();
       const available = row.isPublished && (!starts || starts.getTime() <= current) && (!ends || ends.getTime() >= current);
       const action = already && Number(row.existingAttemptStatusId) === 1
         ? '<button class="btn btn-primary" data-exam-continue="' + row.id + '" data-attempt-id="' + row.existingAttemptId + '">ادامه آزمون قبلی</button>'
@@ -284,17 +286,18 @@
       return;
     }
     if (title) title.textContent = nextExam.title;
-    if (details) details.textContent = (nextExam.startAt ? new Date(nextExam.startAt).toLocaleString('fa-IR') : 'در حال برگزاری') + ' — مدت زمان: ' + faNumber(nextExam.durationMinutes) + ' دقیقه';
-    const startAt = nextExam.startAt ? new Date(nextExam.startAt).getTime() : Date.now();
-    const endAt = nextExam.endAt ? new Date(nextExam.endAt).getTime() : Infinity;
+    if (details) details.textContent = (nextExam.startAt ? (parseUtcDate(nextExam.startAt)?.toLocaleString('fa-IR') || '—') : 'در حال برگزاری') + ' — مدت زمان: ' + faNumber(nextExam.durationMinutes) + ' دقیقه';
+    const startAt = parseUtcDate(nextExam.startAt)?.getTime() ?? now();
+    const endAt = parseUtcDate(nextExam.endAt)?.getTime() ?? Infinity;
     const tick = () => {
-      const left = startAt - Date.now();
+      const current = now();
+      const left = startAt - current;
       if (!timer) return;
       if (left > 0) {
         const seconds = Math.floor(left / 1000), days = Math.floor(seconds / 86400), hours = Math.floor((seconds % 86400) / 3600), minutes = Math.floor((seconds % 3600) / 60), secs = seconds % 60;
         timer.innerHTML = '<b>' + faNumber(days) + ' روز</b><span>' + faNumber(hours) + ':' + String(minutes).padStart(2,'0') + ':' + String(secs).padStart(2,'0') + ' مانده</span>';
         if (link) { link.textContent = 'هنوز شروع نشده'; link.classList.remove('btn-gold'); link.classList.add('btn-outline'); link.setAttribute('aria-disabled','true'); delete link.dataset.examStart; }
-      } else if (Date.now() <= endAt) {
+      } else if (current <= endAt) {
         timer.innerHTML = '<b>اکنون</b><span>زمان شروع آزمون رسیده است</span>';
         if (link) { link.textContent = 'ورود به آزمون'; link.classList.remove('btn-outline'); link.classList.add('btn-gold'); link.setAttribute('aria-disabled','false'); link.dataset.examStart = String(nextExam.id); }
       } else {
@@ -453,7 +456,7 @@
     const list = $('#teacherPendingPlaceholder'), count = $('#mftPendingGradeCount'), upcoming = $('#mftUpcomingExams');
     const attemptsTask = request('/canonical/results').then(attempts => {
       const pending = (Array.isArray(attempts) ? attempts : []).filter(x => ['Submitted','PartiallyGraded'].includes(x.status));
-      if (list) list.innerHTML = pending.length ? pending.map(x => '<li class="flex items-center justify-between" style="padding:10px 0;border-bottom:1px solid var(--border)"><div><b>' + escapeHtml(x.studentName || 'دانشجو') + '</b><div class="text-soft text-sm">' + escapeHtml(x.examTitle) + ' — ارسال ' + (x.submittedAt ? new Date(x.submittedAt).toLocaleString('fa-IR') : 'بدون تاریخ') + '</div><div class="text-soft text-sm">' + (x.score == null ? 'نمره تستی: هنوز ثبت نشده' : 'نمره خودکار تا این مرحله: ' + faNumber(x.score)) + (x.status === 'PartiallyGraded' ? ' — پاسخ تشریحی در انتظار تصحیح' : '') + '</div></div><a class="btn btn-outline btn-sm" href="results.html?attemptId=' + encodeURIComponent(x.id) + '">تصحیح</a></li>').join('') : '<li class="text-soft">برگه‌ای در انتظار تصحیح نیست.</li>';
+      if (list) list.innerHTML = pending.length ? pending.map(x => '<li class="flex items-center justify-between" style="padding:10px 0;border-bottom:1px solid var(--border)"><div><b>' + escapeHtml(x.studentName || 'دانشجو') + '</b><div class="text-soft text-sm">شماره دانشجویی: ' + escapeHtml(x.studentNumber || 'ثبت نشده') + '</div><div class="text-soft text-sm">' + escapeHtml(x.examTitle) + ' — ارسال ' + (x.submittedAt ? new Date(x.submittedAt).toLocaleString('fa-IR') : 'بدون تاریخ') + '</div><div class="text-soft text-sm">' + (x.score == null ? 'نمره تستی: هنوز ثبت نشده' : 'نمره خودکار تا این مرحله: ' + faNumber(x.score)) + (x.status === 'PartiallyGraded' ? ' — پاسخ تشریحی در انتظار تصحیح' : '') + '</div></div><a class="btn btn-outline btn-sm" href="results.html?attemptId=' + encodeURIComponent(x.id) + '">تصحیح</a></li>').join('') : '<li class="text-soft">برگه‌ای در انتظار تصحیح نیست.</li>';
       if (count) count.textContent = faNumber(pending.length) + ' مورد باقی‌مانده';
     }).catch(error => {
       if (list) list.innerHTML = '<li class="text-soft">دریافت صف تصحیح ناموفق بود: ' + escapeHtml(error.message || 'خطای نامشخص') + '</li>';
@@ -461,8 +464,8 @@
     });
     const examsTask = request('/canonical/exams').then(exams => {
       const now = Date.now();
-      const scheduled = (Array.isArray(exams) ? exams : []).filter(x => x.startAt && new Date(x.startAt).getTime() >= now && (!x.endAt || new Date(x.endAt).getTime() >= now)).sort((a,b) => new Date(a.startAt) - new Date(b.startAt));
-      if (upcoming) upcoming.innerHTML = scheduled.length ? scheduled.map(x => '<li class="flex items-center gap-12"><div class="mohr sm"><div class="mohr-inner"><b>' + escapeHtml(String(x.title || '').slice(0,2)) + '</b></div></div><div><b style="font-size:13px">' + escapeHtml(x.title || 'آزمون بدون عنوان') + '</b><div class="text-soft text-sm">' + new Date(x.startAt).toLocaleString('fa-IR') + ' — ' + faNumber(x.durationMinutes) + ' دقیقه</div><small class="text-soft">' + (x.isPublished ? 'منتشرشده' : 'پیش‌نویس') + '</small></div></li>').join('') : '<li class="text-soft">آزمون زمان‌بندی‌شده آینده‌ای وجود ندارد.</li>';
+      const scheduled = (Array.isArray(exams) ? exams : []).filter(x => x.startAt && (parseUtcDate(x.startAt)?.getTime() ?? 0) >= now && (!x.endAt || (parseUtcDate(x.endAt)?.getTime() ?? 0) >= now)).sort((a,b) => (parseUtcDate(a.startAt)?.getTime() ?? 0) - (parseUtcDate(b.startAt)?.getTime() ?? 0));
+      if (upcoming) upcoming.innerHTML = scheduled.length ? scheduled.map(x => '<li class="flex items-center gap-12"><div class="mohr sm"><div class="mohr-inner"><b>' + escapeHtml(String(x.title || '').slice(0,2)) + '</b></div></div><div><b style="font-size:13px">' + escapeHtml(x.title || 'آزمون بدون عنوان') + '</b><div class="text-soft text-sm">' + (parseUtcDate(x.startAt)?.toLocaleString('fa-IR') || '—') + ' — ' + faNumber(x.durationMinutes) + ' دقیقه</div><small class="text-soft">' + (x.isPublished ? 'منتشرشده' : 'پیش‌نویس') + '</small></div></li>').join('') : '<li class="text-soft">آزمون زمان‌بندی‌شده آینده‌ای وجود ندارد.</li>';
     }).catch(error => {
       if (upcoming) upcoming.innerHTML = '<li class="text-soft">دریافت آزمون‌های زمان‌بندی‌شده ناموفق بود: ' + escapeHtml(error.message || 'خطای نامشخص') + '</li>';
     });
