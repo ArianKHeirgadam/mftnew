@@ -80,7 +80,7 @@ public sealed class CanonicalQuestionsController(
     [HttpPost("lookups/skills")]
     public async Task<IActionResult> CreateSkill(SkillCreateRequest request, CancellationToken ct)
     {
-        if (!User.IsInRole("SuperAdmin")) return Forbid();
+        if (!User.IsInRole("SuperAdmin") && !User.IsInRole("Teacher")) return Forbid();
         var name = request.Name?.Trim();
         if (string.IsNullOrWhiteSpace(name) || name.Length > 100 || request.ExamCategoryId <= 0)
             return BadRequest(new { message = "نام مهارت و دسته‌بندی معتبر الزامی است." });
