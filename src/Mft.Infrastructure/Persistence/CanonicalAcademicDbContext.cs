@@ -29,6 +29,7 @@ public sealed class CanonicalAcademicDbContext(
     public DbSet<CanonicalExamDocument> ExamDocuments => Set<CanonicalExamDocument>();
     public DbSet<CanonicalExamSubmissionDocument> ExamSubmissionDocuments => Set<CanonicalExamSubmissionDocument>();
     public DbSet<CanonicalExamSectionDocument> ExamSectionDocuments => Set<CanonicalExamSectionDocument>();
+    public DbSet<CanonicalExamSectionSubmissionDocument> ExamSectionSubmissionDocuments => Set<CanonicalExamSectionSubmissionDocument>();
     public DbSet<CanonicalExamAttemptQuestionOrder> ExamAttemptQuestionOrders => Set<CanonicalExamAttemptQuestionOrder>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
@@ -228,6 +229,19 @@ public sealed class CanonicalAcademicDbContext(
             e.HasOne<CanonicalExamSection>().WithMany().HasForeignKey(x => x.ExamSectionId).OnDelete(DeleteBehavior.Cascade);
             e.HasOne<CanonicalUser>().WithMany().HasForeignKey(x => x.UploadedByUserId).OnDelete(DeleteBehavior.NoAction);
         });
+        modelBuilder.Entity<CanonicalExamSectionSubmissionDocument>(e =>
+        {
+            e.ToTable("ExamSectionSubmissionDocuments"); e.HasKey(x => x.Id);
+            e.Property(x => x.Id).HasColumnType("bigint").UseIdentityColumn();
+            e.Property(x => x.StoredFileName).HasMaxLength(100).IsRequired();
+            e.Property(x => x.OriginalFileName).HasMaxLength(255).IsRequired();
+            e.Property(x => x.UploadedAt).HasColumnType("datetime2").HasDefaultValueSql("sysutcdatetime()");
+            e.HasIndex(x => new { x.AttemptId, x.ExamSectionId }).IsUnique();
+            e.HasIndex(x => x.UploadedByUserId);
+            e.HasOne<CanonicalExamAttempt>().WithMany().HasForeignKey(x => x.AttemptId).OnDelete(DeleteBehavior.Cascade);
+            e.HasOne<CanonicalExamSection>().WithMany().HasForeignKey(x => x.ExamSectionId).OnDelete(DeleteBehavior.NoAction);
+            e.HasOne<CanonicalUser>().WithMany().HasForeignKey(x => x.UploadedByUserId).OnDelete(DeleteBehavior.NoAction);
+        });
         modelBuilder.Entity<CanonicalExamAttemptQuestionOrder>(e =>
         {
             e.ToTable("ExamAttemptQuestionOrders"); e.HasKey(x => x.Id);
@@ -326,4 +340,16 @@ public sealed class CanonicalExamAttemptQuestionOrder
     public int QuestionOrder { get; set; }
     public string? OptionOrderJson { get; set; }
     public string? MatchingRightOrderJson { get; set; }
+}
+
+public sealed class CanonicalExamSectionSubmissionDocument
+{
+    public long Id { get; set; }
+    public long AttemptId { get; set; }
+    public long ExamSectionId { get; set; }
+    public string StoredFileName { get; set; } = "";
+    public string OriginalFileName { get; set; } = "";
+    public long FileSize { get; set; }
+    public long UploadedByUserId { get; set; }
+    public DateTime UploadedAt { get; set; }
 }
