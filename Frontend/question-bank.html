@@ -43,12 +43,7 @@
           <div class="table-wrap">
             <table class="dt">
               <thead><tr><th>متن سوال</th><th>دسته‌بندی</th><th>نوع</th><th>سطح دشواری</th><th>عملیات</th></tr></thead>
-              <tbody>
-                <tr><td style="max-width:340px">پیچیدگی زمانی الگوریتم کویک‌سورت در بدترین حالت چیست؟</td><td>الگوریتم</td><td><span class="badge badge-info">چهارگزینه‌ای</span></td><td><span class="badge badge-warn">متوسط</span></td><td class="flex gap-8"><button class="btn btn-outline btn-sm" data-modal-open="questionModal">ویرایش</button><button class="btn btn-danger btn-sm">حذف</button></td></tr>
-                <tr><td style="max-width:340px">الگوریتم کاراتسوبا را برای ضرب دو عدد ۴ رقمی شرح دهید.</td><td>الگوریتم</td><td><span class="badge badge-muted">تشریحی</span></td><td><span class="badge badge-danger">سخت</span></td><td class="flex gap-8"><button class="btn btn-outline btn-sm" data-modal-open="questionModal">ویرایش</button><button class="btn btn-danger btn-sm">حذف</button></td></tr>
-                <tr><td style="max-width:340px">کدام ساختار داده برای پیاده‌سازی صف اولویت مناسب‌تر است؟</td><td>ساختمان داده</td><td><span class="badge badge-info">چهارگزینه‌ای</span></td><td><span class="badge badge-ok">آسان</span></td><td class="flex gap-8"><button class="btn btn-outline btn-sm" data-modal-open="questionModal">ویرایش</button><button class="btn btn-danger btn-sm">حذف</button></td></tr>
-                <tr><td style="max-width:340px">نرمال‌سازی پایگاه داده تا فرم نرمال سوم را با مثال توضیح دهید.</td><td>پایگاه داده</td><td><span class="badge badge-muted">تشریحی</span></td><td><span class="badge badge-warn">متوسط</span></td><td class="flex gap-8"><button class="btn btn-outline btn-sm" data-modal-open="questionModal">ویرایش</button><button class="btn btn-danger btn-sm">حذف</button></td></tr>
-              </tbody>
+              <tbody id="questionRows"><tr><td colspan="5" style="text-align:center;padding:24px">در حال دریافت سؤال‌ها...</td></tr></tbody>
             </table>
           </div>
           <div class="pagination"><button>«</button><button class="active">۱</button><button>۲</button><button>۳</button><button>»</button></div>
@@ -103,7 +98,32 @@
  const correct=document.getElementById('correctOption');
  const notify=(m,t='info')=>window.showToast?.(m,t);
  const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
- let lookups=null;
+ let lookups=null, questionRows=[];
+ const searchField=document.querySelector('.table-toolbar .search-box input');
+ const categoryFilter=document.querySelectorAll('.table-toolbar select')[0];
+ const difficultyFilter=document.querySelectorAll('.table-toolbar select')[1];
+ const typeLabel=code=>({MultipleChoice:'چهارگزینه‌ای',Essay:'تشریحی',Matching:'وصل‌کردنی'}[code]||code||'—');
+ const difficultyLabel=value=>({1:'آسان',2:'متوسط',3:'سخت',Easy:'آسان',Medium:'متوسط',Hard:'سخت'}[value]||'—');
+ const renderQuestions=()=>{
+  const term=(searchField?.value||'').trim().toLocaleLowerCase();
+  const category=categoryFilter?.value||'';
+  const difficulty=difficultyFilter?.value||'';
+  const rows=questionRows.filter(q=>(!term||String(q.text||'').toLocaleLowerCase().includes(term))&&
+   (!category||category==='همه دسته‌بندی‌ها'||q.categoryName===category)&&
+   (!difficulty||difficulty==='همه سطوح دشواری'||difficultyLabel(q.difficultyLevel)===difficulty));
+  document.getElementById('questionRows').innerHTML=rows.length?rows.map(q=>'<tr>'+
+   '<td style="max-width:340px">'+esc(q.text)+'</td><td>'+esc(q.categoryName||'—')+'</td>'+
+   '<td><span class="badge badge-info">'+esc(typeLabel(q.questionTypeCode))+'</span></td>'+
+   '<td>'+esc(difficultyLabel(q.difficultyLevel))+'</td><td class="flex gap-8">'+
+   '<button class="btn btn-outline btn-sm" data-question-edit="'+q.id+'">ویرایش</button>'+
+   '<button class="btn btn-danger btn-sm" data-question-delete="'+q.id+'">حذف</button></td></tr>').join(''):
+   '<tr><td colspan="5" style="text-align:center;padding:24px">سؤالی برای نمایش وجود ندارد.</td></tr>';
+ };
+ async function loadQuestions(){
+  const rows=await api.request('/canonical/questions');
+  questionRows=Array.isArray(rows)?rows:[];
+  renderQuestions();
+ }
  async function loadCanonicalLookups(){
   try{
    lookups=await api.request('/canonical/questions/lookups');
@@ -143,7 +163,38 @@
    location.reload();
   }catch(e){notify(e.message||'ذخیره سؤال ناموفق بود.','danger');}
  });
- loadCanonicalLookups();
+ if(searchField)searchField.addEventListener('input',renderQuestions);
+ [categoryFilter,difficultyFilter].forEach(x=>x?.addEventListener('change',renderQuestions));
+ document.getElementById('questionRows').addEventListener('click',async event=>{
+  const edit=event.target.closest('[data-question-edit]');
+  const remove=event.target.closest('[data-question-delete]');
+  if(edit){
+   try{
+    const q=await api.request('/canonical/questions/'+encodeURIComponent(edit.dataset.questionEdit));
+    modal.dataset.editId=q.id;
+    document.querySelector('[data-question-text]').value=q.text||'';
+    skill.value=String(q.skillId);
+    const type=lookups?.questionTypes.find(x=>Number(x.id)===Number(q.questionTypeId));
+    document.getElementById('qType').value=type?.code||'Essay';
+    document.getElementById('qType').dispatchEvent(new Event('change'));
+    document.getElementById('questionPoints').value=q.points??1;
+    document.querySelector('[data-question-difficulty]').value=({1:'Easy',2:'Medium',3:'Hard'}[q.difficultyLevel]||'Medium');
+    document.querySelectorAll('[data-question-option]').forEach((el,i)=>el.value=q.options?.[i]?.optionText||'');
+    const correctIndex=(q.options||[]).findIndex(x=>x.isCorrect);
+    correct.value=correctIndex>=0?String(correctIndex+1):'';
+    document.querySelectorAll('[data-match-left]').forEach((el,i)=>el.value=q.matchingPairs?.[i]?.leftItem||'');
+    document.querySelectorAll('[data-match-right]').forEach((el,i)=>el.value=q.matchingPairs?.[i]?.rightItem||'');
+    modal.classList.add('show');
+   }catch(e){notify(e.message,'danger');}
+  }
+  if(remove){
+   if(!confirm('این سؤال حذف شود؟'))return;
+   try{await api.request('/canonical/questions/'+encodeURIComponent(remove.dataset.questionDelete),{method:'DELETE'});notify('سؤال حذف شد.','ok');await loadQuestions();}
+   catch(e){notify(e.message,'danger');}
+  }
+ });
+ modal.querySelectorAll('[data-modal-close]').forEach(x=>x.addEventListener('click',()=>{delete modal.dataset.editId;}));
+ loadCanonicalLookups().then(loadQuestions).catch(e=>notify(e.message,'danger'));
 })();
 </script>
 </body>
