@@ -110,7 +110,7 @@
     if(saving){pending=true;return;}
     saving=true;pending=false;if(saveLabel)saveLabel.textContent='در حال ذخیره...';
     try{
-      await api.request(`/canonical/exams/${encodeURIComponent(examId)}/attempt/${encodeURIComponent(attemptId)}/answers`,{method:'PUT',body:JSON.stringify({answers:requestPayload(),autoSubmit:auto})});
+      await api.request(`/canonical/exams/${encodeURIComponent(examId)}/attempt/${encodeURIComponent(attemptId)}/answers`,{method:'PUT',body:JSON.stringify({answers:requestPayload()})});
       if(saveLabel)saveLabel.textContent='ذخیره شد';
     }catch(error){if(saveLabel)saveLabel.textContent='ذخیره ناموفق';toast(error.message,'danger');}
     finally{saving=false;if(pending&&!finished)saveAnswers();}
