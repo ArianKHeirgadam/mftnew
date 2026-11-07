@@ -46,7 +46,15 @@ public sealed class CanonicalExamsController(
                 : null,
             HasAttempt = isStudent && academic.ExamAttempts.Any(a => a.ExamId == x.Id && a.StudentUserId == studentId)
         }).ToListAsync(ct);
-        return Ok(rows);
+        var serverNowUtc = DateTime.UtcNow;
+        return Ok(rows.Select(x => new {
+            x.Id, x.Title, x.ExamCategoryId, x.DepartmentId, x.ClassId, x.CreatedByUserId,
+            StartAt = DateTime.SpecifyKind(x.StartAt, DateTimeKind.Utc),
+            EndAt = DateTime.SpecifyKind(x.EndAt, DateTimeKind.Utc),
+            x.DurationMinutes, x.IsPublished, x.IsPdfOnly, x.SectionCount, x.QuestionCount,
+            x.ExistingAttemptId, x.ExistingAttemptStatusId, x.HasAttempt,
+            ServerNowUtc = serverNowUtc
+        }));
     }
 
     [HttpGet("{id:long}")]
