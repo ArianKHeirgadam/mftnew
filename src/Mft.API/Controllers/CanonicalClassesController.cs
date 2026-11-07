@@ -202,6 +202,8 @@ public sealed class CanonicalClassesController(
         var name = request.Name?.Trim();
         if (request.Capacity.HasValue && request.Capacity.Value <= 0)
             return BadRequest(new { message = "ظرفیت کلاس باید عددی بزرگ‌تر از صفر باشد." });
+        if (request.Schedule?.Trim().Length > 200)
+            return BadRequest(new { message = "زمان برگزاری حداکثر ۲۰۰ کاراکتر است." });
         if (string.IsNullOrWhiteSpace(name) || name.Length > 200)
             return BadRequest(new { message = "نام کلاس الزامی و حداکثر ۲۰۰ کاراکتر است." });
 
