@@ -63,10 +63,42 @@ public sealed class QuestionImportController(
         catch (Exception ex) { return BadRequest(new { message = "قالب داده‌های Paste شده قابل خواندن نیست.", detail = ex.Message }); }
     }
 
+    [HttpGet("batches")]
+    public async Task<IActionResult> ListBatches(CancellationToken ct)
+    {
+        if (CurrentUserId is null) return Unauthorized();
+        var query = academic.QuestionImportBatches.AsNoTracking().AsQueryable();
+        if (User.IsInRole("Teacher"))
+            query = query.Where(x => x.TeacherUserId == CurrentUserId.Value);
+        else if (User.IsInRole("Department"))
+        {
+            var userIds = await identity.Users.AsNoTracking()
+                .Where(x => x.DepartmentId == CurrentDepartmentId)
+                .Select(x => x.Id).ToListAsync(ct);
+            query = query.Where(x => userIds.Contains(x.TeacherUserId));
+        }
+
+        var batches = await query.OrderByDescending(x => x.CreatedAt).ThenByDescending(x => x.Id)
+            .Select(x => new { x.Id, x.Title, x.TeacherUserId, x.CreatedAt,
+                QuestionCount = academic.Questions.Count(q => q.ImportBatchId == x.Id) })
+            .ToListAsync(ct);
+        var teacherIds = batches.Select(x => x.TeacherUserId).Distinct().ToArray();
+        var teacherNames = await identity.Users.AsNoTracking()
+            .Where(x => teacherIds.Contains(x.Id))
+            .Select(x => new { x.Id, x.FullName }).ToDictionaryAsync(x => x.Id, x => x.FullName, ct);
+        return Ok(batches.Select(x => new {
+            x.Id, x.Title, x.TeacherUserId, x.CreatedAt, x.QuestionCount,
+            TeacherName = teacherNames.GetValueOrDefault(x.TeacherUserId, "استاد")
+        }));
+    }
+
     [HttpPost("confirm")]
     public async Task<IActionResult> Confirm([FromBody] ImportConfirmRequest request, CancellationToken ct)
     {
         if (CurrentUserId is null) return Unauthorized();
+        var batchTitle = request.BatchTitle?.Trim();
+        if (string.IsNullOrWhiteSpace(batchTitle) || batchTitle.Length > 200)
+            return BadRequest(new { message = "عنوان آزمون برای پوشه‌بندی الزامی و حداکثر ۲۰۰ کاراکتر است." });
         if (request.Rows is null || request.Rows.Count == 0 || request.Rows.Count > MaxRows)
             return BadRequest(new { message = $"تعداد ردیف‌ها باید بین ۱ تا {MaxRows} باشد." });
 
@@ -92,12 +124,21 @@ public sealed class QuestionImportController(
             return Conflict(new { message = $"سؤال ردیف {existingDuplicate.RowNumber} قبلاً در بانک سؤال ثبت شده است." });
 
         await using var transaction = await academic.Database.BeginTransactionAsync(ct);
+        var batch = new CanonicalQuestionImportBatch
+        {
+            TeacherUserId = CurrentUserId.Value,
+            Title = batchTitle
+        };
+        academic.QuestionImportBatches.Add(batch);
+        await academic.SaveChangesAsync(ct);
+
         var insertions = validation.ValidRows.Select(row => new
         {
             Row = row,
             Question = new CanonicalQuestion
             {
                 SkillId = row.SkillId,
+                ImportBatchId = batch.Id,
                 QuestionTypeId = row.QuestionTypeId,
                 Text = row.Text.Trim(),
                 Points = row.Points,
@@ -373,7 +414,7 @@ public sealed class QuestionImportController(
 }
 
 public sealed class ImportPasteRequest { public string Content { get; set; } = ""; }
-public sealed class ImportConfirmRequest { public List<ImportQuestionRow> Rows { get; set; } = new(); }
+public sealed class ImportConfirmRequest { public string BatchTitle { get; set; } = ""; public List<ImportQuestionRow> Rows { get; set; } = new(); }
 public sealed class ImportQuestionRow
 {
     public int RowNumber { get; set; }
