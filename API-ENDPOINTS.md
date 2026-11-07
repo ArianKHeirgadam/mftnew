@@ -165,3 +165,16 @@ The canonical question bank supports a preview-first bulk import for MultipleCho
 - Skill names must match an existing skill. Include `Category` when skill names are not unique.
 - The teacher question bank links to `Frontend/question-import.html`. The preview does not write to the database; confirmation revalidates all rows before committing.
 
+
+## Essay section PDF workflow (stage 3)
+
+New exams can contain an explicit `SectionType = "Essay"` section with no text questions. The teacher uploads one PDF question paper for that section; each student uploads one PDF answer for each Essay section in their attempt. Legacy exams and legacy text Essay questions are not rewritten.
+
+- `POST /api/exam-files/sections/{sectionId}/question-paper` — teacher/department/super-admin uploads or replaces the section's question PDF (multipart field `file`).
+- `GET /api/exam-files/sections/{sectionId}/question-paper?attemptId={attemptId}` — student downloads/views the paper for their own attempt; authorized teachers/managers may omit `attemptId`.
+- `POST /api/exam-files/sections/{sectionId}/attempts/{attemptId}/answer` — student uploads or replaces their PDF answer for that Essay section (multipart field `file`).
+- `GET /api/exam-files/sections/{sectionId}/attempts/{attemptId}/answer` — student downloads their own answer; authorized teachers/managers can download the submission for grading.
+- Section PDF uploads are stored under `App_Data/exam-files`, outside `wwwroot`, use random server-side names, and validate the PDF signature. The exam's nullable `MaxPdfFileSizeBytes` controls the limit (default 20 MiB, bounded to 1–100 MiB).
+- Publishing is blocked until every Essay section has its question PDF. Manual submission is blocked until the student has uploaded an answer PDF for every Essay section. At the server deadline, auto-submit still locks the attempt if an answer PDF is missing; the attempt remains flagged for manual review.
+- The existing exam-level `ExamDocuments` and `ExamSubmissionDocuments` routes remain available for legacy PDF-only exams.
+- Apply `database/patch-essay-section-pdf-submissions.sql` before deploying this version. It adds `ExamSectionSubmissionDocuments`; it does not migrate or delete legacy documents.
