@@ -283,7 +283,16 @@ public sealed class CanonicalExamAttemptController(
             attempt.AutoGradedScore = 0m;
             attempt.FinalScore = null;
             attempt.GradingStatus = "PendingManual";
-            await academic.SaveChangesAsync(ct);
+            try
+            {
+                await using var transaction = await academic.Database.BeginTransactionAsync(ct);
+                await academic.SaveChangesAsync(ct);
+                await transaction.CommitAsync(ct);
+            }
+            catch (DbUpdateConcurrencyException)
+            {
+                return Conflict(new { message = "این تلاش هم‌زمان توسط درخواست دیگری ثبت شده است." });
+            }
             return Ok(new { attempt.Id, attempt.StatusId, attempt.SubmittedAt, attempt.AutoGradedScore, attempt.FinalScore, RequiresManualGrading = true, IsPdfOnly = false });
         }
         if (examQuestions.Count == 0)
@@ -296,7 +305,16 @@ public sealed class CanonicalExamAttemptController(
             attempt.StatusId = submittedStatus.Id;
             attempt.AutoGradedScore = null;
             attempt.FinalScore = null;
-            await academic.SaveChangesAsync(ct);
+            try
+            {
+                await using var transaction = await academic.Database.BeginTransactionAsync(ct);
+                await academic.SaveChangesAsync(ct);
+                await transaction.CommitAsync(ct);
+            }
+            catch (DbUpdateConcurrencyException)
+            {
+                return Conflict(new { message = "این تلاش هم‌زمان توسط درخواست دیگری ثبت شده است." });
+            }
             return Ok(new { attempt.Id, attempt.StatusId, attempt.SubmittedAt, attempt.AutoGradedScore, attempt.FinalScore, RequiresManualGrading = true, IsPdfOnly = true });
         }
         if (request.Answers.Select(x => x.ExamQuestionId).Distinct().Count() != request.Answers.Count ||
