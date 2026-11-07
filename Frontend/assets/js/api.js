@@ -707,7 +707,11 @@
     const usernameField = fields.find(field => field.hasAttribute('data-username-field'));
     if (usernameField) { usernameField.value = existing?.username || ''; usernameField.readOnly = Boolean(id); }
     const passwordField = fields.find(field => field.type === 'password');
-    if (passwordField) passwordField.value = '';
+    if (passwordField) {
+      passwordField.value = '';
+      const passwordWrapper = passwordField.closest('.field');
+      if (passwordWrapper) passwordWrapper.hidden = Boolean(id);
+    }
     const email = fields.find(field => field.type === 'email');
     const mobile = fields.find(field => field.type === 'tel');
     if (email) email.value = existing?.email || '';
@@ -833,6 +837,11 @@
       if (modal.id === 'studentModal') modal.dataset.editRole = 'Student';
       $('input, textarea', modal).forEach(field => { if (!['radio', 'checkbox', 'file'].includes(field.type)) field.value = ''; });
       $('[data-username-field]', modal).forEach(field => { field.readOnly = false; });
+      $('input[type="password"]', modal).forEach(field => {
+        field.value = '';
+        const wrapper = field.closest('.field');
+        if (wrapper) wrapper.hidden = false;
+      });
       $$('input[type="radio"]', modal).forEach((field, index) => { field.checked = index === 0; });
       $$('select', modal).forEach(select => { select.selectedIndex = 0; });
       const activeField = $('[data-user-active]', modal);
