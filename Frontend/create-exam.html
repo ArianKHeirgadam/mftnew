@@ -18,7 +18,7 @@
 .exam-form-grid .field{margin:0}.exam-form-grid .wide{grid-column:1/-1}
 .question-tools{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin:14px 0}
 .question-tools .input{flex:1;min-width:220px}
-.question-list{max-height:480px;overflow:auto;display:grid;gap:8px}
+.exam-import-folders{display:grid;gap:14px;margin:14px 0}.exam-import-folder-group{display:grid;gap:8px}.exam-import-folder-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:10px}.exam-import-folder{border:1px solid var(--border);border-radius:12px;background:var(--surface);padding:12px;text-align:right;cursor:pointer;color:var(--text);display:grid;gap:6px}.exam-import-folder.active{border-color:var(--primary);background:var(--surface-2);box-shadow:inset 0 0 0 1px var(--primary)}.exam-import-folder small{color:var(--text-soft)}.question-list{max-height:480px;overflow:auto;display:grid;gap:8px}
 .question-row{display:flex;align-items:flex-start;gap:12px;padding:13px;border:1px solid var(--border);border-radius:12px;background:var(--surface);cursor:pointer}
 .question-row:has(input:checked){border-color:var(--primary);background:color-mix(in srgb,var(--primary) 7%,var(--surface))}
 .question-row input{margin-top:5px;accent-color:var(--primary)}
@@ -59,6 +59,8 @@
       <div><h3>۲. سؤال‌های آزمون</h3><p class="text-soft text-sm mt-8">سؤال‌ها را از بانک انتخاب کنید. نوع هر سؤال هنگام تعریف همان سؤال مشخص می‌شود.</p></div>
       <a class="btn btn-outline btn-sm" href="question-bank.html" target="_blank" rel="noopener">+ تعریف سؤال جدید در بانک</a>
      </div>
+     <div class="exam-import-folders" id="examImportFolders"><div class="question-empty">در حال دریافت پوشه‌های سؤال...</div></div>
+     <p class="text-soft text-sm" id="examSelectedFolderHint">برای مشاهده سؤال‌ها، یکی از پوشه‌های موجود را انتخاب کنید. در این مرحله امکان ساخت پوشه وجود ندارد.</p>
      <div class="question-tools">
       <input class="input" id="questionSearch" type="search" placeholder="جستجو در سؤال‌ها...">
       <span class="badge badge-muted" id="questionCount">۰ سؤال انتخاب‌شده</span>
@@ -92,26 +94,34 @@
 <script>
 (async function(){
  const $=id=>document.getElementById(id), api=window.MftApi;
- const selectedIds=new Set();let lookups={categories:[],skills:[]},questions=[];
+ const selectedIds=new Set();let lookups={categories:[],skills:[]},questions=[],importBatches=[],selectedBatchId=null;
  let pendingExamId=null,pendingPdfUploaded=false,pendingEssaySectionId=null,pendingEssayPdfUploaded=false;
  const escapeHtml=value=>String(value??'').replace(/[&<>"']/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
  const typeNames={MultipleChoice:'چهارگزینه‌ای',Essay:'تشریحی',Matching:'وصل‌کردنی'};
  const steps=['مشخصات آزمون','سؤال‌ها','بررسی و انتشار'];let current=1;
  function showStep(n){current=n;document.querySelectorAll('.exam-panel').forEach(p=>p.classList.toggle('active',p.id==='panel'+n));$('examSteps').innerHTML=steps.map((s,i)=>{const k=i+1;return '<div class="exam-step '+(k===n?'active':k<n?'done':'')+'"><span class="n">'+(k<n?'✓':k)+'</span><span>'+s+'</span></div>'+(i<2?'<span style="width:28px;height:1px;background:var(--border)"></span>':'');}).join('');}
  function selectedQuestions(){return questions.filter(q=>selectedIds.has(String(q.id)));}
+ function renderImportFolders(){
+  const host=$('examImportFolders');
+  const grouped=new Map();
+  importBatches.forEach(batch=>{const key=String(batch.teacherUserId);if(!grouped.has(key))grouped.set(key,{name:batch.teacherName||'استاد',items:[]});grouped.get(key).items.push(batch);});
+  host.innerHTML=importBatches.length?[...grouped.entries()].map(([teacherId,group])=>'<section class="exam-import-folder-group"><b>استاد: '+escapeHtml(group.name)+'</b><div class="exam-import-folder-grid">'+group.items.map(batch=>'<button type="button" class="exam-import-folder '+(Number(selectedBatchId)===Number(batch.id)?'active':'')+'" data-exam-batch="'+Number(batch.id)+'"><b>'+escapeHtml(batch.title)+'</b><span class="badge badge-muted">'+Number(batch.questionCount||0).toLocaleString('fa-IR')+' سؤال</span><small>'+escapeHtml(new Date(batch.createdAt).toLocaleDateString('fa-IR'))+'</small></button>').join('')+'</div></section>').join(''):'<div class="question-empty">هنوز پوشه‌ای برای سؤال‌های گروهی ثبت نشده است.</div>';
+  const selected=importBatches.find(batch=>Number(batch.id)===Number(selectedBatchId));
+  $('examSelectedFolderHint').textContent=selected?'پوشه انتخاب‌شده: '+selected.title+' — استاد: '+(selected.teacherName||'استاد'):'برای مشاهده سؤال‌ها، یکی از پوشه‌های موجود را انتخاب کنید. در این مرحله امکان ساخت پوشه وجود ندارد.';
+ }
  function renderQuestions(){
   const categoryId=Number($('examCategory').value||0),term=$('questionSearch').value.trim().toLocaleLowerCase();
   const skillIds=new Set(lookups.skills.filter(s=>Number(s.examCategoryId)===categoryId).map(s=>Number(s.id)));
-  const rows=questions.filter(q=>skillIds.has(Number(q.skillId))&&!/essay/i.test(String(q.questionTypeCode||q.questionType||''))&&(!term||String(q.text||'').toLocaleLowerCase().includes(term)));
+  const rows=questions.filter(q=>selectedBatchId!==null&&Number(q.importBatchId)===Number(selectedBatchId)&&skillIds.has(Number(q.skillId))&&!/essay/i.test(String(q.questionTypeCode||q.questionType||''))&&(!term||String(q.text||'').toLocaleLowerCase().includes(term)));
   $('questionCount').textContent=selectedIds.size+' سؤال انتخاب‌شده';
-  $('questionList').innerHTML=rows.length?rows.map(q=>'<label class="question-row"><input type="checkbox" value="'+Number(q.id)+'" '+(selectedIds.has(String(q.id))?'checked':'')+'><span class="qtext">'+escapeHtml(q.text)+'</span><span class="badge badge-info">'+escapeHtml(typeNames[q.questionTypeCode]||q.questionTypeName||'سؤال')+'</span></label>').join(''):'<div class="question-empty">'+(categoryId?'برای این دسته‌بندی سؤال آنلاین قابل انتخابی پیدا نشد. سؤال‌های تشریحی متنی قدیمی در آزمون جدید قابل افزودن نیستند؛ برای Essay از بخش PDF تشریحی استفاده کنید.':'ابتدا دسته‌بندی آزمون را در مرحله مشخصات انتخاب کنید.')+'</div>';
+  $('questionList').innerHTML=rows.length?rows.map(q=>'<label class="question-row"><input type="checkbox" value="'+Number(q.id)+'" '+(selectedIds.has(String(q.id))?'checked':'')+'><span class="qtext">'+escapeHtml(q.text)+'</span><span class="badge badge-info">'+escapeHtml(typeNames[q.questionTypeCode]||q.questionTypeName||'سؤال')+'</span></label>').join(''):'<div class="question-empty">'+(categoryId?'برای این دسته‌بندی سؤال آنلاین قابل انتخابی پیدا نشد. سؤال‌های تشریحی متنی قدیمی در آزمون جدید قابل افزودن نیستند؛ برای Essay از بخش PDF تشریحی استفاده کنید.':'ابتدا یک پوشه از سؤال‌های استاد را انتخاب کنید و سپس دسته‌بندی آزمون را مشخص کنید.')+'</div>';
  }
  async function loadData(){
-  const [l,q,classes]=await Promise.all([api.request('/questions/lookups'),api.request('/questions'),api.request('/canonical/classes')]);
-  lookups=l||{categories:[],skills:[]};questions=Array.isArray(q)?q:[];
+  const [l,q,classes,batches]=await Promise.all([api.request('/questions/lookups'),api.request('/questions'),api.request('/canonical/classes'),api.request('/questions/import/batches')]);
+  lookups=l||{categories:[],skills:[]};questions=Array.isArray(q)?q:[];importBatches=Array.isArray(batches)?batches:[];
   $('examCategory').innerHTML='<option value="">انتخاب دسته‌بندی</option>'+lookups.categories.map(x=>'<option value="'+Number(x.id)+'">'+escapeHtml(x.name)+'</option>').join('');
   $('examClass').innerHTML='<option value="">انتخاب کلاس</option>'+(Array.isArray(classes)?classes:[]).map(x=>'<option value="'+Number(x.id)+'" data-department-id="'+Number(x.departmentId)+'">'+escapeHtml(x.name)+' — '+escapeHtml(x.department||'')+'</option>').join('');
-  renderQuestions();
+  renderImportFolders();renderQuestions();
  }
  function getEssayPdfSizeMb(){
   if(!$('essaySectionPdfFile').files[0])return null;
@@ -148,9 +158,10 @@
  $('toReview').addEventListener('click',()=>{const e=validateDetails();if(e)return window.showToast?.(e,'warn');if(!selectedIds.size&&!$('examPdfFile').files[0]&&!$('essaySectionPdfFile').files[0])return window.showToast?.('برای آزمون باید سؤال آنلاین یا یکی از فایل‌های PDF را انتخاب کنید.','warn');showSummary();showStep(3);});
  $('backToQuestions').addEventListener('click',()=>showStep(2));
  $('questionSearch').addEventListener('input',renderQuestions);
+ $('examImportFolders').addEventListener('click',event=>{const button=event.target.closest('[data-exam-batch]');if(!button)return;selectedBatchId=Number(button.dataset.examBatch);renderImportFolders();renderQuestions();});
  $('questionList').addEventListener('change',e=>{const input=e.target;if(!input.matches('input[type=checkbox]'))return;input.checked?selectedIds.add(String(input.value)):selectedIds.delete(String(input.value));$('questionCount').textContent=selectedIds.size+' سؤال انتخاب‌شده';});
  $('examCategory').addEventListener('change',()=>{selectedIds.clear();renderQuestions();});
- $('refreshQuestions').addEventListener('click',async()=>{try{questions=await api.request('/questions');questions=Array.isArray(questions)?questions:[];renderQuestions();window.showToast?.('بانک سؤال بروزرسانی شد.','ok');}catch(e){window.showToast?.(e.message||'دریافت بانک سؤال ناموفق بود.','danger');}});
+ $('refreshQuestions').addEventListener('click',async()=>{try{const [updatedQuestions,updatedBatches]=await Promise.all([api.request('/questions'),api.request('/questions/import/batches')]);questions=Array.isArray(updatedQuestions)?updatedQuestions:[];importBatches=Array.isArray(updatedBatches)?updatedBatches:[];renderImportFolders();renderQuestions();window.showToast?.('پوشه‌ها و بانک سؤال بروزرسانی شدند.','ok');}catch(e){window.showToast?.(e.message||'دریافت بانک سؤال ناموفق بود.','danger');}});
  $('createExam').addEventListener('click',async()=>{
   const err=validateDetails();if(err)return window.showToast?.(err,'warn');
    const chosen=selectedQuestions(),file=$('examPdfFile').files[0],essayFile=$('essaySectionPdfFile').files[0];
