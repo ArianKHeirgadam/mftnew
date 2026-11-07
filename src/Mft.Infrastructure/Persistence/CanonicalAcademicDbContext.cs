@@ -14,6 +14,7 @@ public sealed class CanonicalAcademicDbContext(
     public DbSet<CanonicalSkill> Skills => Set<CanonicalSkill>();
     public DbSet<CanonicalQuestionType> QuestionTypes => Set<CanonicalQuestionType>();
     public DbSet<CanonicalQuestion> Questions => Set<CanonicalQuestion>();
+    public DbSet<CanonicalQuestionImportBatch> QuestionImportBatches => Set<CanonicalQuestionImportBatch>();
     public DbSet<CanonicalMultipleChoiceOption> MultipleChoiceOptions => Set<CanonicalMultipleChoiceOption>();
     public DbSet<CanonicalMatchingPair> MatchingPairs => Set<CanonicalMatchingPair>();
     public DbSet<CanonicalEssayGradingCriterion> EssayGradingCriteria => Set<CanonicalEssayGradingCriterion>();
@@ -81,9 +82,20 @@ public sealed class CanonicalAcademicDbContext(
             e.Property(x => x.MetadataJson).HasColumnType("nvarchar(max)");
             e.Property(x => x.CreatedAt).HasColumnType("datetime2").HasDefaultValueSql("sysutcdatetime()");
             e.HasIndex(x => x.CreatedByUserId); e.HasIndex(x => x.QuestionTypeId); e.HasIndex(x => x.SkillId);
+            e.HasIndex(x => x.ImportBatchId);
             e.HasOne<CanonicalSkill>().WithMany().HasForeignKey(x => x.SkillId).OnDelete(DeleteBehavior.NoAction);
             e.HasOne<CanonicalQuestionType>().WithMany().HasForeignKey(x => x.QuestionTypeId).OnDelete(DeleteBehavior.NoAction);
             e.HasOne<CanonicalUser>().WithMany().HasForeignKey(x => x.CreatedByUserId).OnDelete(DeleteBehavior.NoAction);
+            e.HasOne<CanonicalQuestionImportBatch>().WithMany().HasForeignKey(x => x.ImportBatchId).OnDelete(DeleteBehavior.NoAction);
+        });
+        modelBuilder.Entity<CanonicalQuestionImportBatch>(e =>
+        {
+            e.ToTable("QuestionImportBatches"); e.HasKey(x => x.Id);
+            e.Property(x => x.Id).HasColumnType("bigint").UseIdentityColumn();
+            e.Property(x => x.Title).HasMaxLength(200).IsRequired();
+            e.Property(x => x.CreatedAt).HasColumnType("datetime2").HasDefaultValueSql("sysutcdatetime()");
+            e.HasIndex(x => new { x.TeacherUserId, x.CreatedAt });
+            e.HasOne<CanonicalUser>().WithMany().HasForeignKey(x => x.TeacherUserId).OnDelete(DeleteBehavior.NoAction);
         });
         modelBuilder.Entity<CanonicalMultipleChoiceOption>(e =>
         {
@@ -365,7 +377,8 @@ public sealed class CanonicalAcademicDbContext(
 public sealed class CanonicalExamCategory { public long Id { get; set; } public string Name { get; set; } = ""; public ICollection<CanonicalSkill> Skills { get; set; } = new List<CanonicalSkill>(); }
 public sealed class CanonicalSkill { public long Id { get; set; } public long ExamCategoryId { get; set; } public string Name { get; set; } = ""; public CanonicalExamCategory ExamCategory { get; set; } = null!; }
 public sealed class CanonicalQuestionType { public long Id { get; set; } public string Code { get; set; } = ""; public string Name { get; set; } = ""; }
-public sealed class CanonicalQuestion { public long Id { get; set; } public long SkillId { get; set; } public long QuestionTypeId { get; set; } public string Text { get; set; } = ""; public decimal Points { get; set; } = 1m; public byte? DifficultyLevel { get; set; } public long CreatedByUserId { get; set; } public string? MetadataJson { get; set; } public DateTime CreatedAt { get; set; } }
+public sealed class CanonicalQuestion { public long Id { get; set; } public long SkillId { get; set; } public long QuestionTypeId { get; set; } public string Text { get; set; } = ""; public decimal Points { get; set; } = 1m; public byte? DifficultyLevel { get; set; } public long CreatedByUserId { get; set; } public long? ImportBatchId { get; set; } public string? MetadataJson { get; set; } public DateTime CreatedAt { get; set; } }
+public sealed class CanonicalQuestionImportBatch { public long Id { get; set; } public long TeacherUserId { get; set; } public string Title { get; set; } = ""; public DateTime CreatedAt { get; set; } }
 public sealed class CanonicalMultipleChoiceOption { public long Id { get; set; } public long QuestionId { get; set; } public string OptionText { get; set; } = ""; public bool IsCorrect { get; set; } public int DisplayOrder { get; set; } }
 public sealed class CanonicalMatchingPair { public long Id { get; set; } public long QuestionId { get; set; } public string LeftItem { get; set; } = ""; public string RightItem { get; set; } = ""; public int DisplayOrder { get; set; } }
 public sealed class CanonicalEssayGradingCriterion { public long Id { get; set; } public long QuestionId { get; set; } public string CriteriaText { get; set; } = ""; public decimal MaxPoints { get; set; } }
