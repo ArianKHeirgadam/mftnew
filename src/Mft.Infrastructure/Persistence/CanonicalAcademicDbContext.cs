@@ -95,6 +95,7 @@ public sealed class CanonicalAcademicDbContext(
             e.Property(x => x.Title).HasMaxLength(200).IsRequired();
             e.Property(x => x.CreatedAt).HasColumnType("datetime2").HasDefaultValueSql("sysutcdatetime()");
             e.HasIndex(x => new { x.TeacherUserId, x.CreatedAt });
+            e.HasIndex(x => new { x.TeacherUserId, x.Title }).IsUnique();
             e.HasOne<CanonicalUser>().WithMany().HasForeignKey(x => x.TeacherUserId).OnDelete(DeleteBehavior.NoAction);
         });
         modelBuilder.Entity<CanonicalMultipleChoiceOption>(e =>
