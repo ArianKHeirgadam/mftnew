@@ -350,7 +350,7 @@
 
   async function loadStudentPerformance() {
     if (!document.body.matches('[data-active="dashboard"]') || (currentUser()?.role || '').toLowerCase() !== 'student') return;
-    const attempts = await request('/results');
+    const attempts = await request('/canonical/results');
     const scored = attempts.filter(attempt => attempt.score != null).sort((a, b) => new Date(a.submittedAt || a.startedAt) - new Date(b.submittedAt || b.startedAt));
     window.MftChartData = { ...(window.MftChartData || {}), performance: scored.map((attempt, index) => ({ label: attempt.examTitle || `آزمون ${index + 1}`, score: attempt.score })) };
     document.dispatchEvent(new Event('mft:data-ready'));
@@ -377,8 +377,8 @@
         : '<li class="text-soft">اعلانی ثبت نشده است.</li>';
     }
     if (role === 'department') {
-      const exams = await request('/exams');
-      renderRows('#departmentExamsBody', exams, exam => `<tr><td>${escapeHtml(exam.title)}</td><td>—</td><td>${exam.startsAt ? new Date(exam.startsAt).toLocaleDateString('fa-IR') : '—'}</td><td>—</td><td>${exam.isPublished ? 'منتشرشده' : 'پیش‌نویس'}</td><td><a href="results.html?examId=${exam.id}" class="btn btn-ghost btn-sm">نتایج</a></td></tr>`, 6);
+      const exams = await request('/canonical/exams');
+      renderRows('#departmentExamsBody', exams, exam => `<tr><td>${escapeHtml(exam.title)}</td><td>—</td><td>${exam.startAt ? new Date(exam.startAt).toLocaleDateString('fa-IR') : '—'}</td><td>—</td><td>${exam.isPublished ? 'منتشرشده' : 'پیش‌نویس'}</td><td><a href="results.html?examId=${exam.id}" class="btn btn-ghost btn-sm">نتایج</a></td></tr>`, 6);
     }
   }
 
@@ -950,7 +950,7 @@
             throw error;
           }
         } else if (target.dataset.resultView) {
-          const result = await request(`/results/${target.dataset.resultView}`);
+          const result = await request(`/canonical/results/${target.dataset.resultView}`);
           const answers = result.answers.map(answer => `سؤال ${answer.questionId}: ${escapeHtml(answer.answer || 'بدون پاسخ')} — نمره ${faNumber(answer.awardedScore)}`).join('\n');
           alert(`${result.exam}\nوضعیت: ${result.status}\nنمره: ${result.score ?? 'در انتظار تصحیح'}\n\n${answers}`);
         }
