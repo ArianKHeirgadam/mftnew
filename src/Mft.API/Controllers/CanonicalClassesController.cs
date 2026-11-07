@@ -144,6 +144,53 @@ public sealed class CanonicalClassesController(
         return Ok(new { classId = id, teacherCount = validIds.Count, teacherIds = validIds });
     }
 
+    [HttpPut("{id:long}/roster")]
+    public async Task<IActionResult> UpdateRoster(long id, CanonicalClassRosterRequest request, CancellationToken ct)
+    {
+        var classInfo = await academic.Classes.FirstOrDefaultAsync(x => x.Id == id, ct);
+        if (classInfo is null) return NotFound();
+        if (!CanManageDepartment(classInfo.DepartmentId)) return Forbid();
+
+        var studentIds = request.StudentIds ?? new List<long>();
+        var teacherIds = request.TeacherIds ?? new List<long>();
+        if (studentIds.Count > 2000 || studentIds.Any(x => x <= 0) || studentIds.Distinct().Count() != studentIds.Count)
+            return BadRequest(new { message = "فهرست دانشجویان نامعتبر یا دارای شناسه تکراری است." });
+        if (teacherIds.Count > 500 || teacherIds.Any(x => x <= 0) || teacherIds.Distinct().Count() != teacherIds.Count)
+            return BadRequest(new { message = "فهرست استادان نامعتبر یا دارای شناسه تکراری است." });
+
+        var validStudentIds = await identity.Users.Where(x => studentIds.Contains(x.Id) &&
+            x.DepartmentId == classInfo.DepartmentId && x.IsActive &&
+            x.UserRoles.Any(ur => ur.Role.Name == CanonicalRoleNames.Student)).Select(x => x.Id).ToListAsync(ct);
+        if (validStudentIds.Count != studentIds.Count)
+            return BadRequest(new { message = "همه دانشجویان باید دانشجوی فعال همان دپارتمان باشند." });
+
+        var validTeacherIds = await identity.Users.Where(x => teacherIds.Contains(x.Id) &&
+            x.DepartmentId == classInfo.DepartmentId && x.IsActive &&
+            x.UserRoles.Any(ur => ur.Role.Name == CanonicalRoleNames.Teacher)).Select(x => x.Id).ToListAsync(ct);
+        if (validTeacherIds.Count != teacherIds.Count)
+            return BadRequest(new { message = "همه استادان باید استاد فعال همان دپارتمان باشند." });
+
+        await using var transaction = await academic.Database.BeginTransactionAsync(ct);
+        var currentStudents = await academic.ClassMembers.Where(x => x.ClassId == id).ToListAsync(ct);
+        var desiredStudents = validStudentIds.ToHashSet();
+        var existingStudents = currentStudents.Select(x => x.StudentUserId).ToHashSet();
+        academic.ClassMembers.RemoveRange(currentStudents.Where(x => !desiredStudents.Contains(x.StudentUserId)));
+        var addedAt = DateTime.UtcNow;
+        academic.ClassMembers.AddRange(desiredStudents.Except(existingStudents).Select(studentId =>
+            new CanonicalClassMember { ClassId = id, StudentUserId = studentId, AddedAt = addedAt }));
+
+        var currentTeachers = await academic.ClassTeachers.Where(x => x.ClassId == id).ToListAsync(ct);
+        var desiredTeachers = validTeacherIds.ToHashSet();
+        var existingTeachers = currentTeachers.Select(x => x.TeacherUserId).ToHashSet();
+        academic.ClassTeachers.RemoveRange(currentTeachers.Where(x => !desiredTeachers.Contains(x.TeacherUserId)));
+        academic.ClassTeachers.AddRange(desiredTeachers.Except(existingTeachers).Select(teacherId =>
+            new CanonicalClassTeacher { ClassId = id, TeacherUserId = teacherId, AddedAt = addedAt }));
+
+        await academic.SaveChangesAsync(ct);
+        await transaction.CommitAsync(ct);
+        return Ok(new { classId = id, studentCount = validStudentIds.Count, teacherCount = validTeacherIds.Count });
+    }
+
     [HttpPost]
     public async Task<IActionResult> Create(CanonicalClassRequest request, CancellationToken ct)
     {
@@ -223,5 +270,11 @@ public sealed class CanonicalClassMembersRequest
 
 public sealed class CanonicalClassTeachersRequest
 {
+    public List<long> TeacherIds { get; set; } = new();
+}
+
+public sealed class CanonicalClassRosterRequest
+{
+    public List<long> StudentIds { get; set; } = new();
     public List<long> TeacherIds { get; set; } = new();
 }
