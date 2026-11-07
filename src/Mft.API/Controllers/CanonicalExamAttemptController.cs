@@ -67,7 +67,7 @@ public sealed class CanonicalExamAttemptController(
             .FirstOrDefaultAsync(x => x.Id == attemptId && x.ExamId == examId && x.StudentUserId == StudentId, ct);
         if (attempt is null) return NotFound();
         var exam = await academic.Exams.AsNoTracking().FirstAsync(x => x.Id == examId, ct);
-        var deadline = attempt.StartedAt.AddMinutes(exam.DurationMinutes);
+        var deadline = DateTime.SpecifyKind(attempt.StartedAt.AddMinutes(exam.DurationMinutes), DateTimeKind.Utc);
         if (attempt.StatusId != 1)
             return Conflict(new { message = "این تلاش قبلاً ثبت نهایی شده و دیگر قابل ادامه نیست.", attempt.StatusId, attempt.SubmittedAt });
         if (DateTime.UtcNow >= deadline)
@@ -91,7 +91,7 @@ public sealed class CanonicalExamAttemptController(
         var saved = await academic.StudentAnswers.AsNoTracking().Where(x => x.ExamAttemptId == attemptId)
             .ToDictionaryAsync(x => x.ExamQuestionId, x => x.AnswerJson, ct);
         var isPdfOnly = sections.Count == 0 && await academic.ExamDocuments.AnyAsync(x => x.ExamId == examId, ct);
-        return Ok(new { attempt.Id, attempt.StartedAt, Deadline = deadline, IsPdfOnly = isPdfOnly, Sections = sections, SavedAnswers = saved });
+        return Ok(new { attempt.Id, StartedAtUtc = DateTime.SpecifyKind(attempt.StartedAt, DateTimeKind.Utc), Deadline = deadline, ServerNowUtc = DateTime.UtcNow, IsPdfOnly = isPdfOnly, Sections = sections, SavedAnswers = saved });
     }
 
     [HttpPut("{attemptId:long}/answers")]
@@ -103,7 +103,7 @@ public sealed class CanonicalExamAttemptController(
         if (attempt.StatusId != 1)
             return Conflict(new { message = "این تلاش ثبت نهایی شده و پاسخ‌های آن قابل تغییر نیست." });
         var exam = await academic.Exams.AsNoTracking().FirstAsync(x => x.Id == examId, ct);
-        var deadline = attempt.StartedAt.AddMinutes(exam.DurationMinutes);
+        var deadline = DateTime.SpecifyKind(attempt.StartedAt.AddMinutes(exam.DurationMinutes), DateTimeKind.Utc);
         if (DateTime.UtcNow >= deadline)
             return Conflict(new { message = "مهلت آزمون به پایان رسیده است." });
         var validIds = await academic.ExamQuestions.AsNoTracking()
@@ -137,8 +137,11 @@ public sealed class CanonicalExamAttemptController(
         if (attempt.StatusId != 1)
             return Conflict(new { message = "این آزمون قبلاً ثبت نهایی شده است؛ امکان ارسال مجدد وجود ندارد." });
         var exam = await academic.Exams.AsNoTracking().FirstAsync(x => x.Id == examId, ct);
-        var deadline = attempt.StartedAt.AddMinutes(exam.DurationMinutes);
-        if (DateTime.UtcNow > deadline.AddSeconds(30))
+        var deadline = DateTime.SpecifyKind(attempt.StartedAt.AddMinutes(exam.DurationMinutes), DateTimeKind.Utc);
+        var serverNow = DateTime.UtcNow;
+        if (request.AutoSubmit && serverNow < deadline)
+            return Conflict(new { message = "زمان آزمون طبق ساعت سرور هنوز به پایان نرسیده است؛ پاسخ‌ها ثبت نهایی نشدند.", deadline });
+        if (serverNow > deadline.AddSeconds(30))
             return Conflict(new { message = "مهلت آزمون به پایان رسیده است." });
 
         var examQuestions = await academic.ExamQuestions.AsNoTracking()
@@ -249,6 +252,7 @@ public sealed class CanonicalExamAttemptController(
 public sealed class CanonicalSubmitAttemptRequest
 {
     public List<CanonicalSubmittedAnswer> Answers { get; set; } = new();
+    public bool AutoSubmit { get; set; }
 }
 public sealed class CanonicalSubmittedAnswer
 {
