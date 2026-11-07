@@ -26,7 +26,7 @@ public sealed class CanonicalClassesController(
 
         var rows = await query.OrderBy(x => x.Name).Select(x => new
         {
-            x.Id, x.Name, x.DepartmentId, x.Capacity,
+            x.Id, x.Name, x.DepartmentId, x.Capacity, x.Schedule,
             MemberCount = academic.ClassMembers.Count(m => m.ClassId == x.Id)
         }).ToListAsync(ct);
 
@@ -40,6 +40,7 @@ public sealed class CanonicalClassesController(
             id = x.Id, name = x.Name, departmentId = x.DepartmentId,
             department = departments.GetValueOrDefault(x.DepartmentId),
             capacity = x.Capacity,
+            schedule = x.Schedule,
             memberCount = x.MemberCount
         }));
     }
@@ -217,12 +218,49 @@ public sealed class CanonicalClassesController(
             Name = name,
             DepartmentId = departmentId.Value,
             Capacity = request.Capacity,
+            Schedule = string.IsNullOrWhiteSpace(request.Schedule) ? null : request.Schedule.Trim(),
             CreatedAt = DateTime.UtcNow
         };
         academic.Classes.Add(entity);
         await academic.SaveChangesAsync(ct);
         return CreatedAtAction(nameof(Members), new { id = entity.Id },
-            new { id = entity.Id, name = entity.Name, departmentId = entity.DepartmentId, capacity = entity.Capacity, memberCount = 0 });
+            new { id = entity.Id, name = entity.Name, departmentId = entity.DepartmentId, capacity = entity.Capacity, schedule = entity.Schedule, memberCount = 0 });
+    }
+
+    [HttpPut("{id:long}")]
+    public async Task<IActionResult> Update(long id, CanonicalClassUpdateRequest request, CancellationToken ct)
+    {
+        var entity = await academic.Classes.FirstOrDefaultAsync(x => x.Id == id, ct);
+        if (entity is null) return NotFound();
+        if (!CanManageDepartment(entity.DepartmentId)) return Forbid();
+        var name = request.Name?.Trim();
+        if (string.IsNullOrWhiteSpace(name) || name.Length > 200)
+            return BadRequest(new { message = "نام کلاس الزامی و حداکثر ۲۰۰ کاراکتر است." });
+        var schedule = request.Schedule?.Trim();
+        if (schedule?.Length > 200)
+            return BadRequest(new { message = "زمان برگزاری حداکثر ۲۰۰ کاراکتر است." });
+        if (await academic.Classes.AnyAsync(x => x.Id != id && x.DepartmentId == entity.DepartmentId && x.Name == name, ct))
+            return Conflict(new { message = "کلاسی با این نام در این دپارتمان وجود دارد." });
+        entity.Name = name;
+        entity.Schedule = string.IsNullOrWhiteSpace(schedule) ? null : schedule;
+        await academic.SaveChangesAsync(ct);
+        return Ok(new { id = entity.Id, name = entity.Name, schedule = entity.Schedule });
+    }
+
+    [HttpDelete("{id:long}")]
+    public async Task<IActionResult> Delete(long id, CancellationToken ct)
+    {
+        var entity = await academic.Classes.FirstOrDefaultAsync(x => x.Id == id, ct);
+        if (entity is null) return NotFound();
+        if (!CanManageDepartment(entity.DepartmentId)) return Forbid();
+        var hasStudents = await academic.ClassMembers.AnyAsync(x => x.ClassId == id, ct);
+        var hasTeachers = await academic.ClassTeachers.AnyAsync(x => x.ClassId == id, ct);
+        var hasExams = await academic.Exams.AnyAsync(x => x.ClassId == id, ct);
+        if (hasStudents || hasTeachers || hasExams)
+            return Conflict(new { message = "این کلاس عضو یا آزمون مرتبط دارد؛ برای جلوگیری از حذف سوابق، ابتدا ارتباط‌های آن را مدیریت کنید." });
+        academic.Classes.Remove(entity);
+        await academic.SaveChangesAsync(ct);
+        return NoContent();
     }
 
     [HttpPut("{id:long}/capacity")]
@@ -287,6 +325,13 @@ public sealed class CanonicalClassRequest
     public string Name { get; set; } = "";
     public long? DepartmentId { get; set; }
     public int? Capacity { get; set; }
+    public string? Schedule { get; set; }
+}
+
+public sealed class CanonicalClassUpdateRequest
+{
+    public string Name { get; set; } = "";
+    public string? Schedule { get; set; }
 }
 
 public sealed class CanonicalClassCapacityRequest
