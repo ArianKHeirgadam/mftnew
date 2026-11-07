@@ -147,12 +147,12 @@
               const isTeacher = role === 'teacher' || (item.roles || []).some(value => String(value).toLowerCase() === 'teacher');
               const isStudent = role === 'student' || (item.roles || []).some(value => String(value).toLowerCase() === 'student');
               if (!isTeacher && !isStudent) return;
-              results.push({ title: item.fullName || item.username, detail: (isTeacher ? 'استاد' : 'دانشجو') + ' · ' + (item.department || 'بدون دپارتمان'), href: isTeacher ? 'teachers.html' : 'students.html' });
+              results.push({ title: item.fullName || item.username, detail: (isTeacher ? 'استاد' : 'دانشجو') + ' · ' + (item.department || 'بدون دپارتمان'), href: (isTeacher ? 'teachers.html' : 'students.html') + '?search=' + encodeURIComponent(term) });
             });
           departments.filter(item => (item.name || '').toLocaleLowerCase().includes(term.toLocaleLowerCase()))
-            .slice(0, 4).forEach(item => results.push({ title: item.name, detail: 'دپارتمان', href: 'departments.html' }));
+            .slice(0, 4).forEach(item => results.push({ title: item.name, detail: 'دپارتمان', href: 'departments.html?search=' + encodeURIComponent(term) }));
           classes.filter(item => (item.name || '').toLocaleLowerCase().includes(term.toLocaleLowerCase()))
-            .slice(0, 4).forEach(item => results.push({ title: item.name, detail: 'کلاس · ' + (item.department || ''), href: 'classes.html' }));
+            .slice(0, 4).forEach(item => results.push({ title: item.name, detail: 'کلاس · ' + (item.department || ''), href: 'classes.html?search=' + encodeURIComponent(term) }));
           panel.innerHTML = '';
           if (!results.length) return showMessage('نتیجه‌ای برای جستجوی شما پیدا نشد.');
           results.slice(0, 12).forEach(item => {
@@ -184,7 +184,7 @@
     const studentBody = $('#studentsBody');
     const teacherBody = $('#teachersBody') || $('body[data-active="teachers"] table tbody');
     const searchField = $('main .table-toolbar .search-box input');
-    const search = searchField?.value.trim();
+    const search = searchField?.value.trim() || new URLSearchParams(location.search).get('search') || '';
 
     if (studentBody) {
       const rows = await request(`/users?role=Student${search ? `&search=${encodeURIComponent(search)}` : ''}`);
@@ -208,7 +208,7 @@
 
   async function loadDepartments() {
     if (!$('body[data-active="departments"]')) return;
-    const search = $('main .table-toolbar .search-box input')?.value.trim();
+    const search = $('main .table-toolbar .search-box input')?.value.trim() || new URLSearchParams(location.search).get('search') || '';
     const rows = await request(`/departments${search ? `?search=${encodeURIComponent(search)}` : ''}`);
     $$('[data-department-field]').forEach(select => {
       const selected = select.value;
