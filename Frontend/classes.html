@@ -8,7 +8,7 @@
   <link rel="stylesheet" href="assets/css/responsive.css">
   <link rel="stylesheet" href="assets/css/dark.css">
   <style>
-    .roster-list{display:grid;gap:8px;max-height:280px;overflow:auto;padding:2px}
+    .roster-list{display:grid;gap:8px;max-height:170px;overflow:auto;padding:2px}
     .roster-person{width:100%;display:flex;align-items:center;gap:12px;text-align:right;padding:12px 14px;border:1px solid var(--border);border-radius:12px;background:var(--surface);color:var(--text);cursor:pointer;transition:.18s}
     .roster-person:hover:not(:disabled){border-color:var(--primary);background:var(--surface-2)}
     .roster-person.is-selected{border-color:var(--primary);background:color-mix(in srgb,var(--primary) 8%,var(--surface))}
@@ -21,9 +21,11 @@
     .roster-preview-chip button{border:0;background:transparent;color:var(--danger);font-weight:700;cursor:pointer}
     .roster-preview-list{display:grid;gap:7px}
     .roster-empty{padding:18px 12px;text-align:center;border:1px dashed var(--border);border-radius:10px;color:var(--text-soft);font-size:12px}
-    #classRosterModal .modal-box{display:flex;flex-direction:column}
-    #classRosterModal .modal-body{overflow:auto}
-    @media(max-width:760px){#classRosterModal .modal-body .grid-2{grid-template-columns:1fr!important}#classRosterModal aside{position:static!important}}
+    #classRosterModal{z-index:1000;padding:12px 20px}
+    #classRosterModal .modal-box{display:flex;flex-direction:column;width:min(1280px,calc(100vw - 40px))!important;max-height:78dvh;min-height:0}
+    #classRosterModal .modal-body{overflow:auto;min-height:0}
+    #classRosterModal .modal-body>.grid-2{grid-template-columns:minmax(0,1.8fr) minmax(300px,1fr)!important}
+    @media(max-width:760px){#classRosterModal{padding:8px}#classRosterModal .modal-box{width:100%!important;max-height:calc(100dvh - 16px)}#classRosterModal .modal-body .grid-2{grid-template-columns:1fr!important}#classRosterModal aside{position:static!important}.roster-list{max-height:150px}}
   </style>
 </head>
 <body data-role="superadmin" data-active="classes">
@@ -136,6 +138,8 @@
   const api = () => window.MftApi;
   const sameDepartment = item => Number(item.departmentId) === Number(currentClass?.departmentId);
   const modal = () => $('#classRosterModal');
+  // Keep the modal outside animated/content stacking contexts so it overlays the sidebar and menus.
+  document.body.appendChild(modal());
 
   function renderPreview() {
     const selectedStudents = students.filter(item => selectedIds.has(Number(item.id)));
