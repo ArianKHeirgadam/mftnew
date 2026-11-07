@@ -26,6 +26,18 @@
         </div>
       </div>
 
+      <section class="card card-pad" id="taxonomyManagement" hidden style="margin-bottom:18px">
+        <h3 style="margin-bottom:12px">مدیریت دسته‌بندی‌ها و مهارت‌ها</h3>
+        <p class="text-soft text-sm" style="margin-bottom:14px">ابتدا دسته‌بندی بسازید و سپس مهارت‌های مربوط به آن را تعریف کنید. این اطلاعات در فرم ثبت سؤال استفاده می‌شوند.</p>
+        <div class="grid-2" style="align-items:end">
+          <div class="field"><label for="newCategoryName">دسته‌بندی جدید</label><input class="input" id="newCategoryName" maxlength="150" placeholder="مثلاً برنامه‌نویسی"></div>
+          <button class="btn btn-outline" id="createCategory">ثبت دسته‌بندی</button>
+          <div class="field"><label for="newSkillCategory">دسته‌بندی مهارت</label><select class="select" id="newSkillCategory"><option value="">ابتدا دسته‌بندی بسازید</option></select></div>
+          <div class="field"><label for="newSkillName">نام مهارت / سرفصل</label><input class="input" id="newSkillName" maxlength="100" placeholder="مثلاً ساختمان داده"></div>
+        </div>
+        <button class="btn btn-primary" id="createSkill">ثبت مهارت</button>
+      </section>
+
       <div class="tabs" data-tabs>
         <button class="tab-btn active" data-tab="tabAll">همه (۱۲۴۰)</button>
         <button class="tab-btn" data-tab="tabMcq">چهارگزینه‌ای (۹۸۰)</button>
@@ -128,6 +140,8 @@
   try{
    lookups=await api.request('/questions/lookups');
    skill.innerHTML='<option value="">انتخاب مهارت</option>'+lookups.skills.map(x=>'<option value="'+x.id+'">'+esc(x.name)+' — '+esc(lookups.categories.find(c=>Number(c.id)===Number(x.examCategoryId))?.name||'')+'</option>').join('');
+   const taxonomyCategory=document.getElementById('newSkillCategory');
+   if(taxonomyCategory)taxonomyCategory.innerHTML='<option value="">انتخاب دسته‌بندی</option>'+lookups.categories.map(x=>'<option value="'+x.id+'">'+esc(x.name)+'</option>').join('');
    if(categoryFilter)categoryFilter.innerHTML='<option value="">همه دسته‌بندی‌ها</option>'+lookups.categories.map(x=>'<option value="'+esc(x.name)+'">'+esc(x.name)+'</option>').join('');
    if(!lookups.skills.length) notify('هیچ مهارتی در بانک اطلاعاتی ثبت نشده است؛ ابتدا دسته‌بندی و مهارت‌ها باید در دیتابیس تعریف شوند.','warn');
   }catch(e){skill.innerHTML='<option value="">دریافت مهارت‌ها ناموفق بود</option>';notify(e.message,'danger');}
@@ -163,6 +177,31 @@
    notify(id?'سؤال با موفقیت ویرایش شد.':'سؤال با موفقیت ذخیره شد.','ok');
    location.reload();
   }catch(e){notify(e.message||'ذخیره سؤال ناموفق بود.','danger');}
+ });
+ const taxonomyPanel=document.getElementById('taxonomyManagement');
+ api.request('/auth/me').then(user=>{
+  if(String(user.role||'').toLowerCase()==='superadmin')taxonomyPanel.hidden=false;
+ }).catch(()=>{});
+ document.getElementById('createCategory').addEventListener('click',async()=>{
+  const name=document.getElementById('newCategoryName').value.trim();
+  if(!name)return notify('نام دسته‌بندی را وارد کنید.','warn');
+  try{
+   await api.request('/questions/lookups/categories',{method:'POST',body:JSON.stringify({name})});
+   document.getElementById('newCategoryName').value='';
+   await loadCanonicalLookups();
+   notify('دسته‌بندی ثبت شد.','ok');
+  }catch(e){notify(e.message||'ثبت دسته‌بندی ناموفق بود.','danger');}
+ });
+ document.getElementById('createSkill').addEventListener('click',async()=>{
+  const name=document.getElementById('newSkillName').value.trim();
+  const examCategoryId=Number(document.getElementById('newSkillCategory').value||0);
+  if(!name||!examCategoryId)return notify('نام مهارت و دسته‌بندی را انتخاب کنید.','warn');
+  try{
+   await api.request('/questions/lookups/skills',{method:'POST',body:JSON.stringify({name,examCategoryId})});
+   document.getElementById('newSkillName').value='';
+   await loadCanonicalLookups();
+   notify('مهارت ثبت شد و به فهرست انتخاب سؤال اضافه شد.','ok');
+  }catch(e){notify(e.message||'ثبت مهارت ناموفق بود.','danger');}
  });
  if(searchField)searchField.addEventListener('input',renderQuestions);
  [categoryFilter,difficultyFilter].forEach(x=>x?.addEventListener('change',renderQuestions));
