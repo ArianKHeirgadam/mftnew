@@ -101,9 +101,9 @@
  function renderQuestions(){
   const categoryId=Number($('examCategory').value||0),term=$('questionSearch').value.trim().toLocaleLowerCase();
   const skillIds=new Set(lookups.skills.filter(s=>Number(s.examCategoryId)===categoryId).map(s=>Number(s.id)));
-  const rows=questions.filter(q=>skillIds.has(Number(q.skillId))&&(!term||String(q.text||'').toLocaleLowerCase().includes(term)));
+  const rows=questions.filter(q=>skillIds.has(Number(q.skillId))&&!/essay/i.test(String(q.questionTypeCode||q.questionType||''))&&(!term||String(q.text||'').toLocaleLowerCase().includes(term)));
   $('questionCount').textContent=selectedIds.size+' سؤال انتخاب‌شده';
-  $('questionList').innerHTML=rows.length?rows.map(q=>'<label class="question-row"><input type="checkbox" value="'+Number(q.id)+'" '+(selectedIds.has(String(q.id))?'checked':'')+'><span class="qtext">'+escapeHtml(q.text)+'</span><span class="badge badge-info">'+escapeHtml(typeNames[q.questionTypeCode]||q.questionTypeName||'سؤال')+'</span></label>').join(''):'<div class="question-empty">'+(categoryId?'برای این دسته‌بندی سؤالی در بانک پیدا نشد. می‌توانید سؤال جدید تعریف کنید یا آزمون را با PDF بسازید.':'ابتدا دسته‌بندی آزمون را در مرحله مشخصات انتخاب کنید.')+'</div>';
+  $('questionList').innerHTML=rows.length?rows.map(q=>'<label class="question-row"><input type="checkbox" value="'+Number(q.id)+'" '+(selectedIds.has(String(q.id))?'checked':'')+'><span class="qtext">'+escapeHtml(q.text)+'</span><span class="badge badge-info">'+escapeHtml(typeNames[q.questionTypeCode]||q.questionTypeName||'سؤال')+'</span></label>').join(''):'<div class="question-empty">'+(categoryId?'برای این دسته‌بندی سؤال آنلاین قابل انتخابی پیدا نشد. سؤال‌های تشریحی متنی قدیمی در آزمون جدید قابل افزودن نیستند؛ برای Essay از بخش PDF تشریحی استفاده کنید.':'ابتدا دسته‌بندی آزمون را در مرحله مشخصات انتخاب کنید.')+'</div>';
  }
  async function loadData(){
   const [l,q,classes]=await Promise.all([api.request('/questions/lookups'),api.request('/questions'),api.request('/canonical/classes')]);
