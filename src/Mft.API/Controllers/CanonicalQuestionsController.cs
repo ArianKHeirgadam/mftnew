@@ -118,9 +118,12 @@ public sealed class CanonicalQuestionsController(
             DifficultyLevel = request.DifficultyLevel, CreatedByUserId = CurrentUserId.Value,
             MetadataJson = request.Metadata is null ? null : JsonSerializer.Serialize(request.Metadata)
         };
+        await using var transaction = await academic.Database.BeginTransactionAsync(ct);
         academic.Questions.Add(entity);
+        await academic.SaveChangesAsync(ct); // Generate the database identity before creating child rows.
         ApplyChildren(entity, request);
         await academic.SaveChangesAsync(ct);
+        await transaction.CommitAsync(ct);
         return CreatedAtAction(nameof(Get), new { id = entity.Id }, new { id = entity.Id });
     }
 
