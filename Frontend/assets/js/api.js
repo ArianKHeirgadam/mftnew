@@ -12,7 +12,7 @@
   const $$ = (selector, root = document) => [...root.querySelectorAll(selector)];
   const escapeHtml = value => String(value ?? '').replace(/[&<>"']/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[ch]);
   const faNumber = value => Number(value || 0).toLocaleString('fa-IR');
-  const parseUtcDate = value => { if (!value) return null; const raw=String(value); const normalized=/(?:Z|[+-]\\d{2}:?\\d{2})$/i.test(raw)?raw:raw+'Z'; const date=new Date(normalized); return Number.isNaN(date.getTime())?null:date; };
+  const parseUtcDate = value => { if (!value) return null; const raw=String(value); const normalized=/(?:Z|[+-]\d{2}:?\d{2})$/i.test(raw)?raw:raw+'Z'; const date=new Date(normalized); return Number.isNaN(date.getTime())?null:date; };
   if (!document.querySelector('script[data-mft-persian-picker]')) {
     const pickerScript = document.createElement('script');
     pickerScript.src = 'assets/js/persian-date-picker.js';
@@ -421,7 +421,7 @@
     const header = $('body[data-active="results"] table thead tr');
     if (header) header.innerHTML = '<th>#</th><th>آزمون</th><th>دانشجو</th><th>وضعیت</th><th>نمره</th>';
     renderRows('body[data-active="results"] table tbody', rows, row => `<tr>
-      <td><a href="results.html?attemptId=${encodeURIComponent(row.id)}">${escapeHtml(String(row.id).slice(0, 8))}</a></td><td>${escapeHtml(row.examTitle)}</td><td>${escapeHtml(row.studentName || '—')}</td>
+      <td><a href="results.html?attemptId=${encodeURIComponent(row.id)}">${escapeHtml(String(row.id).slice(0, 8))}</a></td><td>${escapeHtml(row.examTitle)}</td><td>${escapeHtml(row.studentName || '—')}<div class="text-soft text-sm">شماره دانشجویی: ${escapeHtml(row.studentNumber || 'ثبت نشده')}</div></td>
       <td>${row.status === 'InProgress' ? 'در حال برگزاری' : row.status === 'Submitted' ? 'تصحیح خودکار انجام شد' : row.status === 'PartiallyGraded' ? (row.hasAutoGradedAnswers ? 'نمره تستی آماده — تشریحی در انتظار تصحیح' : 'در انتظار تصحیح تشریحی') : row.status === 'FullyGraded' ? 'تصحیح کامل' : 'در انتظار بررسی'}</td>
       <td>${row.score == null ? (row.resultsPublished ? 'در انتظار تصحیح' : 'منتشر نشده') : faNumber(row.score)}</td></tr>`, 5);
 
