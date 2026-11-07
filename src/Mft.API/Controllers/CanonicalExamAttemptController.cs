@@ -214,7 +214,19 @@ public sealed class CanonicalExamAttemptController(
                     ExamAttemptId = attemptId, ExamQuestionId = answer.ExamQuestionId, AnswerJson = json
                 });
         }
-        await academic.SaveChangesAsync(ct);
+        // Touch the attempt row even when StatusId remains InProgress. RowVersion then
+        // serializes autosave against submit and against another concurrent autosave.
+        academic.Entry(attempt).Property(x => x.StatusId).IsModified = true;
+        try
+        {
+            await using var saveTransaction = await academic.Database.BeginTransactionAsync(ct);
+            await academic.SaveChangesAsync(ct);
+            await saveTransaction.CommitAsync(ct);
+        }
+        catch (DbUpdateConcurrencyException)
+        {
+            return Conflict(new { message = "این تلاش هم‌زمان در درخواست دیگری تغییر کرده است؛ پاسخ‌ها را دوباره بارگذاری و ذخیره کنید." });
+        }
         return Ok(new { savedCount = request.Answers.Count, savedAt = DateTime.UtcNow });
     }
 
@@ -247,6 +259,7 @@ public sealed class CanonicalExamAttemptController(
             return Conflict(new { message = "فایل PDF صورت سؤال برای یک یا چند بخش تشریحی موجود نیست.", missingSectionIds = missingQuestionPaperIds });
         if (missingAnswerIds.Length > 0 && !request.AutoSubmit)
             return BadRequest(new { message = "برای ثبت نهایی، پاسخ PDF تمام بخش‌های تشریحی را بارگذاری کنید.", missingSectionIds = missingAnswerIds });
+        attempt.ManualReviewRequired = missingAnswerIds.Length > 0;
         // At the deadline, auto-submit locks the attempt even if a PDF was omitted.
         // The manual grading workflow can then flag the missing section response.
 
@@ -270,7 +283,16 @@ public sealed class CanonicalExamAttemptController(
             attempt.AutoGradedScore = 0m;
             attempt.FinalScore = null;
             attempt.GradingStatus = "PendingManual";
-            await academic.SaveChangesAsync(ct);
+            try
+            {
+                await using var transaction = await academic.Database.BeginTransactionAsync(ct);
+                await academic.SaveChangesAsync(ct);
+                await transaction.CommitAsync(ct);
+            }
+            catch (DbUpdateConcurrencyException)
+            {
+                return Conflict(new { message = "این تلاش هم‌زمان توسط درخواست دیگری ثبت شده است." });
+            }
             return Ok(new { attempt.Id, attempt.StatusId, attempt.SubmittedAt, attempt.AutoGradedScore, attempt.FinalScore, RequiresManualGrading = true, IsPdfOnly = false });
         }
         if (examQuestions.Count == 0)
@@ -283,7 +305,16 @@ public sealed class CanonicalExamAttemptController(
             attempt.StatusId = submittedStatus.Id;
             attempt.AutoGradedScore = null;
             attempt.FinalScore = null;
-            await academic.SaveChangesAsync(ct);
+            try
+            {
+                await using var transaction = await academic.Database.BeginTransactionAsync(ct);
+                await academic.SaveChangesAsync(ct);
+                await transaction.CommitAsync(ct);
+            }
+            catch (DbUpdateConcurrencyException)
+            {
+                return Conflict(new { message = "این تلاش هم‌زمان توسط درخواست دیگری ثبت شده است." });
+            }
             return Ok(new { attempt.Id, attempt.StatusId, attempt.SubmittedAt, attempt.AutoGradedScore, attempt.FinalScore, RequiresManualGrading = true, IsPdfOnly = true });
         }
         if (request.Answers.Select(x => x.ExamQuestionId).Distinct().Count() != request.Answers.Count ||
@@ -384,7 +415,16 @@ public sealed class CanonicalExamAttemptController(
         attempt.SubmittedAt = DateTime.UtcNow;
         attempt.StatusId = pendingManual ? partial.Id : status.Id;
         if (!pendingManual) attempt.FinalScore = autoScore;
-        await academic.SaveChangesAsync(ct);
+        try
+        {
+            await using var submitTransaction = await academic.Database.BeginTransactionAsync(ct);
+            await academic.SaveChangesAsync(ct);
+            await submitTransaction.CommitAsync(ct);
+        }
+        catch (DbUpdateConcurrencyException)
+        {
+            return Conflict(new { message = "این تلاش قبلاً توسط درخواست دیگری ثبت یا تغییر داده شده است؛ ثبت دوباره انجام نشد." });
+        }
         return Ok(new { attempt.Id, attempt.StatusId, attempt.SubmittedAt, attempt.AutoGradedScore, attempt.FinalScore, RequiresManualGrading = pendingManual });
     }
 }
