@@ -31,7 +31,12 @@ public sealed class CanonicalExamAttemptController(
             } while (token == 0 || !usedTokens.Add(token));
             result.Add(new MatchingRightMapItem(pairId, token));
         }
-        return result.OrderBy(_ => RandomNumberGenerator.GetInt32(int.MaxValue)).ToList();
+        for (var i = result.Count - 1; i > 0; i--)
+        {
+            var j = RandomNumberGenerator.GetInt32(i + 1);
+            (result[i], result[j]) = (result[j], result[i]);
+        }
+        return result;
     }
 
     private long? StudentId => long.TryParse(User.FindFirstValue(ClaimTypes.NameIdentifier), out var id) ? id : null;
@@ -142,6 +147,13 @@ public sealed class CanonicalExamAttemptController(
         var orderRows = await academic.ExamAttemptQuestionOrders.AsNoTracking()
             .Where(x => x.ExamAttemptId == attemptId && x.MatchingRightOrderJson != null)
             .ToDictionaryAsync(x => x.ExamQuestionId, x => x.MatchingRightOrderJson!, ct);
+        var missingMatchingOrder = sections.SelectMany(s => s.Questions)
+            .Where(q => string.Equals(q.QuestionType, "Matching", StringComparison.OrdinalIgnoreCase) &&
+                q.MatchingPairs.Count > 0 && !orderRows.ContainsKey(q.ExamQuestionId))
+            .Select(q => q.ExamQuestionId).ToArray();
+        if (missingMatchingOrder.Length > 0)
+            return Conflict(new { message = "اطلاعات ترتیب وصل‌کردنی برای این تلاش قدیمی موجود نیست؛ برای حفظ داده‌های تاریخی، ترتیب جدیدی ساخته نمی‌شود.", examQuestionIds = missingMatchingOrder });
+
         var sectionsForResponse = sections.Select(section => new
         {
             section.Id, section.SkillId, section.DurationMinutes, section.DisplayOrder, section.WeightPercent,
