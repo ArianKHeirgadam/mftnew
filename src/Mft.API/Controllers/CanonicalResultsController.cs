@@ -82,7 +82,7 @@ public sealed class CanonicalResultsController(
             where answer.ExamAttemptId == attemptId
             orderby examQuestion.DisplayOrder
             select new {
-                answer.Id, answer.ExamQuestionId, question.Id as QuestionId,
+                answer.Id, answer.ExamQuestionId, QuestionId = question.Id,
                 question.Text, question.QuestionTypeId, answer.AnswerJson,
                 answer.IsAutoGraded, answer.Score, answer.GradedByUserId, answer.GradedAt,
                 examQuestion.PointsOverride, question.Points
@@ -238,5 +238,4 @@ public sealed class CanonicalResultsController(
 public sealed class CanonicalManualGradeRequest
 {
     public decimal Score { get; set; }
-    public string? Comment { get; set; }
 }
