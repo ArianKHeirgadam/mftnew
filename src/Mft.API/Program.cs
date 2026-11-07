@@ -39,6 +39,7 @@ builder.Services.AddDbContext<CanonicalOperationsDbContext>(options =>
 
 builder.Services.AddScoped<IAuthService, AuthService>();
 builder.Services.AddScoped<ITokenService, TokenService>();
+builder.Services.AddHostedService<CanonicalExamAutoSubmitWorker>();
 
 // --------------------------------------------------
 // JWT Authentication
