@@ -100,7 +100,7 @@
 <script>
 (() => {
   const $ = selector => document.querySelector(selector);
-  const $ = selector => [...document.querySelectorAll(selector)];
+  const all = selector => Array.from(document.querySelectorAll(selector));
   const esc = value => String(value ?? '').replace(/[&<>"']/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
   let classes = [], students = [], teachers = [], selectedIds = new Set(), selectedTeacherIds = new Set(), currentClass = null, me = null;
   const isSuperAdmin = () => String(me?.role || '').toLowerCase() === 'superadmin';
@@ -242,7 +242,7 @@
     modal().classList.add('show');
     renderStudents(); renderTeachers();
   });
-  $$('[data-roster-close]').forEach(button => button.addEventListener('click', () => modal().classList.remove('show')));
+  all('[data-roster-close]').forEach(button => button.addEventListener('click', () => modal().classList.remove('show')));
   modal().addEventListener('click', event => { if (event.target === modal()) modal().classList.remove('show'); });
 
   $('#classStudents').addEventListener('change', event => {
