@@ -33,6 +33,8 @@ public sealed class CanonicalAcademicDbContext(
     public DbSet<CanonicalExamAttemptQuestionOrder> ExamAttemptQuestionOrders => Set<CanonicalExamAttemptQuestionOrder>();
     public DbSet<CanonicalExamSectionManualGrade> ExamSectionManualGrades => Set<CanonicalExamSectionManualGrade>();
     public DbSet<CanonicalExamSectionManualGradeHistory> ExamSectionManualGradeHistory => Set<CanonicalExamSectionManualGradeHistory>();
+    public DbSet<CanonicalExamAttemptManualGrade> ExamAttemptManualGrades => Set<CanonicalExamAttemptManualGrade>();
+    public DbSet<CanonicalExamAttemptManualGradeHistory> ExamAttemptManualGradeHistory => Set<CanonicalExamAttemptManualGradeHistory>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -305,6 +307,34 @@ public sealed class CanonicalAcademicDbContext(
             e.HasOne<CanonicalUser>().WithMany().HasForeignKey(x => x.ChangedByUserId).OnDelete(DeleteBehavior.NoAction);
         });
 
+        modelBuilder.Entity<CanonicalExamAttemptManualGrade>(e =>
+        {
+            e.ToTable("ExamAttemptManualGrades"); e.HasKey(x => x.Id);
+            e.Property(x => x.Id).HasColumnType("bigint").UseIdentityColumn();
+            e.Property(x => x.Score).HasPrecision(9, 2);
+            e.Property(x => x.Feedback).HasMaxLength(2000);
+            e.Property(x => x.GradedAt).HasColumnType("datetime2");
+            e.Property(x => x.RowVersion).IsRowVersion().IsConcurrencyToken();
+            e.HasIndex(x => x.AttemptId).IsUnique();
+            e.HasIndex(x => x.GradedByUserId);
+            e.HasOne<CanonicalExamAttempt>().WithMany().HasForeignKey(x => x.AttemptId).OnDelete(DeleteBehavior.NoAction);
+            e.HasOne<CanonicalUser>().WithMany().HasForeignKey(x => x.GradedByUserId).OnDelete(DeleteBehavior.NoAction);
+        });
+        modelBuilder.Entity<CanonicalExamAttemptManualGradeHistory>(e =>
+        {
+            e.ToTable("ExamAttemptManualGradeHistory"); e.HasKey(x => x.Id);
+            e.Property(x => x.Id).HasColumnType("bigint").UseIdentityColumn();
+            e.Property(x => x.PreviousScore).HasPrecision(9, 2);
+            e.Property(x => x.NewScore).HasPrecision(9, 2);
+            e.Property(x => x.PreviousFeedback).HasMaxLength(2000);
+            e.Property(x => x.NewFeedback).HasMaxLength(2000);
+            e.Property(x => x.ChangedAt).HasColumnType("datetime2");
+            e.HasIndex(x => new { x.AttemptId, x.ChangedAt });
+            e.HasOne(x => x.ManualGrade).WithMany().HasForeignKey(x => x.ManualGradeId).OnDelete(DeleteBehavior.NoAction);
+            e.HasOne<CanonicalExamAttempt>().WithMany().HasForeignKey(x => x.AttemptId).OnDelete(DeleteBehavior.NoAction);
+            e.HasOne<CanonicalUser>().WithMany().HasForeignKey(x => x.ChangedByUserId).OnDelete(DeleteBehavior.NoAction);
+        });
+
         modelBuilder.Entity<CanonicalExamDocument>(e =>
         {
             e.ToTable("ExamDocuments"); e.HasKey(x => x.Id);
@@ -403,6 +433,31 @@ public sealed class CanonicalExamSectionManualGradeHistory
     public CanonicalExamSectionManualGrade ManualGrade { get; set; } = null!;
     public long AttemptId { get; set; }
     public long ExamSectionId { get; set; }
+    public decimal? PreviousScore { get; set; }
+    public decimal NewScore { get; set; }
+    public string? PreviousFeedback { get; set; }
+    public string? NewFeedback { get; set; }
+    public long ChangedByUserId { get; set; }
+    public DateTime ChangedAt { get; set; }
+}
+
+public sealed class CanonicalExamAttemptManualGrade
+{
+    public long Id { get; set; }
+    public long AttemptId { get; set; }
+    public decimal Score { get; set; }
+    public string? Feedback { get; set; }
+    public long GradedByUserId { get; set; }
+    public DateTime GradedAt { get; set; }
+    public byte[] RowVersion { get; set; } = Array.Empty<byte>();
+}
+
+public sealed class CanonicalExamAttemptManualGradeHistory
+{
+    public long Id { get; set; }
+    public long ManualGradeId { get; set; }
+    public CanonicalExamAttemptManualGrade ManualGrade { get; set; } = null!;
+    public long AttemptId { get; set; }
     public decimal? PreviousScore { get; set; }
     public decimal NewScore { get; set; }
     public string? PreviousFeedback { get; set; }
