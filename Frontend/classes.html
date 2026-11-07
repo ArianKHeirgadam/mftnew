@@ -101,73 +101,100 @@
 (() => {
   const $ = selector => document.querySelector(selector);
   const esc = value => String(value ?? '').replace(/[&<>"']/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
-  let classes = [], students = [], selectedIds = new Set(), currentClass = null, me = null;
+  let classes = [], students = [], teachers = [], selectedIds = new Set(), selectedTeacherIds = new Set(), currentClass = null, me = null;
   const isSuperAdmin = () => String(me?.role || '').toLowerCase() === 'superadmin';
   const notify = (message, type = 'info') => window.showToast?.(message, type);
   const api = () => window.MftApi;
+  const sameDepartment = item => Number(item.departmentId) === Number(currentClass?.departmentId);
+  const modal = () => $('#classRosterModal');
 
-  function updateCounts() {
-    const visible = [...$('#classStudents').querySelectorAll('[data-student-id]')];
-    const selected = visible.filter(row => row.querySelector('input').checked).length;
-    $('#selectedCount').textContent = selected + ' انتخاب‌شده از ' + selectedIds.size;
+  function renderPreview() {
+    const selectedStudents = students.filter(item => selectedIds.has(Number(item.id)));
+    const selectedTeachers = teachers.filter(item => selectedTeacherIds.has(Number(item.id)));
+    $('#rosterStudentPreview').innerHTML = selectedStudents.length
+      ? selectedStudents.map(item => '<div class="text-sm">' + esc(item.fullName) + '</div>').join('')
+      : '<p class="text-soft text-sm">دانشجویی انتخاب نشده</p>';
+    $('#rosterTeacherPreview').innerHTML = selectedTeachers.length
+      ? selectedTeachers.map(item => '<div class="text-sm">' + esc(item.fullName) + '</div>').join('')
+      : '<p class="text-soft text-sm">استادی انتخاب نشده</p>';
     $('#memberCount').textContent = selectedIds.size + ' دانشجو';
-    $('#selectAllStudents').checked = visible.length > 0 && visible.every(row => row.querySelector('input').checked);
+    $('#teacherCount').textContent = selectedTeacherIds.size + ' استاد';
+    $('#selectedCount').textContent = selectedIds.size + ' انتخاب‌شده';
+    $('#selectedTeacherCount').textContent = selectedTeacherIds.size + ' انتخاب‌شده';
   }
 
   function renderStudents() {
     const term = $('#studentSearch').value.trim().toLocaleLowerCase();
-    const rows = students.filter(student =>
-      !term || (student.fullName || '').toLocaleLowerCase().includes(term) ||
-      (student.username || '').toLocaleLowerCase().includes(term));
-    $('#classStudents').innerHTML = rows.length ? rows.map(student => {
-      const checked = selectedIds.has(Number(student.id)) ? 'checked' : '';
-      return '<label class="qpick-row" data-student-id="' + student.id + '">' +
-        '<input type="checkbox" ' + checked + '><span style="flex:1"><b>' + esc(student.fullName) +
-        '</b><small class="text-soft" style="display:block">' + esc(student.username) + '</small></span></label>';
-    }).join('') : '<p class="text-soft">دانشجویی برای این کلاس پیدا نشد.</p>';
-    updateCounts();
+    const rows = students.filter(item => !term ||
+      (item.fullName || '').toLocaleLowerCase().includes(term) ||
+      (item.username || '').toLocaleLowerCase().includes(term));
+    $('#classStudents').innerHTML = rows.length ? rows.map(item => {
+      const id = Number(item.id), eligible = sameDepartment(item);
+      const checked = selectedIds.has(id) ? 'checked' : '';
+      return '<label class="qpick-row" data-student-id="' + id + '" title="' +
+        (eligible ? '' : 'این دانشجو به دپارتمان این کلاس متصل نیست') + '">' +
+        '<input type="checkbox" ' + checked + (eligible ? '' : ' disabled') + '>' +
+        '<span style="flex:1"><b>' + esc(item.fullName) + '</b><small class="text-soft" style="display:block">' +
+        esc(item.username) + ' · ' + esc(item.department || 'بدون دپارتمان') +
+        (eligible ? '' : ' · دپارتمان نامعتبر برای این کلاس') + '</small></span></label>';
+    }).join('') : '<p class="text-soft">دانشجویی پیدا نشد.</p>';
+    const visible = [...$('#classStudents').querySelectorAll('[data-student-id] input:not(:disabled)')];
+    $('#selectAllStudents').checked = visible.length > 0 && visible.every(input => input.checked);
+    renderPreview();
+  }
+
+  function renderTeachers() {
+    const term = $('#teacherSearch').value.trim().toLocaleLowerCase();
+    const rows = teachers.filter(item => !term ||
+      (item.fullName || '').toLocaleLowerCase().includes(term) ||
+      (item.username || '').toLocaleLowerCase().includes(term));
+    $('#classTeachers').innerHTML = rows.length ? rows.map(item => {
+      const id = Number(item.id), eligible = sameDepartment(item);
+      return '<label class="qpick-row" data-teacher-id="' + id + '" title="' +
+        (eligible ? '' : 'این استاد به دپارتمان این کلاس متصل نیست') + '">' +
+        '<input type="checkbox" ' + (selectedTeacherIds.has(id) ? 'checked' : '') +
+        (eligible ? '' : ' disabled') + '><span style="flex:1"><b>' + esc(item.fullName) +
+        '</b><small class="text-soft" style="display:block">' + esc(item.username) + ' · ' +
+        esc(item.department || 'بدون دپارتمان') + (eligible ? '' : ' · دپارتمان نامعتبر برای این کلاس') +
+        '</small></span></label>';
+    }).join('') : '<p class="text-soft">استادی پیدا نشد.</p>';
+    renderPreview();
   }
 
   async function loadClasses(preferredId) {
     classes = await api().request('/canonical/classes');
     $('#classSelect').innerHTML = '<option value="">انتخاب کلاس</option>' + classes.map(item =>
       '<option value="' + item.id + '">' + esc(item.name) + ' — ' + esc(item.department || '') +
-      ' (' + Number(item.memberCount || 0) + ' نفر)</option>').join('');
+      ' (' + Number(item.memberCount || 0) + ' دانشجو)</option>').join('');
     if (preferredId) $('#classSelect').value = String(preferredId);
     if ($('#classSelect').value) await loadClassMembers(Number($('#classSelect').value));
-  }
-
-  function renderSingleStudentOptions() {
-    const select = $('#singleStudentSelect');
-    const button = $('#addSingleStudent');
-    if (!select || !button) return;
-    if (!currentClass) {
-      select.innerHTML = '<option value="">ابتدا یک کلاس انتخاب کنید</option>';
-      select.disabled = true; button.disabled = true; return;
+    else {
+      currentClass = null;
+      $('#openRosterModal').disabled = true;
+      $('#classSummary').textContent = 'کلاسی انتخاب نشده است.';
     }
-    const available = students.filter(student => !selectedIds.has(Number(student.id)));
-    select.innerHTML = '<option value="">انتخاب دانشجو</option>' + available.map(student =>
-      '<option value="' + student.id + '">' + esc(student.fullName) + ' — ' + esc(student.username) + '</option>').join('');
-    select.disabled = available.length === 0;
-    button.disabled = available.length === 0;
-    if (!available.length) select.innerHTML = '<option value="">همه دانشجویان موجود عضو این کلاس هستند</option>';
   }
 
   async function loadClassMembers(id) {
     currentClass = classes.find(item => Number(item.id) === id) || null;
     if (!currentClass) return;
-    const [members, allStudents] = await Promise.all([
+    const [memberResult, allStudents, teacherResult, allTeachers] = await Promise.all([
       api().request('/canonical/classes/' + id + '/members'),
-      api().request('/users?role=Student')
+      api().request('/users?role=Student'),
+      api().request('/canonical/classes/' + id + '/teachers'),
+      api().request('/users?role=Teacher')
     ]);
-    const memberIds = new Set((members.members || []).map(item => Number(item.id)));
-    students = allStudents.filter(item => Number(item.departmentId) === Number(currentClass.departmentId) && item.isActive !== false);
-    selectedIds = new Set([...memberIds].filter(id => students.some(student => Number(student.id) === id)));
-    $('#classSummary').textContent = currentClass.name + ' — ' + (currentClass.department || me?.department || 'دپارتمان') +
-      ' — ' + selectedIds.size + ' عضو';
-    $('#saveMembers').disabled = false;
+    students = allStudents.filter(item => item.isActive !== false);
+    teachers = allTeachers.filter(item => item.isActive !== false);
+    selectedIds = new Set((memberResult.members || []).map(item => Number(item.id)));
+    selectedTeacherIds = new Set((teacherResult.teachers || []).map(item => Number(item.id)));
+    $('#classSummary').textContent = currentClass.name + ' — ' +
+      (currentClass.department || me?.department || 'دپارتمان') +
+      ' — ' + selectedIds.size + ' دانشجو و ' + selectedTeacherIds.size + ' استاد';
+    $('#rosterModalSubtitle').textContent = currentClass.name + ' · ' + (currentClass.department || '');
+    $('#openRosterModal').disabled = false;
     renderStudents();
-    renderSingleStudentOptions();
+    renderTeachers();
   }
 
   async function initialize() {
@@ -175,13 +202,10 @@
     me = await api().request('/auth/me');
     const departments = await api().request('/departments');
     const departmentSelect = $('#classDepartment');
-    const departmentField = $('#classDepartmentField');
-    if (!isSuperAdmin()) {
-      departmentField.hidden = true;
-    } else {
-      departmentSelect.innerHTML = '<option value="">انتخاب دپارتمان</option>' + departments.filter(d => d.isActive !== false)
-        .map(d => '<option value="' + d.id + '">' + esc(d.name) + '</option>').join('');
-    }
+    if (!isSuperAdmin()) $('#classDepartmentField').hidden = true;
+    else departmentSelect.innerHTML = '<option value="">انتخاب دپارتمان</option>' +
+      departments.filter(item => item.isActive !== false)
+        .map(item => '<option value="' + item.id + '">' + esc(item.name) + '</option>').join('');
     await loadClasses();
   }
 
@@ -201,78 +225,72 @@
   });
 
   $('#classSelect').addEventListener('change', async () => {
-    selectedIds = new Set();
-    $('#classStudents').innerHTML = '<p class="text-soft">در حال دریافت اعضا...</p>';
-    if ($('#classSelect').value) {
-      try { await loadClassMembers(Number($('#classSelect').value)); }
-      catch (error) { notify(error.message, 'danger'); }
-    } else {
-      currentClass = null; students = []; selectedIds = new Set(); renderSingleStudentOptions();
-      $('#classStudents').innerHTML = '<p class="text-soft">ابتدا یک کلاس انتخاب کنید.</p>';
+    if (!$('#classSelect').value) {
+      currentClass = null; students = []; teachers = [];
+      selectedIds.clear(); selectedTeacherIds.clear();
       $('#classSummary').textContent = 'کلاسی انتخاب نشده است.';
-      $('#saveMembers').disabled = true; updateCounts();
+      $('#openRosterModal').disabled = true;
+      return;
     }
+    try { await loadClassMembers(Number($('#classSelect').value)); }
+    catch (error) { notify(error.message || 'دریافت اعضای کلاس ناموفق بود.', 'danger'); }
   });
+
+  $('#openRosterModal').addEventListener('click', () => {
+    if (!currentClass) return;
+    modal().classList.add('show');
+    renderStudents(); renderTeachers();
+  });
+  $$('[data-roster-close]').forEach(button => button.addEventListener('click', () => modal().classList.remove('show')));
+  modal().addEventListener('click', event => { if (event.target === modal()) modal().classList.remove('show'); });
 
   $('#classStudents').addEventListener('change', event => {
     const row = event.target.closest('[data-student-id]');
-    if (!row) return;
+    if (!row || event.target.disabled) return;
     const id = Number(row.dataset.studentId);
     if (event.target.checked) selectedIds.add(id); else selectedIds.delete(id);
-    updateCounts();
-    renderSingleStudentOptions();
+    renderPreview();
   });
-
+  $('#classTeachers').addEventListener('change', event => {
+    const row = event.target.closest('[data-teacher-id]');
+    if (!row || event.target.disabled) return;
+    const id = Number(row.dataset.teacherId);
+    if (event.target.checked) selectedTeacherIds.add(id); else selectedTeacherIds.delete(id);
+    renderPreview();
+  });
   $('#selectAllStudents').addEventListener('change', event => {
     for (const row of $('#classStudents').querySelectorAll('[data-student-id]')) {
+      const input = row.querySelector('input');
+      if (input.disabled) continue;
       const id = Number(row.dataset.studentId);
       if (event.target.checked) selectedIds.add(id); else selectedIds.delete(id);
-      row.querySelector('input').checked = event.target.checked;
+      input.checked = event.target.checked;
     }
-    updateCounts();
-    renderSingleStudentOptions();
+    renderPreview();
   });
-
   $('#studentSearch').addEventListener('input', renderStudents);
-
-  $('#addSingleStudent').addEventListener('click', async () => {
-    if (!currentClass) return;
-    const studentId = Number($('#singleStudentSelect').value || 0);
-    if (!studentId || selectedIds.has(studentId)) return notify('یک دانشجوی جدید انتخاب کنید.', 'warn');
-    $('#addSingleStudent').disabled = true;
-    $('#singleEnrollmentMessage').textContent = 'در حال ثبت دانشجو...';
-    try {
-      const nextIds = [...selectedIds, studentId];
-      await api().request('/canonical/classes/' + currentClass.id + '/members', {
-        method: 'PUT', body: JSON.stringify({ studentIds: nextIds })
-      });
-      await loadClasses(currentClass.id);
-      $('#singleEnrollmentMessage').textContent = 'دانشجو با موفقیت در کلاس ثبت‌نام شد.';
-      notify('ثبت‌نام دانشجو در کلاس انجام شد.', 'ok');
-    } catch (error) {
-      $('#singleEnrollmentMessage').textContent = error.message || 'ثبت‌نام ناموفق بود.';
-      notify(error.message || 'ثبت‌نام دانشجو ناموفق بود.', 'danger');
-    } finally {
-      renderSingleStudentOptions();
-    }
-  });
+  $('#teacherSearch').addEventListener('input', renderTeachers);
 
   $('#saveMembers').addEventListener('click', async () => {
     if (!currentClass) return;
-    $('#saveMembers').disabled = true;
+    const button = $('#saveMembers');
+    button.disabled = true;
     try {
       await api().request('/canonical/classes/' + currentClass.id + '/members', {
         method: 'PUT', body: JSON.stringify({ studentIds: [...selectedIds] })
       });
+      await api().request('/canonical/classes/' + currentClass.id + '/teachers', {
+        method: 'PUT', body: JSON.stringify({ teacherIds: [...selectedTeacherIds] })
+      });
       await loadClasses(currentClass.id);
-      notify('اعضای کلاس ذخیره شدند.', 'ok');
-    } catch (error) { notify(error.message || 'ذخیره اعضا ناموفق بود.', 'danger'); }
-    finally { $('#saveMembers').disabled = false; }
+      modal().classList.remove('show');
+      notify('فهرست دانشجویان و استادان کلاس ذخیره شد.', 'ok');
+    } catch (error) { notify(error.message || 'ذخیره اعضای کلاس ناموفق بود.', 'danger'); }
+    finally { button.disabled = false; }
   });
 
-  $('#classStudents').innerHTML = '<p class="text-soft">در حال آماده‌سازی...</p>';
   initialize().catch(error => {
-    $('#classStudents').innerHTML = '<p class="text-soft">بارگذاری کلاس‌ها ناموفق بود.</p>';
+    $('#classSummary').textContent = 'بارگذاری کلاس‌ها ناموفق بود.';
     notify(error.message || 'دریافت اطلاعات کلاس‌ها ناموفق بود.', 'danger');
   });
 })();
