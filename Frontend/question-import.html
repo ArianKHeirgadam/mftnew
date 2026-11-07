@@ -1,0 +1,221 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ورود گروهی سؤالات | سامانه سنجش</title>
+<link rel="stylesheet" href="assets/css/style.css">
+<link rel="stylesheet" href="assets/css/responsive.css">
+<link rel="stylesheet" href="assets/css/dark.css">
+<style>
+.import-layout{display:grid;grid-template-columns:minmax(0,1.4fr) minmax(280px,.8fr);gap:18px;align-items:start}
+.import-panel{padding:20px}
+.import-tabs{display:flex;gap:8px;border-bottom:1px solid var(--border);margin-bottom:18px}
+.import-tab{border:0;background:transparent;padding:10px 14px;color:var(--text-muted);cursor:pointer;border-bottom:2px solid transparent;font:inherit}
+.import-tab.active{color:var(--primary);border-color:var(--primary);font-weight:700}
+.import-pane[hidden]{display:none}
+.drop-zone{border:1px dashed var(--border);border-radius:14px;padding:28px;text-align:center;background:var(--surface-2)}
+.drop-zone input{max-width:100%;margin-top:14px}
+.import-help{font-size:12px;line-height:2;color:var(--text-muted)}
+.import-help code{direction:ltr;display:block;white-space:normal;overflow-wrap:anywhere;background:var(--surface-2);padding:10px;border-radius:8px;margin:8px 0;color:var(--text)}
+.import-summary{display:flex;gap:10px;flex-wrap:wrap;margin:16px 0}
+.import-stat{padding:10px 14px;border:1px solid var(--border);border-radius:10px;min-width:105px}
+.import-stat b{display:block;font-size:20px}
+.import-stat span{font-size:11px;color:var(--text-muted)}
+.import-table{width:100%;border-collapse:collapse;min-width:850px}
+.import-table th,.import-table td{padding:10px;border-bottom:1px solid var(--border);text-align:right;vertical-align:top;font-size:12px}
+.import-table th{background:var(--surface-2);position:sticky;top:0}
+.import-errors{color:var(--danger,#dc2626);line-height:1.8}
+.import-valid{color:var(--success,#16834a)}
+.preview-wrap{overflow:auto;max-height:560px;border:1px solid var(--border);border-radius:10px}
+@media(max-width:900px){.import-layout{grid-template-columns:1fr}}
+</style>
+</head>
+<body data-role="teacher" data-active="question-import">
+<div class="app-shell">
+  <div id="sidebar-root"></div>
+  <div class="main-col">
+    <div id="topbar-root" data-title="ورود گروهی سؤالات"></div>
+    <main class="content fade-in">
+      <div class="page-head">
+        <div>
+          <div class="breadcrumb">سامانه سنجش <span>/</span> <a href="question-bank.html">بانک سؤالات</a> <span>/</span> <b>ورود گروهی</b></div>
+          <h1>ورود گروهی سؤالات</h1>
+          <p class="text-soft text-sm">فایل Excel/CSV بارگذاری کنید یا داده‌ها را از صفحه‌گسترده Paste کنید؛ قبل از ثبت، پیش‌نمایش و اعتبارسنجی انجام می‌شود.</p>
+        </div>
+        <a class="btn btn-outline" href="question-bank.html">بازگشت به بانک سؤالات</a>
+      </div>
+
+      <div class="import-layout">
+        <section class="card import-panel">
+          <div class="import-tabs">
+            <button type="button" class="import-tab active" data-import-tab="file">بارگذاری Excel / CSV</button>
+            <button type="button" class="import-tab" data-import-tab="paste">Paste از Excel</button>
+          </div>
+          <div class="import-pane" id="filePane">
+            <div class="drop-zone">
+              <h3 style="margin-bottom:8px">انتخاب فایل سؤالات</h3>
+              <p class="text-soft text-sm">فرمت‌های مجاز: XLSX و CSV · حداکثر ۵ مگابایت و ۵۰۰ سؤال</p>
+              <input id="importFile" type="file" accept=".xlsx,.csv">
+            </div>
+            <div class="flex gap-8 mt-16">
+              <button type="button" class="btn btn-primary" id="previewFile">بررسی و پیش‌نمایش فایل</button>
+            </div>
+          </div>
+          <div class="import-pane" id="pastePane" hidden>
+            <div class="field">
+              <label for="pasteData">داده‌ها را همراه با ردیف عنوان ستون‌ها Paste کنید</label>
+              <textarea class="textarea" id="pasteData" rows="10" placeholder="Category	Skill	Type	Text	Points	Difficulty	Option1	Option2	Option3	Option4	CorrectOption"></textarea>
+            </div>
+            <button type="button" class="btn btn-primary" id="previewPaste">بررسی و پیش‌نمایش متن</button>
+          </div>
+          <div id="previewArea" hidden style="margin-top:22px">
+            <div class="flex" style="justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap">
+              <h3>پیش‌نمایش و اعتبارسنجی</h3>
+              <button type="button" class="btn btn-outline btn-sm" id="clearPreview">پاک‌کردن پیش‌نمایش</button>
+            </div>
+            <div class="import-summary" id="importSummary"></div>
+            <div class="preview-wrap">
+              <table class="import-table">
+                <thead><tr><th>ردیف</th><th>مهارت</th><th>نوع</th><th>متن سؤال</th><th>گزینه‌ها / جفت‌ها</th><th>وضعیت</th></tr></thead>
+                <tbody id="previewRows"></tbody>
+              </table>
+            </div>
+            <div class="flex gap-8 mt-16" style="justify-content:flex-start;flex-wrap:wrap">
+              <button type="button" class="btn btn-primary" id="confirmImport" disabled>ثبت نهایی سؤالات</button>
+              <span class="text-soft text-sm" id="confirmHint">برای ثبت، تمام ردیف‌ها باید معتبر باشند.</span>
+            </div>
+          </div>
+          <div id="importMessage" class="text-sm" style="margin-top:14px" aria-live="polite"></div>
+        </section>
+
+        <aside class="card import-panel">
+          <h3 style="margin-bottom:12px">قالب فایل ورودی</h3>
+          <p class="import-help">ردیف اول باید عنوان ستون‌ها باشد. نام مهارت باید دقیقاً با مهارت ثبت‌شده در بانک اطلاعاتی یکسان باشد. اگر نام مهارت در چند دسته تکراری است، Category را هم وارد کنید.</p>
+          <div class="import-help">
+            <b>ستون‌های مشترک</b>
+            <code>Category, Skill, Type, Text, Points, Difficulty</code>
+            <b>چهارگزینه‌ای</b>
+            <code>Option1, Option2, Option3, Option4, CorrectOption</code>
+            <b>وصل‌کردنی</b>
+            <code>Left1, Right1, Left2, Right2, ... Left10, Right10</code>
+          </div>
+          <hr style="border:0;border-top:1px solid var(--border);margin:14px 0">
+          <p class="import-help"><b>مقادیر مجاز Type:</b> <code>MultipleChoice</code> یا <code>Matching</code></p>
+          <p class="import-help"><b>مقادیر Difficulty:</b> <code>Easy</code>، <code>Medium</code> یا <code>Hard</code></p>
+          <p class="import-help"><b>CorrectOption:</b> شماره گزینه صحیح از ۱ تا تعداد گزینه‌های غیرخالی است.</p>
+          <p class="import-help">در هر نوبت حداکثر ۵۰۰ سؤال ثبت می‌شود. اگر حتی یک ردیف خطا داشته باشد، ثبت گروهی انجام نمی‌شود؛ خطاها را اصلاح و دوباره پیش‌نمایش بگیرید.</p>
+          <button type="button" class="btn btn-outline btn-sm" id="copyTemplate">کپی عنوان ستون‌ها</button>
+        </aside>
+      </div>
+    </main>
+  </div>
+</div>
+<script src="assets/js/theme.js"></script>
+<script src="assets/js/app.js"></script>
+<script src="assets/js/api.js"></script>
+<script>
+(() => {
+  const api = window.MftApi;
+  const $ = selector => document.querySelector(selector);
+  const esc = value => String(value ?? '').replace(/[&<>"']/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
+  const message = (text, type='info') => {
+    const el = $('#importMessage');
+    el.textContent = text;
+    el.style.color = type === 'error' ? 'var(--danger,#dc2626)' : type === 'success' ? 'var(--success,#16834a)' : 'var(--text-muted)';
+  };
+  let previewRows = [];
+  const template = 'Category\tSkill\tType\tText\tPoints\tDifficulty\tOption1\tOption2\tOption3\tOption4\tCorrectOption\tLeft1\tRight1\tLeft2\tRight2';
+
+  document.querySelectorAll('[data-import-tab]').forEach(button => button.addEventListener('click', () => {
+    document.querySelectorAll('[data-import-tab]').forEach(x => x.classList.toggle('active', x === button));
+    $('#filePane').hidden = button.dataset.importTab !== 'file';
+    $('#pastePane').hidden = button.dataset.importTab !== 'paste';
+    clearPreview();
+  }));
+
+  function clearPreview() {
+    previewRows = [];
+    $('#previewArea').hidden = true;
+    $('#previewRows').replaceChildren();
+    $('#confirmImport').disabled = true;
+    $('#importSummary').replaceChildren();
+    message('');
+  }
+
+  function showPreview(result) {
+    previewRows = result.rows || [];
+    $('#previewArea').hidden = false;
+    $('#importSummary').innerHTML =
+      '<div class="import-stat"><b>' + Number(result.totalRows || 0).toLocaleString('fa-IR') + '</b><span>کل ردیف‌ها</span></div>' +
+      '<div class="import-stat"><b class="import-valid">' + Number(result.validRows || 0).toLocaleString('fa-IR') + '</b><span>ردیف معتبر</span></div>' +
+      '<div class="import-stat"><b class="import-errors">' + Number(result.invalidRows || 0).toLocaleString('fa-IR') + '</b><span>ردیف دارای خطا</span></div>';
+    $('#previewRows').innerHTML = previewRows.map(row => {
+      const details = row.type === 'MultipleChoice'
+        ? (row.options || []).map((value, i) => (i + 1) + '. ' + esc(value) + (Number(row.correctOption) === i + 1 ? ' ✓' : '')).join('<br>')
+        : (row.matchingPairs || []).map(pair => esc(pair.leftItem) + ' ← ' + esc(pair.rightItem)).join('<br>');
+      const errors = row.errors || [];
+      return '<tr><td>' + esc(row.rowNumber) + '</td><td>' + esc(row.skill) + '</td><td>' + esc(row.type) +
+        '</td><td style="min-width:220px;max-width:340px">' + esc(row.text) + '</td><td>' + details +
+        '</td><td>' + (errors.length ? '<span class="import-errors">' + errors.map(esc).join('<br>') + '</span>' : '<span class="import-valid">معتبر</span>') + '</td></tr>';
+    }).join('');
+    $('#confirmImport').disabled = !result.canImport || previewRows.length === 0;
+    $('#confirmHint').textContent = result.canImport ? 'همه ردیف‌ها معتبرند؛ ثبت نهایی را انجام دهید.' : 'ابتدا تمام خطاهای نمایش‌داده‌شده را اصلاح کنید.';
+    message(result.canImport ? 'پیش‌نمایش موفق بود؛ هنوز چیزی در بانک سؤال ثبت نشده است.' : 'پیش‌نمایش انجام شد؛ ردیف‌های دارای خطا باید اصلاح شوند.', result.canImport ? 'success' : 'error');
+    $('#previewArea').scrollIntoView({behavior:'smooth',block:'start'});
+  }
+
+  async function runPreview(path, options) {
+    clearPreview();
+    message('در حال خواندن و اعتبارسنجی داده‌ها...');
+    try {
+      const result = await api.request(path, options);
+      showPreview(result);
+    } catch (error) {
+      message(error.message || 'پیش‌نمایش ناموفق بود.', 'error');
+    }
+  }
+
+  $('#previewFile').addEventListener('click', () => {
+    const file = $('#importFile').files[0];
+    if (!file) return message('ابتدا فایل Excel یا CSV را انتخاب کنید.', 'error');
+    const data = new FormData();
+    data.append('file', file);
+    runPreview('/questions/import/preview/file', {method:'POST',body:data});
+  });
+
+  $('#previewPaste').addEventListener('click', () => {
+    const content = $('#pasteData').value.trim();
+    if (!content) return message('ابتدا داده‌ها را Paste کنید.', 'error');
+    runPreview('/questions/import/preview/paste', {method:'POST',body:JSON.stringify({content})});
+  });
+
+  $('#confirmImport').addEventListener('click', async () => {
+    if (!previewRows.length || previewRows.some(row => (row.errors || []).length)) return;
+    if (!confirm('تمام سؤال‌های پیش‌نمایش‌شده در بانک سؤال ثبت شوند؟')) return;
+    $('#confirmImport').disabled = true;
+    message('در حال ثبت گروهی سؤالات...');
+    try {
+      const result = await api.request('/questions/import/confirm', {
+        method:'POST',
+        body:JSON.stringify({rows:previewRows})
+      });
+      message(result.message || 'ثبت گروهی با موفقیت انجام شد.', 'success');
+      previewRows = [];
+      $('#confirmImport').disabled = true;
+      $('#confirmHint').textContent = 'ثبت انجام شد. برای ورود گروهی جدید، فایل یا متن تازه‌ای انتخاب کنید.';
+    } catch (error) {
+      $('#confirmImport').disabled = false;
+      message(error.message || 'ثبت گروهی ناموفق بود.', 'error');
+    }
+  });
+
+  $('#clearPreview').addEventListener('click', clearPreview);
+  $('#copyTemplate').addEventListener('click', async () => {
+    try { await navigator.clipboard.writeText(template); message('عنوان ستون‌ها کپی شد.', 'success'); }
+    catch { message('کپی خودکار ممکن نشد؛ عنوان ستون‌ها را از راهنمای کنار صفحه بردارید.', 'error'); }
+  });
+})();
+</script>
+</body>
+</html>
