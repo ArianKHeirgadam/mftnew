@@ -299,7 +299,7 @@ public sealed class CanonicalAcademicDbContext(
             e.Property(x => x.NewFeedback).HasMaxLength(2000);
             e.Property(x => x.ChangedAt).HasColumnType("datetime2");
             e.HasIndex(x => new { x.AttemptId, x.ExamSectionId, x.ChangedAt });
-            e.HasOne<CanonicalExamSectionManualGrade>().WithMany().HasForeignKey(x => x.ManualGradeId).OnDelete(DeleteBehavior.NoAction);
+            e.HasOne(x => x.ManualGrade).WithMany().HasForeignKey(x => x.ManualGradeId).OnDelete(DeleteBehavior.NoAction);
             e.HasOne<CanonicalExamAttempt>().WithMany().HasForeignKey(x => x.AttemptId).OnDelete(DeleteBehavior.NoAction);
             e.HasOne<CanonicalExamSection>().WithMany().HasForeignKey(x => x.ExamSectionId).OnDelete(DeleteBehavior.NoAction);
             e.HasOne<CanonicalUser>().WithMany().HasForeignKey(x => x.ChangedByUserId).OnDelete(DeleteBehavior.NoAction);
@@ -400,6 +400,7 @@ public sealed class CanonicalExamSectionManualGradeHistory
 {
     public long Id { get; set; }
     public long ManualGradeId { get; set; }
+    public CanonicalExamSectionManualGrade ManualGrade { get; set; } = null!;
     public long AttemptId { get; set; }
     public long ExamSectionId { get; set; }
     public decimal? PreviousScore { get; set; }
