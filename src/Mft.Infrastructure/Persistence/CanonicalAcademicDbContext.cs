@@ -131,6 +131,7 @@ public sealed class CanonicalAcademicDbContext(
             e.Property(x => x.Id).HasColumnType("bigint").UseIdentityColumn();
             e.Property(x => x.Name).HasMaxLength(200).IsRequired();
             e.Property(x => x.Capacity).HasColumnType("int");
+            e.Property(x => x.Schedule).HasMaxLength(200);
             e.Property(x => x.CreatedAt).HasColumnType("datetime2").HasDefaultValueSql("sysutcdatetime()");
             e.HasIndex(x => new { x.DepartmentId, x.Name }).IsUnique();
             e.HasIndex(x => x.DepartmentId);
@@ -384,7 +385,7 @@ public sealed class CanonicalQuestionImportBatch { public long Id { get; set; } 
 public sealed class CanonicalMultipleChoiceOption { public long Id { get; set; } public long QuestionId { get; set; } public string OptionText { get; set; } = ""; public bool IsCorrect { get; set; } public int DisplayOrder { get; set; } }
 public sealed class CanonicalMatchingPair { public long Id { get; set; } public long QuestionId { get; set; } public string LeftItem { get; set; } = ""; public string RightItem { get; set; } = ""; public int DisplayOrder { get; set; } }
 public sealed class CanonicalEssayGradingCriterion { public long Id { get; set; } public long QuestionId { get; set; } public string CriteriaText { get; set; } = ""; public decimal MaxPoints { get; set; } }
-public sealed class CanonicalClass { public long Id { get; set; } public string Name { get; set; } = ""; public long DepartmentId { get; set; } public int? Capacity { get; set; } public DateTime CreatedAt { get; set; } }
+public sealed class CanonicalClass { public long Id { get; set; } public string Name { get; set; } = ""; public long DepartmentId { get; set; } public int? Capacity { get; set; } public string? Schedule { get; set; } public DateTime CreatedAt { get; set; } }
 public sealed class CanonicalClassMember { public long Id { get; set; } public long ClassId { get; set; } public long StudentUserId { get; set; } public DateTime AddedAt { get; set; } }
 public sealed class CanonicalClassTeacher { public long Id { get; set; } public long ClassId { get; set; } public long TeacherUserId { get; set; } public DateTime AddedAt { get; set; } }
 public sealed class CanonicalExam { public long Id { get; set; } public string Title { get; set; } = ""; public long ExamCategoryId { get; set; } public long DepartmentId { get; set; } public long? ClassId { get; set; } public long CreatedByUserId { get; set; } public DateTime StartAt { get; set; } public DateTime EndAt { get; set; } public int DurationMinutes { get; set; } public bool IsPublished { get; set; } public bool ResultsPublished { get; set; } public DateTime? ResultsPublishedAt { get; set; } public long? ResultsPublishedByUserId { get; set; } public DateTime CreatedAt { get; set; } public long? MaxPdfFileSizeBytes { get; set; } }
