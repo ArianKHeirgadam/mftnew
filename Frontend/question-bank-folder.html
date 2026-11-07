@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>سؤال‌های پوشه | سامانه سنجش</title>
+<link rel="stylesheet" href="assets/css/style.css">
+<link rel="stylesheet" href="assets/css/responsive.css">
+<link rel="stylesheet" href="assets/css/dark.css">
+<style>
+.folder-question-list{display:grid;gap:14px}
+.folder-question{border:1px solid var(--border);border-radius:14px;background:var(--surface);padding:16px;min-width:0}
+.folder-question-head{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;flex-wrap:wrap;margin-bottom:12px}
+.folder-question-text{line-height:2;white-space:pre-wrap;overflow-wrap:anywhere}
+.folder-question-meta{display:flex;gap:8px;flex-wrap:wrap}
+.folder-question-details{display:grid;gap:6px;margin-top:12px;padding:12px;border-radius:10px;background:var(--surface-2)}
+.folder-question-details p{margin:0;line-height:1.9}
+</style>
+</head>
+<body data-role="teacher" data-active="bank">
+<div class="app-shell">
+ <div id="sidebar-root"></div>
+ <div class="main-col">
+  <div id="topbar-root" data-title="سؤال‌های پوشه"></div>
+  <main class="content fade-in">
+   <div class="page-head">
+    <div>
+     <div class="breadcrumb">سامانه سنجش <span>/</span> <a href="question-bank.html">بانک سؤالات</a> <span>/</span> <b>نمایش پوشه</b></div>
+     <h1 id="folderTitle">در حال دریافت پوشه...</h1>
+     <p class="text-soft text-sm mt-8" id="folderMeta"></p>
+    </div>
+    <a class="btn btn-outline" href="question-bank.html">بازگشت به بانک سؤال</a>
+   </div>
+   <section class="card card-pad">
+    <div class="flex justify-between items-center gap-8" style="flex-wrap:wrap;margin-bottom:14px">
+     <h3>سؤال‌های این آزمون</h3>
+     <span class="badge badge-muted" id="folderQuestionCount">۰ سؤال</span>
+    </div>
+    <div class="folder-question-list" id="folderQuestions"><div class="question-empty">در حال دریافت سؤال‌ها...</div></div>
+   </section>
+  </main>
+ </div>
+</div>
+<script src="assets/js/theme.js"></script>
+<script src="assets/js/app.js"></script>
+<script src="assets/js/api.js"></script>
+<script>
+(async()=>{
+ const $=id=>document.getElementById(id),api=window.MftApi;
+ const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+ const id=Number(new URLSearchParams(location.search).get('batchId'));
+ const typeName={MultipleChoice:'چهارگزینه‌ای',Essay:'تشریحی',Matching:'وصل‌کردنی'};
+ const difficultyName={1:'آسان',2:'متوسط',3:'سخت'};
+ if(!Number.isSafeInteger(id)||id<=0){$('folderTitle').textContent='شناسه پوشه معتبر نیست';$('folderQuestions').textContent='از بانک سؤال یک پوشه معتبر انتخاب کنید.';return;}
+ try{
+  const [batches,questions]=await Promise.all([
+   api.request('/questions/import/batches'),
+   api.request('/questions?importBatchId='+encodeURIComponent(id))
+  ]);
+  const batch=(Array.isArray(batches)?batches:[]).find(x=>Number(x.id)===id);
+  if(!batch)throw new Error('پوشه پیدا نشد یا اجازه مشاهده آن را ندارید.');
+  $('folderTitle').textContent=batch.title;
+  $('folderMeta').textContent='استاد: '+batch.teacherName+' | تاریخ ثبت: '+new Date(batch.createdAt).toLocaleString('fa-IR');
+  const rows=Array.isArray(questions)?questions:[];
+  $('folderQuestionCount').textContent=rows.length.toLocaleString('fa-IR')+' سؤال';
+  $('folderQuestions').innerHTML=rows.length?rows.map((q,i)=>{
+   const options=(q.options||[]).map((o,j)=>'<p>'+(j+1)+'. '+esc(o.optionText)+(o.isCorrect?' <b class="text-success">✓ پاسخ صحیح</b>':'')+'</p>').join('');
+   const pairs=(q.matchingPairs||[]).map(p=>'<p>'+esc(p.leftItem)+' ← '+esc(p.rightItem)+'</p>').join('');
+   const details=options||pairs;
+   return '<article class="folder-question"><div class="folder-question-head"><b>سؤال '+(i+1).toLocaleString('fa-IR')+'</b><div class="folder-question-meta"><span class="badge badge-info">'+esc(typeName[q.questionTypeCode]||q.questionTypeName||'سؤال')+'</span><span class="badge badge-muted">بارم: '+Number(q.points||0).toLocaleString('fa-IR')+'</span><span class="badge badge-muted">'+esc(difficultyName[q.difficultyLevel]||'—')+'</span></div></div><div class="folder-question-text">'+esc(q.text)+'</div>'+(details?'<div class="folder-question-details">'+details+'</div>':'')+'</article>';
+  }).join(''):'<div class="question-empty">در این پوشه سؤالی برای نمایش وجود ندارد.</div>';
+ }catch(e){$('folderTitle').textContent='خطا در دریافت پوشه';$('folderQuestions').textContent=e.message||'دریافت اطلاعات ناموفق بود.';}
+})();
+</script>
+</body>
+</html>
