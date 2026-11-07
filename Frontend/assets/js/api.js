@@ -226,7 +226,6 @@
           : result.autoScore != null
             ? `نمره موقت ${faNumber(result.autoScore)} از ${faNumber(result.maxScore)} — در انتظار تصحیح ${faNumber(result.pendingManualCount)} سؤال تشریحی`
             : (result.resultsPublished ? 'در انتظار تکمیل تصحیح' : 'منتشر نشده');
-        const outcome = '';
         heading.textContent = `نتیجه آزمون: ${result.exam} — ${scoreLabel}`;
       }
       const body = $('body[data-active="results"] .card table tbody');
@@ -236,8 +235,8 @@
           const isEssay = ['Essay', 'Text'].includes(String(answer.questionType || '').trim());
           const canEditGrade = canGrade && isEssay && !result.resultsPublished;
           const gradeControl = canEditGrade
-            ? `<div class="flex gap-8 mt-8"><input class="input" type="number" min="0" max="${Number(answer.maxScore || 0)}" step="0.01" value="${Number(answer.awardedScore || 0)}" data-grade-score style="max-width:100px" aria-label="نمره خام سؤال"><input class="input" type="text" maxlength="2000" data-grade-comment value="${escapeHtml(answer.gradingComment || '')}" placeholder="توضیح تصحیح" style="max-width:180px"><button class="btn btn-primary btn-sm" data-grade-answer="${answer.examQuestionId}">ثبت نمره</button></div><small class="text-soft">حداکثر نمره خام: ${faNumber(answer.maxScore || 0)}</small>`
-            : (isEssay && answer.isCorrect == null ? 'در انتظار تصحیح تشریحی' : answer.isCorrect == null ? 'کلید پاسخ تعریف نشده' : answer.isCorrect ? 'صحیح' : 'نادرست');
+            ? `<div class="flex gap-8 mt-8"><input class="input" type="number" min="0" max="${Number(answer.maxScore || 0)}" step="0.01" value="${Number(answer.awardedScore || 0)}" data-grade-score style="max-width:100px" aria-label="نمره خام سؤال"><button class="btn btn-primary btn-sm" data-grade-answer="${answer.examQuestionId}">ثبت نمره</button></div><small class="text-soft">حداکثر نمره خام: ${faNumber(answer.maxScore || 0)}</small>`
+            : (isEssay ? (answer.isManuallyGraded ? 'تصحیح شده' : 'در انتظار تصحیح تشریحی') : (answer.isAutoGraded ? 'تصحیح خودکار شده' : '—'));
           return `<tr>
             <td>${faNumber(index + 1)}</td><td>${escapeHtml(answer.question || `سؤال ${answer.questionId}`)}</td>
             <td>${escapeHtml(typeof answer.answer === 'string' ? answer.answer : answer.answer?.text ?? JSON.stringify(answer.answer ?? 'بدون پاسخ'))}</td><td>${escapeHtml(Array.isArray(answer.correctAnswer) ? answer.correctAnswer.map(x => x.optionText || `${x.leftItem || ''}: ${x.rightItem || ''}`).join('، ') : answer.correctAnswer || '—')}</td>
