@@ -56,14 +56,14 @@ public static class ExamScoring
         if (questionPoints < 0m)
             throw new ArgumentOutOfRangeException(nameof(questionPoints));
 
-        if (correctRightIdByLeftId.Count == 0 || selections.Count == 0)
-            return 0m;
-
         var validLeftIds = correctRightIdByLeftId.Keys.ToHashSet();
         var validRightIds = correctRightIdByLeftId.Values.ToHashSet();
 
         if (validRightIds.Count != correctRightIdByLeftId.Count)
             throw new ArgumentException("Right-side matching IDs must be unique.", nameof(correctRightIdByLeftId));
+
+        if (correctRightIdByLeftId.Count == 0 || selections.Count == 0)
+            return 0m;
 
         if (selections.Any(x => !validLeftIds.Contains(x.LeftItemId) || !validRightIds.Contains(x.RightItemId)))
             throw new ArgumentException("A matching item ID does not belong to this question and attempt.", nameof(selections));
