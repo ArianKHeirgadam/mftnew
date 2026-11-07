@@ -183,7 +183,6 @@
  $('questionSearch').addEventListener('input',renderQuestions);
  $('questionList').addEventListener('change',e=>{const input=e.target;if(!input.matches('input[type=checkbox]'))return;input.checked?selectedIds.add(String(input.value)):selectedIds.delete(String(input.value));$('questionCount').textContent=selectedIds.size+' سؤال انتخاب‌شده';});
  $('examCategory').addEventListener('change',()=>{selectedIds.clear();preferredEssaySkillId=0;renderQuestions();});
- $('essaySectionPdfFile').addEventListener('change',()=>{$('essaySkillPicker').hidden=!$('essaySectionPdfFile').files[0];});
  $('refreshQuestions').addEventListener('click',async()=>{try{questions=await api.request('/questions');questions=Array.isArray(questions)?questions:[];renderQuestions();window.showToast?.('بانک سؤال بروزرسانی شد.','ok');}catch(e){window.showToast?.(e.message||'دریافت بانک سؤال ناموفق بود.','danger');}});
  $('createExam').addEventListener('click',async()=>{
   const err=validateDetails();if(err)return window.showToast?.(err,'warn');
