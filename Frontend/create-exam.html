@@ -59,7 +59,6 @@
       <div><h3>۲. سؤال‌های آزمون</h3><p class="text-soft text-sm mt-8">سؤال‌ها را از بانک انتخاب کنید. نوع هر سؤال هنگام تعریف همان سؤال مشخص می‌شود.</p></div>
       <div class="flex gap-8" style="flex-wrap:wrap"><button class="btn btn-outline btn-sm" id="openSkillModal" type="button">+ تعریف مهارت</button><a class="btn btn-outline btn-sm" href="question-bank.html" target="_blank" rel="noopener">+ تعریف سؤال جدید در بانک</a></div>
      </div>
-     <div class="field mt-16" id="essaySkillPicker" hidden><label for="examEssaySkill">مهارت بخش تشریحی PDF</label><select class="select" id="examEssaySkill"><option value="">انتخاب مهارت</option></select><small class="text-soft">این مهارت برای ثبت بخش تشریحی آزمون استفاده می‌شود.</small></div>
      <div class="question-tools">
       <input class="input" id="questionSearch" type="search" placeholder="جستجو در سؤال‌ها...">
       <span class="badge badge-muted" id="questionCount">۰ سؤال انتخاب‌شده</span>
@@ -122,7 +121,6 @@
   const [l,q,classes]=await Promise.all([api.request('/questions/lookups'),api.request('/questions'),api.request('/canonical/classes')]);
   lookups=l||{categories:[],skills:[]};questions=Array.isArray(q)?q:[];
   $('examCategory').innerHTML='<option value="">انتخاب دسته‌بندی</option>'+lookups.categories.map(x=>'<option value="'+Number(x.id)+'">'+escapeHtml(x.name)+'</option>').join('');
-  renderEssaySkills();
   $('examClass').innerHTML='<option value="">انتخاب کلاس</option>'+(Array.isArray(classes)?classes:[]).map(x=>'<option value="'+Number(x.id)+'" data-department-id="'+Number(x.departmentId)+'">'+escapeHtml(x.name)+' — '+escapeHtml(x.department||'')+'</option>').join('');
   renderQuestions();
  }
@@ -131,13 +129,6 @@
   const raw=$('examMaxPdfSizeMb').value.trim();
   const value=raw===''?20:Number(raw);
   return Number.isInteger(value)&&value>=1&&value<=100?value:NaN;
- }
- function renderEssaySkills(){
-  const categoryId=Number($('examCategory').value||0);
-  const rows=lookups.skills.filter(skill=>Number(skill.examCategoryId)===categoryId);
-  $('examEssaySkill').innerHTML='<option value="">انتخاب مهارت</option>'+rows.map(skill=>'<option value="'+Number(skill.id)+'">'+escapeHtml(skill.name)+'</option>').join('');
-  if(preferredEssaySkillId&&rows.some(skill=>Number(skill.id)===preferredEssaySkillId))$('examEssaySkill').value=String(preferredEssaySkillId);
-  else if(rows.length===1)$('examEssaySkill').value=String(rows[0].id);
  }
  function closeSkillModal(){ $('createSkillModal').classList.remove('show'); $('createSkillModal').setAttribute('aria-hidden','true'); }
  $('openSkillModal').addEventListener('click',()=>{
@@ -155,7 +146,7 @@
   try{
    const created=await api.request('/questions/lookups/skills',{method:'POST',body:JSON.stringify({name,examCategoryId:categoryId})});
    const skill={id:Number(created.id),name:created.name||name,examCategoryId:Number(created.examCategoryId||categoryId)};
-   lookups.skills.push(skill);preferredEssaySkillId=skill.id;renderEssaySkills();$('examEssaySkill').value=String(skill.id);
+   lookups.skills.push(skill);preferredEssaySkillId=skill.id;
    $('skillCreateStatus').textContent='مهارت با موفقیت ذخیره شد.';window.showToast?.('مهارت ذخیره شد و در بانک مهارت‌ها در دسترس است.','ok');
    setTimeout(closeSkillModal,450);
   }catch(error){$('skillCreateStatus').textContent=error.message||'ذخیره مهارت ناموفق بود.';}
@@ -191,7 +182,7 @@
  $('backToQuestions').addEventListener('click',()=>showStep(2));
  $('questionSearch').addEventListener('input',renderQuestions);
  $('questionList').addEventListener('change',e=>{const input=e.target;if(!input.matches('input[type=checkbox]'))return;input.checked?selectedIds.add(String(input.value)):selectedIds.delete(String(input.value));$('questionCount').textContent=selectedIds.size+' سؤال انتخاب‌شده';});
- $('examCategory').addEventListener('change',()=>{selectedIds.clear();preferredEssaySkillId=0;renderEssaySkills();renderQuestions();});
+ $('examCategory').addEventListener('change',()=>{selectedIds.clear();preferredEssaySkillId=0;renderQuestions();});
  $('essaySectionPdfFile').addEventListener('change',()=>{$('essaySkillPicker').hidden=!$('essaySectionPdfFile').files[0];});
  $('refreshQuestions').addEventListener('click',async()=>{try{questions=await api.request('/questions');questions=Array.isArray(questions)?questions:[];renderQuestions();window.showToast?.('بانک سؤال بروزرسانی شد.','ok');}catch(e){window.showToast?.(e.message||'دریافت بانک سؤال ناموفق بود.','danger');}});
  $('createExam').addEventListener('click',async()=>{
@@ -204,7 +195,7 @@
    if(!departmentId)return window.showToast?.('دپارتمان کلاس معتبر نیست.','warn');
    const grouped=new Map();chosen.forEach(q=>{const id=Number(q.skillId);if(!grouped.has(id))grouped.set(id,[]);grouped.get(id).push(Number(q.id));});
    const groups=[...grouped.entries()],duration=Number($('examDuration').value);
-   const essaySkillId=essayFile?(Number($('examEssaySkill').value||0)||preferredEssaySkillId||(groups.length?groups[0][0]:Number(lookups.skills.find(s=>Number(s.examCategoryId)===Number($('examCategory').value))?.id||0))):0;
+   const essaySkillId=essayFile?(preferredEssaySkillId||(groups.length?groups[0][0]:Number(lookups.skills.find(s=>Number(s.examCategoryId)===Number($('examCategory').value))?.id||0))):0;
    if(essayFile&&!essaySkillId)return window.showToast?.('برای ساخت بخش Essay باید حداقل یک مهارت در دسته‌بندی انتخاب‌شده تعریف شده باشد.','warn');
    const sectionCount=groups.length+(essayFile?1:0);
    if(!isPdfOnly&&duration<sectionCount)return window.showToast?.('مدت آزمون باید حداقل به تعداد بخش‌های آزمون دقیقه باشد.','warn');
