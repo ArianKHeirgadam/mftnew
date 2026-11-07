@@ -33,7 +33,8 @@ public sealed class CanonicalResultsController(
             query = query.Where(x => x.Attempt.StudentUserId == CurrentUserId &&
                 (((x.Attempt.StatusId == 2 || x.Attempt.StatusId == 3 || x.Attempt.StatusId == 4) &&
                   (academic.ExamSections.Any(section => section.ExamId == x.Exam.Id) ||
-                   academic.StudentAnswers.Any(answer => answer.ExamAttemptId == x.Attempt.Id && answer.IsAutoGraded))) ||
+                   academic.StudentAnswers.Any(answer => answer.ExamAttemptId == x.Attempt.Id && answer.IsAutoGraded) ||
+                   x.Attempt.AutoGradedScore != null)) ||
                  (x.Exam.ResultsPublished && x.Attempt.StatusId == 4)));
         else if (User.IsInRole("Teacher"))
             query = query.Where(x => x.Exam.CreatedByUserId == CurrentUserId ||
@@ -68,8 +69,7 @@ public sealed class CanonicalResultsController(
             studentNumber = studentDetails.GetValueOrDefault(x.StudentUserId)?.Username,
             startedAt = x.StartedAt, submittedAt = x.SubmittedAt,
             score = isStudent
-                ? (x.ResultsPublished && x.StatusId == 4 ? x.FinalScore :
-                    (x.HasAutoGradedAnswers ? x.AutoGradedScore : null))
+                ? (x.ResultsPublished && x.StatusId == 4 ? x.FinalScore : x.AutoGradedScore)
                 : x.FinalScore ?? x.AutoGradedScore,
             status = StatusCodeName(x.StatusId),
             isPdfOnly = x.IsPdfOnly,
