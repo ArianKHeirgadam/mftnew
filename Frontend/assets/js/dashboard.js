@@ -14,10 +14,10 @@
   }
 
   function renderCharts() {
-    if (typeof Chart === 'undefined' || !window.MftChartData) return;
+    if (typeof Chart === 'undefined') return;
     charts.forEach(chart => chart.destroy());
     charts = [];
-    const data = window.MftChartData;
+    const data = window.MftChartData || {};
     const colors = themeColors();
     Chart.defaults.font.family = 'Vazirmatn';
     Chart.defaults.color = colors.text;
@@ -47,6 +47,22 @@
     }
 
     const performanceCanvas = document.getElementById('chartPerformance');
+    if (performanceCanvas) {
+      const host = performanceCanvas.parentElement;
+      let emptyState = host.querySelector('[data-performance-empty]');
+      if (!Array.isArray(data.performance) || data.performance.length === 0) {
+        if (!emptyState) {
+          emptyState = document.createElement('div');
+          emptyState.dataset.performanceEmpty = 'true';
+          emptyState.textContent = 'هنوز نمرهٔ ثبت‌شده‌ای برای نمایش روند وجود ندارد.';
+          emptyState.style.cssText = 'position:absolute;inset:0;display:flex;align-items:center;justify-content:center;text-align:center;padding:16px;color:var(--text-muted,#7b8794);font-size:13px;pointer-events:none';
+          host.style.position = 'relative';
+          host.appendChild(emptyState);
+        }
+      } else if (emptyState) {
+        emptyState.remove();
+      }
+    }
     if (performanceCanvas && Array.isArray(data.performance) && data.performance.length) {
       charts.push(new Chart(performanceCanvas, {
         type: 'line',
