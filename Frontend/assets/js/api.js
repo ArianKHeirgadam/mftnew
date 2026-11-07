@@ -1525,6 +1525,21 @@
   }
 
 
+  async function loadDepartmentIdentity() {
+    if (document.body.dataset.active !== 'dashboard' || (currentUser()?.role || '').toLowerCase() !== 'department') return;
+    const profile = await request('/users/me/profile');
+    const departmentName = String(profile.department || '').trim();
+    if (!departmentName) {
+      console.warn('Department profile did not return a department name.');
+      return;
+    }
+    document.querySelectorAll('[data-department-name]').forEach(element => {
+      element.textContent = departmentName;
+    });
+    const navTitle = document.querySelector('[data-department-nav-title]');
+    if (navTitle) navTitle.textContent = departmentName;
+  }
+
   async function init() {
     wireClicks();
     await login();
@@ -1542,6 +1557,7 @@
     if ($('#departmentExamsBody')) $('#departmentExamsBody').replaceChildren();
     await safe(async () => {
       await loadCurrentUser();
+      await loadDepartmentIdentity().catch(error => console.warn("Department identity:", error.message));
       await loadNotificationIndicators();
       if (document.body.dataset.active === 'notifications') await setupNotificationComposer();
       const isSuperAdmin = (currentUser()?.role || '').toLowerCase() === 'superadmin';
