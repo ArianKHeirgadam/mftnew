@@ -327,9 +327,11 @@
       }
       const heading = $('body[data-active="results"] h1');
       if (heading) {
-        const scoreLabel = result.status === 'PartiallyGraded' && result.autoScore != null
-          ? `نمره موقت تستی ${faNumber(result.autoScore)} — ${faNumber(result.pendingManualCount)} سؤال تشریحی در انتظار تصحیح`
-          : result.score != null
+        const scoreLabel = result.isPdfOnly && result.score == null
+          ? 'پاسخنامه PDF در انتظار تصحیح استاد'
+          : result.status === 'PartiallyGraded' && result.autoScore != null
+            ? `نمره موقت تستی ${faNumber(result.autoScore)} — ${faNumber(result.pendingManualCount)} سؤال تشریحی در انتظار تصحیح`
+            : result.score != null
             ? `${faNumber(result.score)} از ${faNumber(result.maxScore)}`
             : result.autoScore != null
               ? `نمره تستی ${faNumber(result.autoScore)} از ${faNumber(result.maxScore)}`
