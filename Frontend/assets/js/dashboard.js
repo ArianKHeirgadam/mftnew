@@ -14,16 +14,17 @@
   }
 
   function renderCharts() {
-    if (typeof Chart === 'undefined') return;
     charts.forEach(chart => chart.destroy());
     charts = [];
     const data = window.MftChartData || {};
     const colors = themeColors();
-    Chart.defaults.font.family = 'Vazirmatn';
-    Chart.defaults.color = colors.text;
+    if (typeof Chart !== 'undefined') {
+      Chart.defaults.font.family = 'Vazirmatn';
+      Chart.defaults.color = colors.text;
+    }
 
     const activityCanvas = document.getElementById('chartActivity');
-    if (activityCanvas && Array.isArray(data.activity) && data.activity.length) {
+    if (typeof Chart !== 'undefined' && activityCanvas && Array.isArray(data.activity) && data.activity.length) {
       charts.push(new Chart(activityCanvas, {
         type: 'line',
         data: {
@@ -35,7 +36,7 @@
     }
 
     const departmentCanvas = document.getElementById('chartDepartments');
-    if (departmentCanvas && Array.isArray(data.departments) && data.departments.length) {
+    if (typeof Chart !== 'undefined' && departmentCanvas && Array.isArray(data.departments) && data.departments.length) {
       charts.push(new Chart(departmentCanvas, {
         type: 'bar',
         data: {
@@ -63,7 +64,7 @@
         emptyState.remove();
       }
     }
-    if (performanceCanvas && Array.isArray(data.performance) && data.performance.length) {
+    if (performanceCanvas && Array.isArray(data.performance) && data.performance.length && typeof Chart !== 'undefined') {
       charts.push(new Chart(performanceCanvas, {
         type: 'line',
         data: { labels: data.performance.map(item => item.label), datasets: [{ label: 'نمره', data: data.performance.map(item => item.score), borderColor: colors.gold, backgroundColor: colors.gold, tension: 0.3, pointRadius: 4 }] },
@@ -71,8 +72,17 @@
       }));
     }
 
+    if (performanceCanvas) {
+      const host = performanceCanvas.parentElement;
+      let fallback = host.querySelector('[data-performance-fallback]');
+      if (typeof Chart === 'undefined' && Array.isArray(data.performance) && data.performance.length) {
+        if (!fallback) { fallback = document.createElement('ol'); fallback.dataset.performanceFallback = 'true'; fallback.style.cssText = 'margin:8px 0 0;padding:0 22px;display:grid;gap:8px;font-size:13px'; host.appendChild(fallback); }
+        fallback.innerHTML = data.performance.map(item => '<li style="display:flex;justify-content:space-between;gap:12px"><span>' + String(item.label).replace(/[&<>"']/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch])) + '</span><b>' + Number(item.score).toLocaleString('fa-IR') + '</b></li>').join('');
+      } else if (fallback) fallback.remove();
+    }
+
     const resultCanvas = document.getElementById('chartResult');
-    if (resultCanvas && data.resultCounts) {
+    if (typeof Chart !== 'undefined' && resultCanvas && data.resultCounts) {
       charts.push(new Chart(resultCanvas, {
         type: 'doughnut',
         data: { labels: ['پاسخ صحیح', 'پاسخ نادرست', 'در انتظار تصحیح'], datasets: [{ data: [data.resultCounts.correct, data.resultCounts.incorrect, data.resultCounts.pending], backgroundColor: [colors.primary, '#D64550', colors.grid], borderWidth: 0 }] },
