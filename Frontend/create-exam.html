@@ -29,7 +29,14 @@
   .choice-card:hover{border-color:var(--primary);}
   .choice-card.selected{border-color:var(--primary);background:color-mix(in srgb, var(--primary) 6%, transparent);}
   .choice-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:12px;}
-  .qpick-row{display:flex;align-items:center;gap:12px;padding:12px 0;border-bottom:1px solid var(--border);}
+  .qpick-row{display:flex;align-items:center;gap:12px;padding:13px 14px;border:1px solid var(--border);border-radius:12px;margin:8px 0;background:var(--surface);cursor:pointer;transition:.18s}
+  .qpick-row:hover{border-color:var(--primary);background:var(--surface-2)}
+  .qpick-row:has(input:checked){border-color:var(--primary);background:color-mix(in srgb,var(--primary) 7%,var(--surface))}
+  .qpick-row input{width:17px;height:17px;accent-color:var(--primary);flex-shrink:0}
+  .question-picker-tools{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin:12px 0}
+  .question-picker-tools .input{flex:1;min-width:220px}
+  #manualPick{max-height:430px;overflow:auto;padding:2px}
+  .question-picker-empty{padding:26px 16px;text-align:center;border:1px dashed var(--border);border-radius:12px;color:var(--text-soft)}
 </style>
 </head>
 <body data-role="teacher" data-active="exams">
@@ -86,11 +93,11 @@
             <h3>انتخاب سوالات</h3>
             <label class="checkbox-row"><input type="checkbox" id="randomToggle"> انتخاب تصادفی سوالات از بانک سوال</label>
           </div>
-          <div id="manualPick">
-            <div class="qpick-row"><input type="checkbox" checked><span style="flex:1">پیچیدگی زمانی الگوریتم کویک‌سورت در بدترین حالت چیست؟</span><span class="badge badge-info">چهارگزینه‌ای</span></div>
-            <div class="qpick-row"><input type="checkbox" checked><span style="flex:1">کدام ساختار داده برای پیاده‌سازی صف اولویت مناسب‌تر است؟</span><span class="badge badge-info">چهارگزینه‌ای</span></div>
-            <div class="qpick-row"><input type="checkbox"><span style="flex:1">الگوریتم کاراتسوبا را برای ضرب دو عدد ۴ رقمی شرح دهید.</span><span class="badge badge-muted">تشریحی</span></div>
+          <div class="question-picker-tools">
+            <input class="input" id="examQuestionSearch" type="search" placeholder="جستجو در متن سؤال‌ها...">
+            <span class="badge badge-muted" id="examQuestionCount">۰ سؤال</span>
           </div>
+          <div id="manualPick"><div class="question-picker-empty">ابتدا دسته‌بندی آزمون را انتخاب کنید.</div></div>
           <div id="randomPick" style="display:none">
             <div class="field"><label>تعداد سوالات چهارگزینه‌ای</label><input class="input" id="randomMcqCount" type="number" min="0" value="15"></div>
             <div class="field"><label>تعداد سوالات تشریحی</label><input class="input" id="randomEssayCount" type="number" min="0" value="2"></div>
@@ -150,6 +157,55 @@
   const STEPS = ["دپارتمان", "استاد", "سوالات", "اطلاعات آزمون", "زمان‌بندی", "پیش‌نمایش"];
   let current = 1;
   const selectedQuestionIds = new Set();
+  let examLookups = null;
+  let examQuestionRows = [];
+  const escapeExamHtml = value => String(value ?? '').replace(/[&<>"']/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
+  const questionTypeNames = { MultipleChoice: 'چهارگزینه‌ای', Essay: 'تشریحی', Matching: 'وصل‌کردنی' };
+
+  function renderExamQuestions() {
+    const categoryId = Number(document.getElementById('examCategory').value || 0);
+    const term = (document.getElementById('examQuestionSearch')?.value || '').trim().toLocaleLowerCase();
+    const skills = new Map((examLookups?.skills || []).map(skill => [Number(skill.id), skill]));
+    const rows = examQuestionRows.filter(question => {
+      const skill = skills.get(Number(question.skillId));
+      return categoryId > 0 && skill && Number(skill.examCategoryId) === categoryId &&
+        (!term || String(question.text || '').toLocaleLowerCase().includes(term));
+    });
+    const host = document.getElementById('manualPick');
+    document.getElementById('examQuestionCount').textContent = rows.length + ' سؤال';
+    host.innerHTML = rows.length ? rows.map(question => {
+      const type = question.questionTypeCode || '';
+      const checked = selectedQuestionIds.has(String(question.id)) ? ' checked' : '';
+      return '<label class="qpick-row"><input type="checkbox" value="' + Number(question.id) +
+        '" data-skill-id="' + Number(question.skillId) + '" data-question-type="' + escapeExamHtml(type) + '"' + checked +
+        '><span style="flex:1;line-height:1.8">' + escapeExamHtml(question.text) + '</span>' +
+        '<span class="badge badge-info">' + escapeExamHtml(questionTypeNames[type] || question.questionTypeName || 'سؤال') +
+        '</span></label>';
+    }).join('') : '<div class="question-picker-empty">' +
+      (categoryId ? 'برای این دسته‌بندی سؤالی پیدا نشد. ابتدا در بانک سؤال، سؤال و مهارت مرتبط ثبت کنید.' : 'ابتدا دسته‌بندی آزمون را انتخاب کنید.') +
+      '</div>';
+  }
+
+  async function loadExamPickerData() {
+    const api = window.MftApi;
+    if (!api) throw new Error('اتصال API آماده نیست.');
+    const [lookups, questions, classes] = await Promise.all([
+      api.request('/questions/lookups'),
+      api.request('/questions'),
+      api.request('/canonical/classes')
+    ]);
+    examLookups = lookups || { categories: [], skills: [], questionTypes: [] };
+    examQuestionRows = Array.isArray(questions) ? questions : [];
+    const categorySelect = document.getElementById('examCategory');
+    categorySelect.innerHTML = '<option value="">انتخاب دسته‌بندی آزمون</option>' +
+      (examLookups.categories || []).map(item => '<option value="' + Number(item.id) + '">' + escapeExamHtml(item.name) + '</option>').join('');
+    const classSelect = document.getElementById('examClass');
+    classSelect.innerHTML = '<option value="">انتخاب کلاس دریافت‌کنندگان</option>' +
+      (Array.isArray(classes) ? classes : []).map(item => '<option value="' + Number(item.id) +
+        '" data-department-id="' + Number(item.departmentId) + '">' + escapeExamHtml(item.name) +
+        ' — ' + escapeExamHtml(item.department || '') + '</option>').join('');
+    renderExamQuestions();
+  }
   function syncSelectedQuestions() {
     document.querySelectorAll('#manualPick input[type="checkbox"][value]').forEach(input => {
       if (input.checked) selectedQuestionIds.add(String(input.value));
@@ -202,8 +258,14 @@
   });
   document.getElementById("randomToggle").addEventListener("change", event => {
     document.getElementById("manualPick").style.display = event.target.checked ? "none" : "block";
+    document.getElementById("examQuestionSearch").style.display = event.target.checked ? "none" : "block";
     document.getElementById("randomPick").style.display = event.target.checked ? "block" : "none";
   });
+  document.getElementById('examCategory').addEventListener('change', () => {
+    selectedQuestionIds.clear();
+    renderExamQuestions();
+  });
+  document.getElementById('examQuestionSearch').addEventListener('input', renderExamQuestions);
   document.getElementById("wizPrev").addEventListener("click", () => { if (current > 1) showStep(current - 1); });
 
   document.getElementById("wizNext").addEventListener("click", async () => {
@@ -318,9 +380,19 @@
     }
   });
   document.getElementById("manualPick").addEventListener("change", event => {
-    if (event.target.matches('input[type="checkbox"][value]')) syncSelectedQuestions();
+    const input = event.target;
+    if (!input.matches('input[type="checkbox"][value]')) return;
+    if (input.checked) selectedQuestionIds.add(String(input.value));
+    else selectedQuestionIds.delete(String(input.value));
+    document.getElementById('examQuestionCount').textContent =
+      selectedManualQuestions().length + ' سؤال انتخاب‌شده';
   });
   showStep(1);
+  loadExamPickerData().catch(error => {
+    document.getElementById('manualPick').innerHTML =
+      '<div class="question-picker-empty">' + escapeExamHtml(error.message || 'دریافت سؤال‌ها ناموفق بود.') + '</div>';
+    showToast(error.message || 'دریافت اطلاعات آزمون ناموفق بود.', 'danger');
+  });
 </script>
 </body>
 </html>
