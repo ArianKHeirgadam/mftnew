@@ -33,6 +33,7 @@ public sealed class CanonicalExamsController(
         var rows = await q.OrderByDescending(x => x.Id).Select(x => new {
             x.Id, x.Title, x.ExamCategoryId, x.DepartmentId, x.ClassId, x.CreatedByUserId,
             x.StartAt, x.EndAt, x.DurationMinutes, x.IsPublished,
+            IsPdfOnly = !academic.ExamSections.Any(s => s.ExamId == x.Id) && academic.ExamDocuments.Any(d => d.ExamId == x.Id),
             SectionCount = academic.ExamSections.Count(s => s.ExamId == x.Id),
             QuestionCount = academic.ExamSections.Where(s => s.ExamId == x.Id)
                 .SelectMany(s => academic.ExamQuestions.Where(eq => eq.ExamSectionId == s.Id)).Count(),
@@ -63,8 +64,9 @@ public sealed class CanonicalExamsController(
                 Questions = academic.ExamQuestions.Where(q => q.ExamSectionId == x.Id)
                     .OrderBy(q => q.DisplayOrder).Select(q => new { q.Id, q.QuestionId, q.DisplayOrder, q.PointsOverride }).ToList()
             }).ToListAsync(ct);
+        var isPdfOnly = sections.Count == 0 && await academic.ExamDocuments.AnyAsync(x => x.ExamId == id, ct);
         return Ok(new { exam.Id, exam.Title, exam.ExamCategoryId, exam.DepartmentId, exam.ClassId, exam.CreatedByUserId,
-            exam.StartAt, exam.EndAt, exam.DurationMinutes, exam.IsPublished, Sections = sections });
+            exam.StartAt, exam.EndAt, exam.DurationMinutes, exam.IsPublished, IsPdfOnly = isPdfOnly, Sections = sections });
     }
 
     [HttpPost]
@@ -81,12 +83,12 @@ public sealed class CanonicalExamsController(
             Title = request.Title.Trim(), ExamCategoryId = request.ExamCategoryId,
             DepartmentId = departmentId.Value, ClassId = request.ClassId, CreatedByUserId = CurrentUserId.Value,
             StartAt = request.StartAt, EndAt = request.EndAt,
-            DurationMinutes = request.DurationMinutes, IsPublished = request.IsPublished
+            DurationMinutes = request.DurationMinutes, IsPublished = request.PdfOnly ? false : request.IsPublished
         };
         academic.Exams.Add(exam);
         await academic.SaveChangesAsync(ct);
-        await ReplaceSections(exam.Id, request.Sections, ct);
-        return CreatedAtAction(nameof(Get), new { id = exam.Id }, new { id = exam.Id });
+        if (!request.PdfOnly) await ReplaceSections(exam.Id, request.Sections, ct);
+        return CreatedAtAction(nameof(Get), new { id = exam.Id }, new { id = exam.Id, isPdfOnly = request.PdfOnly });
     }
 
     [HttpPut("{id:long}")]
@@ -110,6 +112,21 @@ public sealed class CanonicalExamsController(
         await academic.SaveChangesAsync(ct);
         await ReplaceSections(id, request.Sections, ct);
         return NoContent();
+    }
+
+    [HttpPost("{id:long}/publish")]
+    [Authorize(Policy = "TeacherOrAbove")]
+    public async Task<IActionResult> Publish(long id, CancellationToken ct)
+    {
+        var exam = await academic.Exams.FirstOrDefaultAsync(x => x.Id == id, ct);
+        if (exam is null) return NotFound();
+        if (!CanManage(exam)) return Forbid();
+        var sectionCount = await academic.ExamSections.CountAsync(x => x.ExamId == id, ct);
+        if (sectionCount == 0 && !await academic.ExamDocuments.AnyAsync(x => x.ExamId == id, ct))
+            return BadRequest(new { message = "برای انتشار آزمون PDFمحور، ابتدا فایل PDF صورت آزمون را بارگذاری کنید." });
+        exam.IsPublished = true;
+        await academic.SaveChangesAsync(ct);
+        return Ok(new { examId = id, isPublished = true });
     }
 
     [HttpPost("{id:long}/assign-class")]
@@ -164,17 +181,19 @@ public sealed class CanonicalExamsController(
     {
         if (string.IsNullOrWhiteSpace(r.Title) || r.Title.Length > 300 || r.ClassId <= 0 ||
             r.DurationMinutes is < 1 or > 600 || r.EndAt <= r.StartAt ||
-            r.Sections.Count == 0 || r.Sections.SelectMany(x => x.QuestionIds).Distinct().Count() != r.Sections.Sum(x => x.QuestionIds.Count))
+            (r.PdfOnly ? r.Sections.Count != 0 : r.Sections.Count == 0) ||
+            r.Sections.SelectMany(x => x.QuestionIds).Distinct().Count() != r.Sections.Sum(x => x.QuestionIds.Count))
             return BadRequest(new { message = "عنوان، زمان‌بندی، مدت آزمون و فهرست بخش‌ها/سؤال‌ها معتبر نیست." });
         if (!await academic.ExamCategories.AnyAsync(x => x.Id == r.ExamCategoryId, ct))
             return BadRequest(new { message = "دسته‌بندی آزمون معتبر نیست." });
         if (!departmentId.HasValue || !await academic.Classes.AnyAsync(x =>
             x.Id == r.ClassId && x.DepartmentId == departmentId.Value, ct))
             return BadRequest(new { message = "کلاس انتخاب‌شده معتبر نیست یا به دپارتمان آزمون تعلق ندارد." });
-        if (r.Sections.Any(x => x.SkillId <= 0 || x.DurationMinutes < 1 || x.QuestionIds.Count == 0 || x.WeightPercent <= 0))
+        if (!r.PdfOnly && r.Sections.Any(x => x.SkillId <= 0 || x.DurationMinutes < 1 || x.QuestionIds.Count == 0 || x.WeightPercent <= 0))
             return BadRequest(new { message = "هر بخش باید مهارت، زمان، وزن و حداقل یک سؤال معتبر داشته باشد." });
-        if (Math.Abs(r.Sections.Sum(x => x.WeightPercent) - 100m) > 0.01m)
+        if (!r.PdfOnly && Math.Abs(r.Sections.Sum(x => x.WeightPercent) - 100m) > 0.01m)
             return BadRequest(new { message = "مجموع وزن بخش‌های آزمون باید دقیقاً ۱۰۰ درصد باشد." });
+        if (r.PdfOnly) return null;
         var skillIds = r.Sections.Select(x => x.SkillId).Distinct().ToArray();
         if (await academic.Skills.CountAsync(x => skillIds.Contains(x.Id) && x.ExamCategoryId == r.ExamCategoryId, ct) != skillIds.Length)
             return BadRequest(new { message = "یک یا چند مهارت به دسته‌بندی انتخاب‌شده تعلق ندارد." });
@@ -239,6 +258,7 @@ public sealed class ExamUpsert
     public DateTime EndAt { get; set; }
     public int DurationMinutes { get; set; }
     public bool IsPublished { get; set; }
+    public bool PdfOnly { get; set; }
     public List<ExamSectionInput> Sections { get; set; } = new();
 }
 public sealed class ExamSectionInput

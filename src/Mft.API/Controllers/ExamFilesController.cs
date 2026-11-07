@@ -148,9 +148,12 @@ public sealed class ExamFilesController(
         if (attempt.StatusId != 1 || DateTime.UtcNow > attempt.StartedAt.AddMinutes(exam.DurationMinutes))
             return BadRequest(new { message = "مهلت بارگذاری پاسخ این آزمون به پایان رسیده است." });
 
-        var saved = await SaveFile(file, pdfOnly: false, ct);
+        var pdfOnlyExam = !await academic.ExamSections.AnyAsync(x => x.ExamId == exam.Id, ct);
+        var saved = await SaveFile(file, pdfOnly: pdfOnlyExam, ct);
         if (saved is null)
-            return BadRequest(new { message = "فایل پاسخ باید PDF، JPG، JPEG یا PNG معتبر و حداکثر ۲۰ مگابایت باشد." });
+            return BadRequest(new { message = pdfOnlyExam
+                ? "برای آزمون PDFمحور فقط فایل PDF معتبر و حداکثر ۲۰ مگابایت پذیرفته می‌شود."
+                : "فایل پاسخ باید PDF، JPG، JPEG یا PNG معتبر و حداکثر ۲۰ مگابایت باشد." });
 
         if (!await identity.Users.AnyAsync(x => x.Id == studentId && x.IsActive, ct))
         {

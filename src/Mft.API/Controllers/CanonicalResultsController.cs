@@ -119,7 +119,7 @@ public sealed class CanonicalResultsController(
         var pending = answers.Count(x => !x.IsAutoGraded && !x.Score.HasValue);
         return Ok(new {
             id = attempt.Id, examId = exam.Id, exam = exam.Title,
-            score = exam.ResultsPublished ? attempt.FinalScore : null,
+            score = isPdfOnly ? (isStudent && !exam.ResultsPublished ? null : attempt.FinalScore) : (exam.ResultsPublished ? attempt.FinalScore : null),
             autoScore = isStudent && !exam.ResultsPublished ? null : attempt.AutoGradedScore,
             maxScore, pendingManualCount = pending,
             status = exam.ResultsPublished ? StatusCodeName(attempt.StatusId) : "AwaitingPublication",

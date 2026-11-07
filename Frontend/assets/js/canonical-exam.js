@@ -181,9 +181,22 @@
     if(titleNode)titleNode.textContent=data.title||'آزمون آنلاین';
     const saved=data.savedAnswers||{};
     Object.entries(saved).forEach(([id,json])=>{try{answers.set(Number(id),JSON.parse(json));}catch{}});
-    if(!questions.length)throw new Error('برای این آزمون سؤالی تعریف نشده است.');
-    if(studentPdfBox)studentPdfBox.hidden=false;
-    renderNav();render();startClock();
+    if(data.isPdfOnly){
+      if(titleNode)titleNode.textContent=data.title||'آزمون PDFمحور';
+      root.querySelectorAll('.badge, #flagQuestion, .option-row, .exam-layout .alert-warn, #examPrev, #examNext').forEach(node=>node.hidden=true);
+      const heading=root.querySelector('h3');if(heading)heading.textContent='آزمون PDFمحور';
+      const intro=document.createElement('p');intro.className='text-soft';intro.textContent='فایل صورت آزمون را دریافت کنید، پاسخ‌ها را در یک فایل PDF آماده و پیش از ثبت نهایی بارگذاری کنید.';
+      heading?.after(intro);
+      if(studentPdfBox){studentPdfBox.hidden=false;studentPdfBox.querySelector('label').textContent='فایل پاسخ آزمون (PDF، حداکثر ۲۰ مگابایت)';}
+      document.querySelector('.exam-nav-panel')?.remove();
+      if(progressLabel)progressLabel.textContent='آزمون PDFمحور';
+      if(progress)progress.style.width='100%';
+    }else{
+      if(!questions.length)throw new Error('برای این آزمون سؤالی تعریف نشده است.');
+      if(studentPdfBox)studentPdfBox.hidden=false;
+      renderNav();render();
+    }
+    startClock();
   }catch(error){
     if(root)root.innerHTML='<div class="alert alert-danger">'+esc(error.message||'بارگذاری آزمون ناموفق بود.')+'</div><a class="btn btn-outline mt-16" href="dashboard-student.html">بازگشت به داشبورد</a>';
     toast(error.message||'بارگذاری آزمون ناموفق بود.','danger');
