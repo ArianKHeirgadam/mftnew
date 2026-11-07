@@ -342,12 +342,20 @@
       const canGrade = ['teacher', 'department', 'superadmin'].includes(role);
       if (body) {
         if (result.isPdfOnly) {
-          body.innerHTML = `<tr><td>۱</td><td>آزمون PDFمحور</td><td>فایل پاسخ به‌صورت PDF ارسال شده است.</td><td>—</td><td>${canGrade && !result.resultsPublished ? `<div class="flex gap-8 mt-8"><input class="input" type="number" min="0" max="100" step="0.01" value="${result.score == null ? '': Number(result.score)}" placeholder="نمره" data-pdf-grade-score style="max-width:110px" aria-label="نمره از ۱۰۰"><button class="btn btn-primary btn-sm" id="savePdfGrade">ثبت نمره</button></div><small class="text-soft">نمره کلی از ۱۰۰</small>` : (result.score == null ? 'در انتظار تصحیح' : `${faNumber(result.score)} از ۱۰۰`)}</td></tr>`;
+          body.innerHTML = `<tr><td>۱</td><td>آزمون PDFمحور</td><td>فایل پاسخ به‌صورت PDF ارسال شده است.</td><td>—</td><td>${canGrade && !result.resultsPublished ? `<div class="flex gap-8 mt-8"><input class="input" type="number" min="0" max="100" step="0.01" value="${result.pdfGrade?.score ?? result.score ?? ''}" placeholder="نمره" data-pdf-grade-score style="max-width:110px" aria-label="نمره از ۱۰۰"><button class="btn btn-primary btn-sm" id="savePdfGrade">ثبت نمره</button></div><small class="text-soft">نمره کلی از ۱۰۰</small>` : (result.score == null ? 'در انتظار تصحیح استاد' : `${faNumber(result.score)} از ۱۰۰`)}</td></tr>`;
           if (canGrade && !result.resultsPublished) $('#savePdfGrade')?.addEventListener('click', async event => {
             const button=event.currentTarget;const rawScore=$('[data-pdf-grade-score]')?.value?.trim() ?? '';const score=Number(rawScore);
             if(rawScore===''||!Number.isFinite(score)||score<0||score>100)return notify('ابتدا نمره‌ای بین ۰ تا ۱۰۰ وارد کنید.','warn');
             button.disabled=true;
-            try{await request(`/canonical/results/${encodeURIComponent(attemptId)}/pdf-grade`,{method:'PUT',body:JSON.stringify({score})});notify('نمره کلی ثبت شد.','ok');await loadResults();}
+            try{
+              const payload={score};
+              if(result.pdfGrade?.rowVersion) payload.rowVersion=result.pdfGrade.rowVersion;
+              const route=role==='teacher'
+                ? `/canonical/teacher/essay-grading/attempts/${encodeURIComponent(attemptId)}/pdf-grade`
+                : `/canonical/results/${encodeURIComponent(attemptId)}/pdf-grade`;
+              await request(route,{method:'PUT',body:JSON.stringify(payload)});
+              notify('نمره کلی ثبت شد.','ok');await loadResults();
+            }
             catch(error){notify(error.message||'ثبت نمره ناموفق بود.','danger');button.disabled=false;}
           });
         } else body.innerHTML = result.answers.length ? result.answers.map((answer, index) => {
@@ -472,7 +480,7 @@
     const list = $('#teacherPendingPlaceholder'), count = $('#mftPendingGradeCount'), upcoming = $('#mftUpcomingExams');
     const attemptsTask = request('/canonical/results').then(attempts => {
       const pending = (Array.isArray(attempts) ? attempts : []).filter(x => ['Submitted','PartiallyGraded'].includes(x.status));
-      if (list) list.innerHTML = pending.length ? pending.map(x => '<li class="flex items-center justify-between" style="padding:10px 0;border-bottom:1px solid var(--border)"><div><b>' + escapeHtml(x.studentName || 'دانشجو') + '</b><div class="text-soft text-sm">شماره دانشجویی: ' + escapeHtml(x.studentNumber || 'ثبت نشده') + '</div><div class="text-soft text-sm">' + escapeHtml(x.examTitle) + ' — ارسال ' + (x.submittedAt ? new Date(x.submittedAt).toLocaleString('fa-IR') : 'بدون تاریخ') + '</div><div class="text-soft text-sm">' + (x.score == null ? 'نمره تستی: هنوز ثبت نشده' : 'نمره خودکار تا این مرحله: ' + faNumber(x.score)) + (x.status === 'PartiallyGraded' ? ' — پاسخ تشریحی در انتظار تصحیح' : '') + '</div></div><a class="btn btn-outline btn-sm" href="results.html?attemptId=' + encodeURIComponent(x.id) + '">تصحیح</a></li>').join('') : '<li class="text-soft">برگه‌ای در انتظار تصحیح نیست.</li>';
+      if (list) list.innerHTML = pending.length ? pending.map(x => '<li class="flex items-center justify-between" style="padding:10px 0;border-bottom:1px solid var(--border)"><div><b>' + escapeHtml(x.studentName || 'دانشجو') + '</b><div class="text-soft text-sm">شماره دانشجویی: ' + escapeHtml(x.studentNumber || 'ثبت نشده') + '</div><div class="text-soft text-sm">' + escapeHtml(x.examTitle) + ' — ارسال ' + (x.submittedAt ? new Date(x.submittedAt).toLocaleString('fa-IR') : 'بدون تاریخ') + '</div><div class="text-soft text-sm">' + (x.isPdfOnly ? 'پاسخنامه PDF — در انتظار تصحیح استاد' : (x.score == null ? 'نمره تستی: هنوز ثبت نشده' : 'نمره خودکار تا این مرحله: ' + faNumber(x.score)) + (x.status === 'PartiallyGraded' ? ' — پاسخ تشریحی در انتظار تصحیح' : '')) + '</div></div><a class="btn btn-outline btn-sm" href="results.html?attemptId=' + encodeURIComponent(x.id) + '">تصحیح</a></li>').join('') : '<li class="text-soft">برگه‌ای در انتظار تصحیح نیست.</li>';
       if (count) count.textContent = faNumber(pending.length) + ' مورد باقی‌مانده';
     }).catch(error => {
       if (list) list.innerHTML = '<li class="text-soft">دریافت صف تصحیح ناموفق بود: ' + escapeHtml(error.message || 'خطای نامشخص') + '</li>';
