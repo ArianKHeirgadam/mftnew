@@ -5,12 +5,11 @@ public record LoginRequest(string Username, string Password);
 public record LoginResponse(
     string AccessToken,
     DateTime ExpiresAt,
-    Guid UserId,
+    long UserId,
     string Username,
     string FullName,
     string Role,
-    bool MustChangePassword,
-    Guid? DepartmentId);
+    long? DepartmentId);
 
 public record CreateUserRequest(
     string Username,
@@ -19,17 +18,16 @@ public record CreateUserRequest(
     string Role,
     string? Email,
     string? Mobile,
-    Guid? DepartmentId,
-    bool MustChangePassword = false);
+    long? DepartmentId);
 
 public record UpdateUserRequest(
     string FullName,
     string? Email,
     string? Mobile,
-    Guid? DepartmentId,
+    long? DepartmentId,
     bool IsActive);
 
-public record DepartmentRequest(string Name, Guid? ManagerUserId, bool IsActive = true);
+public record DepartmentRequest(string Name, long? ManagerUserId, bool IsActive = true);
 
 public record QuestionRequest(
     string Text,
@@ -57,7 +55,6 @@ public record ExamRequest(
 
 public record AnswerRequest(Guid QuestionId, string? Answer);
 public record SubmitAttemptRequest(IReadOnlyList<AnswerRequest> Answers);
-public record ChangePasswordRequest(string CurrentPassword, string NewPassword);
 public record UpdateProfileRequest(string FullName, string? Email, string? Mobile);
 public record SaveSettingRequest(string Key, string Value);
 
@@ -73,3 +70,5 @@ public record DashboardSummary(
 
 public record AttendanceEntryRequest(Guid StudentId, string Status);
 public record SaveAttendanceRequest(DateOnly Date, Guid? DepartmentId, List<AttendanceEntryRequest> Records);
+
+public record ManualGradeRequest(decimal Score, string? Comment = null);

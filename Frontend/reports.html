@@ -7,7 +7,7 @@
 <link rel="stylesheet" href="assets/css/style.css">
 <link rel="stylesheet" href="assets/css/responsive.css">
 <link rel="stylesheet" href="assets/css/dark.css">
-<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.4/chart.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
 </head>
 <body data-role="superadmin" data-active="reports">
 <div class="app-shell">
@@ -27,14 +27,14 @@
       </div>
 
       <div class="stat-grid">
-        <div class="card stat-card" style="--stat-tint:var(--teal-500)"><div class="stat-ring" style="--p:72"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M7 3h8l4 4v14H7z"/></svg></div><div class="stat-body"><b data-count="0" data-metric="exams">۰</b><span>آزمون برگزارشده این ترم</span></div></div>
+        <div class="card stat-card" style="--stat-tint:var(--teal-500)"><div class="stat-ring" style="--p:72"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M7 3h8l4 4v14H7z"/></svg></div><div class="stat-body"><b data-count="0" data-metric="exams">۰</b><span>کل آزمون‌های ثبت‌شده</span></div></div>
         <div class="card stat-card" style="--stat-tint:var(--gold-500)"><div class="stat-ring" style="--p:76"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 3a9 9 0 1 0 9 9"/></svg></div><div class="stat-body"><b data-count="0" data-metric="passRate">۰</b><span>میانگین نرخ قبولی (٪)</span></div></div>
-        <div class="card stat-card" style="--stat-tint:var(--ok)"><div class="stat-ring" style="--p:94"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="m12 3 9 4.5-9 4.5-9-4.5Z"/></svg></div><div class="stat-body"><b data-count="0" data-metric="participation">۰</b><span>نرخ مشارکت دانشجویان (٪)</span></div></div>
-        <div class="card stat-card" style="--stat-tint:var(--danger)"><div class="stat-ring" style="--p:18"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 9v4M12 17h.01"/><path d="M12 3 2 20h20Z"/></svg></div><div class="stat-body"><b data-count="0">—</b><span>گزارش تخلف انضباطی</span></div></div>
+        <div class="card stat-card" style="--stat-tint:var(--ok)"><div class="stat-ring" style="--p:94"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="m12 3 9 4.5-9 4.5-9-4.5Z"/></svg></div><div class="stat-body"><b data-count="0" data-metric="participation">۰</b><span>تعداد تلاش‌های ثبت‌شده آزمون</span></div></div>
+        <div class="card stat-card" style="--stat-tint:var(--danger)"><div class="stat-ring" style="--p:18"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 9v4M12 17h.01"/><path d="M12 3 2 20h20Z"/></svg></div><div class="stat-body"><b data-count="0" data-metric="students">۰</b><span>کل دانشجویان</span></div></div>
       </div>
 
       <div class="grid-2">
-        <div class="card card-pad"><div class="section-title"><h3>روند برگزاری آزمون‌ها</h3></div><div style="height:260px"><canvas id="chartActivity"></canvas></div></div>
+        <div class="card card-pad"><div class="section-title"><h3>تلاش‌های آزمون در هفت روز اخیر</h3></div><div style="height:260px"><canvas id="chartActivity"></canvas></div></div>
         <div class="card card-pad"><div class="section-title"><h3>دانشجویان به تفکیک دپارتمان</h3></div><div style="height:260px"><canvas id="chartDepartments"></canvas></div></div>
       </div>
 
@@ -42,13 +42,25 @@
         <div class="section-title"><h3>گزارش تفصیلی دپارتمان‌ها</h3></div>
         <div class="table-wrap">
           <table class="dt">
-            <thead><tr><th>دپارتمان</th><th>تعداد آزمون</th><th>میانگین نمره</th><th>نرخ قبولی</th><th>نرخ مشارکت</th></tr></thead>
+            <thead><tr><th>دپارتمان</th><th>دانشجویان</th><th>اساتید</th><th>تعداد آزمون</th><th>میانگین نمره</th><th>نرخ قبولی</th><th>تلاش‌ها</th></tr></thead>
             <tbody>
-              <tr><td>مهندسی کامپیوتر</td><td>۸۶</td><td>۱۵.۸</td><td><div class="progress" style="width:120px"><i style="width:82%"></i></div></td><td>۹۶٪</td></tr>
-              <tr><td>مهندسی برق</td><td>۶۴</td><td>۱۴.۲</td><td><div class="progress" style="width:120px"><i style="width:74%"></i></div></td><td>۹۱٪</td></tr>
-              <tr><td>مهندسی عمران</td><td>۵۲</td><td>۱۳.۵</td><td><div class="progress" style="width:120px"><i style="width:68%;background:var(--gold-500)"></i></div></td><td>۸۸٪</td></tr>
-              <tr><td>مکانیک</td><td>۴۸</td><td>۱۶.۱</td><td><div class="progress" style="width:120px"><i style="width:85%"></i></div></td><td>۹۳٪</td></tr>
+              <tr><td colspan="7" class="text-soft" style="text-align:center;padding:24px">در حال دریافت گزارش دپارتمان‌ها...</td></tr>
             </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="card card-pad mt-24">
+        <div class="section-title"><h3>تلاش‌های اخیر آزمون دانشجویان به تفکیک دپارتمان</h3><span class="text-soft text-sm">حداکثر ۱۰۰ تلاش اخیر</span></div>
+        <div class="flex gap-8" style="flex-wrap:wrap;margin:12px 0 16px">
+          <input class="input" type="search" placeholder="جست‌وجو بر اساس نام دانشجو یا آزمون..." data-report-search style="flex:1;min-width:220px">
+          <select class="input" data-report-department style="min-width:190px;max-width:280px"><option value="">همه دپارتمان‌ها</option></select>
+          <button class="btn btn-outline" type="button" data-report-refresh>بروزرسانی</button>
+        </div>
+        <div class="table-wrap">
+          <table class="dt">
+            <thead><tr><th>دپارتمان</th><th>دانشجو</th><th>آزمون</th><th>شروع</th><th>ارسال</th><th>وضعیت</th><th>نمره</th></tr></thead>
+            <tbody data-recent-attempts><tr><td colspan="7" class="text-soft" style="text-align:center;padding:24px">در حال دریافت تلاش‌ها...</td></tr></tbody>
           </table>
         </div>
       </div>

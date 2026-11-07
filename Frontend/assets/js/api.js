@@ -12,6 +12,19 @@
   const $$ = (selector, root = document) => [...root.querySelectorAll(selector)];
   const escapeHtml = value => String(value ?? '').replace(/[&<>"']/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[ch]);
   const faNumber = value => Number(value || 0).toLocaleString('fa-IR');
+  const parseUtcDate = value => { if (!value) return null; const raw=String(value); const normalized=/(?:Z|[+-]\d{2}:?\d{2})$/i.test(raw)?raw:raw+'Z'; const date=new Date(normalized); return Number.isNaN(date.getTime())?null:date; };
+  if (!document.querySelector('script[data-mft-persian-picker]')) {
+    const pickerScript = document.createElement('script');
+    pickerScript.src = 'assets/js/persian-date-picker.js';
+    pickerScript.dataset.mftPersianPicker = 'true';
+    document.head.appendChild(pickerScript);
+  }
+  const nativeFaDate = Date.prototype.toLocaleDateString, nativeFaDateTime = Date.prototype.toLocaleString;
+  if (!Date.prototype.__mftFaPersianCalendar) {
+    Date.prototype.toLocaleDateString = function(l,o) { return String(l || '').toLowerCase().startsWith('fa') ? nativeFaDate.call(this,l,{calendar:'persian',numberingSystem:'arabext',...(o || {})}) : nativeFaDate.call(this,l,o); };
+    Date.prototype.toLocaleString = function(l,o) { return String(l || '').toLowerCase().startsWith('fa') ? nativeFaDateTime.call(this,l,{calendar:'persian',numberingSystem:'arabext',...(o || {})}) : nativeFaDateTime.call(this,l,o); };
+    Object.defineProperty(Date.prototype,'__mftFaPersianCalendar',{value:true});
+  }
   const notify = (message, type = 'ok') => window.showToast?.(message, type);
 
   async function request(path, options = {}) {
@@ -102,19 +115,97 @@
     });
   }
 
+  function attachGlobalSearch() {
+    const field = $('.topbar .search-box input');
+    if (!field || field.dataset.globalSearchReady) return;
+    field.dataset.globalSearchReady = 'true';
+    const host = field.closest('.search-box');
+    host.style.position = 'relative';
+    const panel = document.createElement('div');
+    panel.id = 'globalSearchResults';
+    panel.className = 'dropdown-menu';
+    panel.style.cssText = 'display:none;position:absolute;top:calc(100% + 8px);right:0;left:0;z-index:1200;max-height:420px;overflow:auto;min-width:280px;padding:8px;background:var(--surface);border:1px solid var(--border);box-shadow:var(--shadow-lg);border-radius:12px';
+    host.appendChild(panel);
+    let timer;
+    const close = () => { panel.style.display = 'none'; };
+    const showMessage = message => {
+      panel.innerHTML = '';
+      const row = document.createElement('div');
+      row.className = 'text-soft text-sm';
+      row.style.padding = '12px';
+      row.textContent = message;
+      panel.appendChild(row);
+      panel.style.display = 'block';
+    };
+    field.addEventListener('input', () => {
+      clearTimeout(timer);
+      const term = field.value.trim();
+      if (term.length < 2) return close();
+      showMessage('در حال جستجو...');
+      timer = setTimeout(async () => {
+        try {
+          const tasks = await Promise.allSettled([
+            request('/users?search=' + encodeURIComponent(term)),
+            request('/departments?search=' + encodeURIComponent(term)),
+            request('/canonical/classes')
+          ]);
+          const users = tasks[0].status === 'fulfilled' ? tasks[0].value : [];
+          const departments = tasks[1].status === 'fulfilled' ? tasks[1].value : [];
+          const classes = tasks[2].status === 'fulfilled' ? tasks[2].value : [];
+          const results = [];
+          users.filter(item => (item.fullName || '').toLocaleLowerCase().includes(term.toLocaleLowerCase()) ||
+            (item.username || '').toLocaleLowerCase().includes(term.toLocaleLowerCase()))
+            .slice(0, 8).forEach(item => {
+              const role = String(item.role || '').toLowerCase();
+              const isTeacher = role === 'teacher' || (item.roles || []).some(value => String(value).toLowerCase() === 'teacher');
+              const isStudent = role === 'student' || (item.roles || []).some(value => String(value).toLowerCase() === 'student');
+              if (!isTeacher && !isStudent) return;
+              results.push({ title: item.fullName || item.username, detail: (isTeacher ? 'استاد' : 'دانشجو') + ' · ' + (item.department || 'بدون دپارتمان'), href: (isTeacher ? 'teachers.html' : 'students.html') + '?search=' + encodeURIComponent(term) });
+            });
+          departments.filter(item => (item.name || '').toLocaleLowerCase().includes(term.toLocaleLowerCase()))
+            .slice(0, 4).forEach(item => results.push({ title: item.name, detail: 'دپارتمان', href: 'departments.html?search=' + encodeURIComponent(term) }));
+          classes.filter(item => (item.name || '').toLocaleLowerCase().includes(term.toLocaleLowerCase()))
+            .slice(0, 4).forEach(item => results.push({ title: item.name, detail: 'کلاس · ' + (item.department || ''), href: 'classes.html?search=' + encodeURIComponent(term) }));
+          panel.innerHTML = '';
+          if (!results.length) return showMessage('نتیجه‌ای برای جستجوی شما پیدا نشد.');
+          results.slice(0, 12).forEach(item => {
+            const link = document.createElement('a');
+            link.href = item.href;
+            link.style.cssText = 'display:flex;flex-direction:column;gap:3px;padding:10px 12px;border-radius:8px;text-decoration:none;color:var(--text)';
+            const title = document.createElement('b');
+            title.textContent = item.title;
+            const detail = document.createElement('small');
+            detail.className = 'text-soft';
+            detail.textContent = item.detail;
+            link.append(title, detail);
+            link.addEventListener('mouseenter', () => { link.style.background = 'var(--surface-2)'; });
+            link.addEventListener('mouseleave', () => { link.style.background = 'transparent'; });
+            panel.appendChild(link);
+          });
+          panel.style.display = 'block';
+        } catch (error) {
+          showMessage(error.message || 'جستجو ناموفق بود.');
+        }
+      }, 300);
+    });
+    field.addEventListener('focus', () => { if (panel.childElementCount && field.value.trim().length >= 2) panel.style.display = 'block'; });
+    document.addEventListener('click', event => { if (!host.contains(event.target)) close(); });
+    field.addEventListener('keydown', event => { if (event.key === 'Escape') close(); });
+  }
+
   async function loadUsers() {
     const studentBody = $('#studentsBody');
     const teacherBody = $('#teachersBody') || $('body[data-active="teachers"] table tbody');
-    const searchField = $('body[data-active="students"] .search-box input, body[data-active="teachers"] .search-box input');
-    const search = searchField?.value.trim();
+    const searchField = $('main .table-toolbar .search-box input');
+    const search = searchField?.value.trim() || new URLSearchParams(location.search).get('search') || '';
 
     if (studentBody) {
       const rows = await request(`/users?role=Student${search ? `&search=${encodeURIComponent(search)}` : ''}`);
       renderRows('#studentsBody', rows, row => `<tr>
         <td>${escapeHtml(row.fullName)}</td><td>${escapeHtml(row.username)}</td><td>${escapeHtml(row.department || '—')}</td>
-        <td>—</td><td>—</td><td>${row.isActive ? 'فعال' : 'غیرفعال'}</td>
+        <td>${row.isActive ? 'فعال' : 'غیرفعال'}</td>
         <td><button class="btn btn-sm" data-user-edit="${row.id}" data-user-role="Student">ویرایش</button>
-        <button class="btn btn-sm btn-danger" data-user-delete="${row.id}">حذف</button></td></tr>`, 7);
+        <button class="btn btn-sm btn-danger" data-user-delete="${row.id}">حذف</button></td></tr>`, 5);
     }
 
     if (teacherBody && document.body.dataset.active === 'teachers') {
@@ -122,15 +213,15 @@
       const cards = $('#cardView');
       if (cards) cards.innerHTML = rows.length ? rows.map(row => `<div class="card teacher-card"><div class="mohr"><div class="mohr-inner"><b>${escapeHtml(row.fullName.slice(0, 2))}</b></div></div><h4>${escapeHtml(row.fullName)}</h4><div class="spec">${escapeHtml(row.department || 'بدون دپارتمان')}</div><span class="badge ${row.isActive ? 'badge-ok' : 'badge-muted'}">${row.isActive ? 'فعال' : 'غیرفعال'}</span><div class="flex gap-8 mt-16" style="justify-content:center"><button class="btn btn-outline btn-sm" data-user-edit="${row.id}" data-user-role="Teacher">ویرایش</button><button class="btn btn-danger btn-sm" data-user-delete="${row.id}">حذف</button></div></div>`).join('') : '<p class="text-soft">استادی ثبت نشده است.</p>';
       renderRows('body[data-active="teachers"] table tbody', rows, row => `<tr>
-        <td>${escapeHtml(row.fullName)}</td><td>${escapeHtml(row.department || '—')}</td><td>—</td><td>—</td>
+        <td>${escapeHtml(row.fullName)}</td><td>${escapeHtml(row.department || '—')}</td>
         <td>${row.isActive ? 'فعال' : 'غیرفعال'}</td><td><button class="btn btn-sm" data-user-edit="${row.id}" data-user-role="Teacher">ویرایش</button>
-        <button class="btn btn-sm btn-danger" data-user-delete="${row.id}">حذف</button></td></tr>`, 6);
+        <button class="btn btn-sm btn-danger" data-user-delete="${row.id}">حذف</button></td></tr>`, 4);
     }
   }
 
   async function loadDepartments() {
     if (!$('body[data-active="departments"]')) return;
-    const search = $('body[data-active="departments"] .search-box input')?.value.trim();
+    const search = $('main .table-toolbar .search-box input')?.value.trim() || new URLSearchParams(location.search).get('search') || '';
     const rows = await request(`/departments${search ? `?search=${encodeURIComponent(search)}` : ''}`);
     $$('[data-department-field]').forEach(select => {
       const selected = select.value;
@@ -150,10 +241,14 @@
 
   async function loadQuestions() {
     if (!$('body[data-active="bank"]')) return;
-    const search = $('body[data-active="bank"] .search-box input')?.value.trim();
+    const search = $('main .table-toolbar .search-box input')?.value.trim() || new URLSearchParams(location.search).get('search') || '';
     const rows = await request(`/questions${search ? `?search=${encodeURIComponent(search)}` : ''}`);
+    const typeNames = { MultipleChoice: 'چهارگزینه‌ای', Essay: 'تشریحی', Matching: 'وصل‌کردنی' };
+    const difficultyNames = { 1: 'آسان', 2: 'متوسط', 3: 'سخت' };
     renderRows('body[data-active="bank"] table tbody', rows, row => `<tr>
-      <td>${escapeHtml(row.text)}</td><td>${escapeHtml(row.category)}</td><td>${escapeHtml(row.type)}</td><td>${escapeHtml(row.difficulty)}</td>
+      <td>${escapeHtml(row.text)}</td><td>${escapeHtml(row.skillName || row.categoryName || '—')}</td>
+      <td>${escapeHtml(typeNames[row.questionTypeCode] || row.questionTypeName || row.questionTypeCode || '—')}</td>
+      <td>${escapeHtml(difficultyNames[Number(row.difficultyLevel)] || '—')}</td>
       <td><button class="btn btn-outline btn-sm" data-question-edit="${row.id}">ویرایش</button>
       <button class="btn btn-danger btn-sm" data-question-delete="${row.id}">حذف</button></td></tr>`, 5);
   }
@@ -161,29 +256,57 @@
   async function loadExams() {
     const role = (document.body.dataset.role || currentUser()?.role || '').toLowerCase();
     if (role !== 'student' || document.body.dataset.active !== 'dashboard') return;
-    const rows = await request('/exams');
-    renderRows('body[data-active="dashboard"] tbody', rows, row => `<tr>
-      <td>${escapeHtml(row.title)}</td><td>${escapeHtml(row.subject || '—')}</td>
-      <td>${row.startsAt ? new Date(row.startsAt).toLocaleDateString('fa-IR') : '—'}</td>
-      <td>${faNumber(row.durationMinutes)} دقیقه</td><td>${row.isPublished ? 'آماده برگزاری' : 'منتشر نشده'}</td>
-      <td>${row.isPublished ? `<button class="btn btn-primary" data-exam-start="${row.id}">شروع آزمون</button>` : '—'}</td></tr>`, 6);
-    const nextExam = rows.filter(row => row.isPublished && (!row.startsAt || new Date(row.startsAt).getTime() >= Date.now())).sort((a, b) => (a.startsAt ? new Date(a.startsAt).getTime() : Infinity) - (b.startsAt ? new Date(b.startsAt).getTime() : Infinity))[0];
-    const nextCard = $('body[data-active="dashboard"] .eyebrow');
-    if (nextCard?.textContent.includes('آزمون پیش رو')) {
-      const card = nextCard.closest('.card');
-      const title = $('h2', card); const details = $('p', card); const link = $('a', card);
-      if (nextExam) {
-        if (title) title.textContent = nextExam.title;
-        if (details) details.textContent = `${nextExam.startsAt ? new Date(nextExam.startsAt).toLocaleString('fa-IR') : 'زمان شروع اعلام نشده'} — مدت زمان: ${faNumber(nextExam.durationMinutes)} دقیقه`;
-        if (link) { link.dataset.examStart = String(nextExam.id); link.href = '#'; link.textContent = 'شروع آزمون'; }
-      } else {
-        if (title) title.textContent = 'آزمون زمان‌بندی‌شده‌ای وجود ندارد';
-        if (details) details.textContent = 'پس از انتشار آزمون توسط استاد، این بخش به‌روزرسانی می‌شود.';
-        if (link) link.remove();
-      }
-      const hours = $('.mohr.lg.gold .mohr-inner', card);
-      if (hours) hours.innerHTML = '<b>—</b><span>ساعت مانده</span>';
+    const rows = await request('/canonical/exams');
+    const serverNow = parseUtcDate(rows[0]?.serverNowUtc)?.getTime() ?? Date.now();
+    const monotonicAtSync = window.performance?.now?.() ?? Date.now();
+    const now = () => serverNow + ((window.performance?.now?.() ?? Date.now()) - monotonicAtSync);
+    const nextExam = rows.filter(row => row.isPublished && row.hasAttempt !== true && (!row.endAt || (parseUtcDate(row.endAt)?.getTime() ?? 0) >= now()))
+      .sort((a,b) => (parseUtcDate(a.startAt)?.getTime() ?? now()) - (parseUtcDate(b.startAt)?.getTime() ?? now()))[0];
+
+    renderRows('body[data-active="dashboard"] tbody', rows, row => {
+      const already = row.hasAttempt === true, starts = parseUtcDate(row.startAt), ends = parseUtcDate(row.endAt), current = now();
+      const available = row.isPublished && (!starts || starts.getTime() <= current) && (!ends || ends.getTime() >= current);
+      const action = already && Number(row.existingAttemptStatusId) === 1
+        ? '<button class="btn btn-primary" data-exam-continue="' + row.id + '" data-attempt-id="' + row.existingAttemptId + '">ادامه آزمون قبلی</button>'
+        : already ? '<span class="badge badge-muted">تلاش ثبت نهایی شده — شرکت مجدد ممنوع</span>'
+        : available ? '<button class="btn btn-primary" data-exam-start="' + row.id + '">شروع آزمون</button>'
+        : '<span class="badge badge-muted">زمان شروع نرسیده یا مهلت تمام شده</span>';
+      return '<tr><td>' + escapeHtml(row.title) + '</td><td>—</td><td>' + (starts ? starts.toLocaleDateString('fa-IR') : '—') +
+        '</td><td>' + faNumber(row.durationMinutes) + ' دقیقه</td><td>' + (row.isPublished ? 'منتشر شده' : 'منتشر نشده') + '</td><td>' + action + '</td></tr>';
+    }, 6);
+
+    const card = $('body[data-active="dashboard"] .eyebrow')?.closest('.card');
+    if (!card) return;
+    const title = $('h2', card), details = $('p', card), link = $('a', card), timer = $('.mohr.lg.gold .mohr-inner', card);
+    if (!nextExam) {
+      if (title) title.textContent = 'آزمون پیش‌رویی وجود ندارد';
+      if (details) details.textContent = 'پس از انتشار آزمون زمان‌بندی‌شده، اطلاعات آن در این بخش نمایش داده می‌شود.';
+      if (link) link.remove();
+      if (timer) timer.innerHTML = '<b>—</b><span>آزمون پیش‌رو</span>';
+      return;
     }
+    if (title) title.textContent = nextExam.title;
+    if (details) details.textContent = (nextExam.startAt ? (parseUtcDate(nextExam.startAt)?.toLocaleString('fa-IR') || '—') : 'در حال برگزاری') + ' — مدت زمان: ' + faNumber(nextExam.durationMinutes) + ' دقیقه';
+    const startAt = parseUtcDate(nextExam.startAt)?.getTime() ?? now();
+    const endAt = parseUtcDate(nextExam.endAt)?.getTime() ?? Infinity;
+    const tick = () => {
+      const current = now();
+      const left = startAt - current;
+      if (!timer) return;
+      if (left > 0) {
+        const seconds = Math.floor(left / 1000), days = Math.floor(seconds / 86400), hours = Math.floor((seconds % 86400) / 3600), minutes = Math.floor((seconds % 3600) / 60), secs = seconds % 60;
+        timer.innerHTML = '<b>' + faNumber(days) + ' روز</b><span>' + faNumber(hours) + ':' + String(minutes).padStart(2,'0') + ':' + String(secs).padStart(2,'0') + ' مانده</span>';
+        if (link) { link.textContent = 'هنوز شروع نشده'; link.classList.remove('btn-gold'); link.classList.add('btn-outline'); link.setAttribute('aria-disabled','true'); delete link.dataset.examStart; }
+      } else if (current <= endAt) {
+        timer.innerHTML = '<b>اکنون</b><span>زمان شروع آزمون رسیده است</span>';
+        if (link) { link.textContent = 'ورود به آزمون'; link.classList.remove('btn-outline'); link.classList.add('btn-gold'); link.setAttribute('aria-disabled','false'); link.dataset.examStart = String(nextExam.id); }
+      } else {
+        timer.innerHTML = '<b>پایان</b><span>مهلت شرکت تمام شده است</span>';
+        if (link) { link.removeAttribute('data-exam-start'); link.setAttribute('aria-disabled','true'); link.textContent = 'مهلت پایان یافته'; }
+      }
+    };
+    if (window.__mftUpcomingExamTimer) clearInterval(window.__mftUpcomingExamTimer);
+    tick(); window.__mftUpcomingExamTimer = setInterval(tick, 1000);
   }
 
   async function loadResults() {
@@ -191,52 +314,183 @@
     const params = new URLSearchParams(location.search);
     const attemptId = params.get('attemptId');
     const examId = params.get('examId');
+    const role = (currentUser()?.role || '').toLowerCase();
     if (attemptId) {
-      const result = await request(`/results/${encodeURIComponent(attemptId)}`);
+      let result;
+      try { result = await request(`/canonical/results/${encodeURIComponent(attemptId)}`); }
+      catch (error) {
+        const heading = $('body[data-active="results"] h1');
+        if (heading) heading.textContent = 'نتیجه هنوز منتشر نشده یا در دسترس نیست';
+        const body = $('body[data-active="results"] .card table tbody');
+        if (body) body.innerHTML = '<tr><td colspan="5" style="text-align:center;padding:28px">پس از تصحیح و انتشار رسمی نتیجه، جزئیات این آزمون نمایش داده می‌شود.</td></tr>';
+        return;
+      }
       const heading = $('body[data-active="results"] h1');
       if (heading) {
-        const scoreLabel = result.score == null ? 'در انتظار تصحیح' : `${faNumber(result.score)} از ${faNumber(result.maxScore)}`;
-        const outcome = result.score == null ? '' : (Number(result.score) >= Number(result.passingScore) ? ' — قبول' : ' — نیازمند تلاش بیشتر');
-        heading.textContent = `نتیجه آزمون: ${result.exam} — نمره ${scoreLabel}${outcome}`;
+        const scoreLabel = result.status === 'PartiallyGraded' && result.autoScore != null
+          ? `نمره موقت تستی ${faNumber(result.autoScore)} — ${faNumber(result.pendingManualCount)} سؤال تشریحی در انتظار تصحیح`
+          : result.score != null
+            ? `${faNumber(result.score)} از ${faNumber(result.maxScore)}`
+            : result.autoScore != null
+              ? `نمره تستی ${faNumber(result.autoScore)} از ${faNumber(result.maxScore)}`
+              : (result.resultsPublished ? 'در انتظار تکمیل تصحیح' : 'هنوز نمره‌ای ثبت نشده');
+        heading.textContent = `نتیجه آزمون: ${result.exam} — ${scoreLabel}`;
+        const studentInfo = $('#resultStudentInfo');
+        if (studentInfo) { studentInfo.hidden = !['teacher','department','superadmin'].includes(role); studentInfo.textContent = 'دانشجو: ' + (result.studentName || '—') + ' | شماره دانشجویی: ' + (result.studentNumber || 'ثبت نشده'); }
       }
-      const scoreText = $$('body[data-active="results"] .stat-card b');
-      if (scoreText[3]) scoreText[3].textContent = result.score == null ? 'در انتظار تصحیح' : faNumber(result.score);
       const body = $('body[data-active="results"] .card table tbody');
-      const answerCounts = { correct: result.answers.filter(answer => answer.isCorrect === true).length, incorrect: result.answers.filter(answer => answer.isCorrect === false).length, pending: result.answers.filter(answer => answer.isCorrect == null).length };
-      window.MftChartData = { ...(window.MftChartData || {}), resultCounts: answerCounts };
-      document.dispatchEvent(new Event('mft:data-ready'));
-      if (body) body.innerHTML = result.answers.length ? result.answers.map((answer, index) => `<tr>
-        <td>${faNumber(index + 1)}</td><td>${escapeHtml(answer.question || `سؤال ${answer.questionId}`)}</td>
-        <td>${escapeHtml(answer.answer || 'بدون پاسخ')}</td><td>${escapeHtml(answer.correctAnswer || 'نیازمند تصحیح')}</td>
-        <td>${answer.isCorrect == null ? 'در انتظار تصحیح' : answer.isCorrect ? 'صحیح' : 'نادرست'}</td></tr>`).join('') : '<tr><td colspan="5">پاسخی ثبت نشده است.</td></tr>';
+      const canGrade = ['teacher', 'department', 'superadmin'].includes(role);
+      if (body) {
+        if (result.isPdfOnly) {
+          body.innerHTML = `<tr><td>۱</td><td>آزمون PDFمحور</td><td>فایل پاسخ به‌صورت PDF ارسال شده است.</td><td>—</td><td>${canGrade && !result.resultsPublished ? `<div class="flex gap-8 mt-8"><input class="input" type="number" min="0" max="100" step="0.01" value="${result.score == null ? '': Number(result.score)}" placeholder="نمره" data-pdf-grade-score style="max-width:110px" aria-label="نمره از ۱۰۰"><button class="btn btn-primary btn-sm" id="savePdfGrade">ثبت نمره</button></div><small class="text-soft">نمره کلی از ۱۰۰</small>` : (result.score == null ? 'در انتظار تصحیح' : `${faNumber(result.score)} از ۱۰۰`)}</td></tr>`;
+          if (canGrade && !result.resultsPublished) $('#savePdfGrade')?.addEventListener('click', async event => {
+            const button=event.currentTarget;const rawScore=$('[data-pdf-grade-score]')?.value?.trim() ?? '';const score=Number(rawScore);
+            if(rawScore===''||!Number.isFinite(score)||score<0||score>100)return notify('ابتدا نمره‌ای بین ۰ تا ۱۰۰ وارد کنید.','warn');
+            button.disabled=true;
+            try{await request(`/canonical/results/${encodeURIComponent(attemptId)}/pdf-grade`,{method:'PUT',body:JSON.stringify({score})});notify('نمره کلی ثبت شد.','ok');await loadResults();}
+            catch(error){notify(error.message||'ثبت نمره ناموفق بود.','danger');button.disabled=false;}
+          });
+        } else body.innerHTML = result.answers.length ? result.answers.map((answer, index) => {
+          const isEssay = ['Essay', 'Text'].includes(String(answer.questionType || '').trim());
+          const canEditGrade = canGrade && isEssay && !result.resultsPublished;
+          const questionTitle = escapeHtml(answer.question || `سؤال ${answer.questionId}`);
+          if (canGrade && !isEssay) {
+            const autoScoreText = answer.isAutoGraded
+              ? `تصحیح خودکار سیستم: ${faNumber(answer.awardedScore ?? 0)} از ${faNumber(answer.maxScore || 0)}`
+              : 'در انتظار پردازش خودکار';
+            return `<tr><td>${faNumber(index + 1)}</td><td>${questionTitle}</td><td colspan="2" class="text-soft">پاسخ تستی توسط سیستم بررسی شده؛ پاسخ دانشجو برای تصحیح دستی نمایش داده نمی‌شود.</td><td>${autoScoreText}</td></tr>`;
+          }
+          const gradeControl = canEditGrade
+            ? `<div class="flex gap-8 mt-8"><input class="input" type="number" min="0" max="${Number(answer.maxScore || 0)}" step="0.01" value="${Number(answer.awardedScore || 0)}" data-grade-score style="max-width:100px" aria-label="نمره خام سؤال"><button class="btn btn-primary btn-sm" data-grade-answer="${answer.examQuestionId}">ثبت نمره</button></div><small class="text-soft">حداکثر نمره خام: ${faNumber(answer.maxScore || 0)}</small>`
+            : (isEssay ? (answer.isManuallyGraded ? 'تصحیح شده' : 'در انتظار تصحیح تشریحی') : (answer.isAutoGraded ? 'تصحیح خودکار شده' : '—'));
+          return `<tr>
+            <td>${faNumber(index + 1)}</td><td>${questionTitle}</td>
+            <td>${escapeHtml(typeof answer.answer === 'string' ? answer.answer : answer.answer?.text ?? JSON.stringify(answer.answer ?? 'بدون پاسخ'))}</td><td>${escapeHtml(Array.isArray(answer.correctAnswer) ? answer.correctAnswer.map(x => x.optionText || `${x.leftItem || ''}: ${x.rightItem || ''}`).join('، ') : answer.correctAnswer || '—')}</td>
+            <td>${gradeControl}</td></tr>`;
+        }).join('') : '<tr><td colspan="5">پاسخی ثبت نشده است.</td></tr>';
+
+        if (canGrade) body.querySelectorAll('[data-grade-answer]').forEach(button => button.addEventListener('click', async () => {
+          const row = button.closest('tr');
+          const score = Number(row?.querySelector('[data-grade-score]')?.value);
+          const comment = row?.querySelector('[data-grade-comment]')?.value || null;
+          if (!Number.isFinite(score) || score < 0) return notify('نمره واردشده معتبر نیست.', 'warn');
+          button.disabled = true;
+          try {
+            await request(`/canonical/results/${encodeURIComponent(attemptId)}/answers/${encodeURIComponent(button.dataset.gradeAnswer)}/grade`, { method: 'PUT', body: JSON.stringify({ score }) });
+            notify('نمره سؤال ثبت شد.', 'ok');
+            await loadResults();
+          } catch (error) { notify(error.message || 'ثبت نمره ناموفق بود.', 'danger'); button.disabled = false; }
+        }));
+      }
+
+      const pdfBox = $('#submissionPdfBox');
+      if (pdfBox && canGrade) {
+        try {
+          const info = await request(`/exam-files/attempts/${encodeURIComponent(attemptId)}/info`);
+          pdfBox.hidden = false;
+          pdfBox.innerHTML = `<div class="section-title"><h3>${result.isPdfOnly ? 'فایل پاسخ آزمون PDFمحور' : 'پاسخ‌نامه تشریحی دانشجو'}</h3></div><p class="text-soft text-sm">${escapeHtml(info.fileName)} — ${faNumber(Math.ceil(info.size / 1024))} کیلوبایت</p><iframe id="submissionPdfFrame" title="پاسخ‌نامه PDF دانشجو" style="width:100%;height:620px;border:1px solid var(--border);border-radius:12px;background:#fff" loading="lazy"></iframe><div class="flex gap-8 mt-12"><button type="button" class="btn btn-outline" id="previewSubmissionPdf">بازکردن در زبانه جدید</button> <button type="button" class="btn btn-outline" id="downloadSubmissionPdf">دریافت فایل</button></div>`;
+          const submissionUrl = await window.MftApi.objectUrl(`/exam-files/attempts/${encodeURIComponent(attemptId)}`);
+          $('#submissionPdfFrame').src = submissionUrl;
+          $('#previewSubmissionPdf')?.addEventListener('click', () => window.MftApi.preview(`/exam-files/attempts/${encodeURIComponent(attemptId)}`).catch(error => notify(error.message, 'danger')));
+          $('#downloadSubmissionPdf')?.addEventListener('click', () => window.MftApi.download(`/exam-files/attempts/${encodeURIComponent(attemptId)}`).catch(error => notify(error.message, 'danger')));
+        } catch {
+          if (result.examPdfAvailable) {
+            pdfBox.hidden = false;
+            pdfBox.innerHTML = '<div class="section-title"><h3>پاسخ‌نامه PDF دانشجو</h3></div><p class="text-soft">دانشجو هنوز فایل PDF پاسخ‌نامه را بارگذاری نکرده است.</p>';
+          } else { pdfBox.hidden = true; pdfBox.innerHTML = ''; }
+        }
+      } else if (pdfBox) { pdfBox.hidden = true; pdfBox.innerHTML = ''; }
+
+      const publishButton = $('#publishExamResults');
+      if (publishButton) {
+        publishButton.hidden = !canGrade || result.resultsPublished === true;
+        publishButton.onclick = async () => {
+          publishButton.disabled = true;
+          try {
+            await request(`/canonical/results/exams/${encodeURIComponent(result.examId)}/publish`, { method: 'POST' });
+            notify('نتایج آزمون منتشر شد.', 'ok');
+            await loadResults();
+          } catch (error) { notify(error.message || 'انتشار نتایج ناموفق بود.', 'danger'); }
+          finally { publishButton.disabled = false; }
+        };
+      }
+      const unpublishButton = $('#unpublishExamResults');
+      if (unpublishButton) {
+        unpublishButton.hidden = !canGrade || result.resultsPublished !== true;
+        unpublishButton.onclick = async () => {
+          unpublishButton.disabled = true;
+          try {
+            await request(`/canonical/results/exams/${encodeURIComponent(result.examId)}/unpublish`, { method: 'POST' });
+            notify('انتشار نتایج لغو شد؛ اکنون می‌توانید نمرات را اصلاح کنید.', 'ok');
+            await loadResults();
+          } catch (error) { notify(error.message || 'لغو انتشار ناموفق بود.', 'danger'); }
+          finally { unpublishButton.disabled = false; }
+        };
+      }
       return;
     }
-    const rows = await request(`/results${examId ? `?examId=${encodeURIComponent(examId)}` : ''}`);
+    const rows = await request(`/canonical/results${examId ? `?examId=${encodeURIComponent(examId)}` : ''}`);
     const header = $('body[data-active="results"] table thead tr');
-    if (header) header.innerHTML = '<th>#</th><th>آزمون</th><th>دانشجو</th><th>وضعیت</th><th>نمره</th>' ;
+    if (header) header.innerHTML = '<th>#</th><th>آزمون</th><th>دانشجو</th><th>وضعیت</th><th>نمره</th>';
     renderRows('body[data-active="results"] table tbody', rows, row => `<tr>
-      <td>${escapeHtml(String(row.id).slice(0, 8))}</td><td>${escapeHtml(row.examTitle)}</td><td>${escapeHtml(row.studentName || '—')}</td>
-      <td>${row.status === 'InProgress' ? 'در حال برگزاری' : row.status === 'Submitted' ? 'ثبت شده' : 'تصحیح شده'}</td>
-      <td>${row.score == null ? 'در انتظار تصحیح' : faNumber(row.score)}</td></tr>`, 5);
+      <td><a href="results.html?attemptId=${encodeURIComponent(row.id)}">${escapeHtml(String(row.id).slice(0, 8))}</a></td><td>${escapeHtml(row.examTitle)}</td><td>${escapeHtml(row.studentName || '—')}<div class="text-soft text-sm">شماره دانشجویی: ${escapeHtml(row.studentNumber || 'ثبت نشده')}</div></td>
+      <td>${row.status === 'InProgress' ? 'در حال برگزاری' : row.status === 'Submitted' ? 'تصحیح خودکار انجام شد' : row.status === 'PartiallyGraded' ? (row.hasAutoGradedAnswers ? 'نمره تستی آماده — تشریحی در انتظار تصحیح' : 'در انتظار تصحیح تشریحی') : row.status === 'FullyGraded' ? 'تصحیح کامل' : 'در انتظار بررسی'}</td>
+      <td>${row.score == null ? (row.resultsPublished ? 'در انتظار تصحیح' : 'منتشر نشده') : faNumber(row.score)}</td></tr>`, 5);
+
+    const publishButton = $('#publishExamResults');
+    if (publishButton) {
+      publishButton.hidden = !examId || role === 'student' || rows.some(row => row.resultsPublished);
+      publishButton.onclick = async () => {
+        if (!examId || publishButton.disabled) return;
+        publishButton.disabled = true;
+        try {
+          await request(`/canonical/results/exams/${encodeURIComponent(examId)}/publish`, { method: 'POST' });
+          notify('نتایج آزمون منتشر شد.', 'ok');
+          await loadResults();
+        } catch (error) { notify(error.message || 'انتشار نتایج ناموفق بود.', 'danger'); }
+        finally { publishButton.disabled = false; }
+      };
+    }
+    const unpublishButton = $('#unpublishExamResults');
+    if (unpublishButton) {
+      unpublishButton.hidden = !examId || role === 'student' || !rows.some(row => row.resultsPublished);
+      unpublishButton.onclick = async () => {
+        if (!examId || unpublishButton.disabled) return;
+        unpublishButton.disabled = true;
+        try {
+          await request(`/canonical/results/exams/${encodeURIComponent(examId)}/unpublish`, { method: 'POST' });
+          notify('انتشار نتایج لغو شد؛ می‌توانید نمرات را اصلاح کنید.', 'ok');
+          await loadResults();
+        } catch (error) { notify(error.message || 'لغو انتشار ناموفق بود.', 'danger'); }
+        finally { unpublishButton.disabled = false; }
+      };
+    }
   }
 
   async function loadTeacherGrades() {
     if (!document.body.matches('[data-active="dashboard"]') || (currentUser()?.role || '').toLowerCase() !== 'teacher') return;
-    const attempts = await request('/results');
-    const pending = attempts.filter(attempt => attempt.status === 'Submitted');
-    const list = $('#teacherPendingPlaceholder');
-    if (list) list.innerHTML = pending.length ? pending.map(attempt => `<li class="flex items-center justify-between" style="padding:10px 0;border-bottom:1px solid var(--border)"><div><b>${escapeHtml(attempt.studentName || 'دانشجو')}</b><div class="text-soft text-sm">${escapeHtml(attempt.examTitle)} — ارسال ${attempt.submittedAt ? new Date(attempt.submittedAt).toLocaleString('fa-IR') : 'بدون تاریخ'}</div></div><button class="btn btn-outline btn-sm" data-grade-attempt="${attempt.id}">تصحیح</button></li>`).join('') : '<li class="text-soft">برگه‌ای در انتظار تصحیح نیست.</li>';
-    const count = $('#mftPendingGradeCount');
-    if (count) count.textContent = `${faNumber(pending.length)} مورد باقی‌مانده`;
-
-    const exams = await request('/exams');
-    const upcoming = $('#mftUpcomingExams');
-    if (upcoming) upcoming.innerHTML = exams.length ? exams.map(exam => `<li class="flex items-center gap-12"><div class="mohr sm"><div class="mohr-inner"><b>${escapeHtml(exam.title.slice(0, 2))}</b></div></div><div><b style="font-size:13px">${escapeHtml(exam.title)}</b><div class="text-soft text-sm">${exam.startsAt ? new Date(exam.startsAt).toLocaleString('fa-IR') : 'زمان‌بندی نشده'} — ${faNumber(exam.durationMinutes)} دقیقه</div></div></li>`).join('') : '<li class="text-soft">هنوز آزمونی ثبت نشده است.</li>';
+    const list = $('#teacherPendingPlaceholder'), count = $('#mftPendingGradeCount'), upcoming = $('#mftUpcomingExams');
+    const attemptsTask = request('/canonical/results').then(attempts => {
+      const pending = (Array.isArray(attempts) ? attempts : []).filter(x => ['Submitted','PartiallyGraded'].includes(x.status));
+      if (list) list.innerHTML = pending.length ? pending.map(x => '<li class="flex items-center justify-between" style="padding:10px 0;border-bottom:1px solid var(--border)"><div><b>' + escapeHtml(x.studentName || 'دانشجو') + '</b><div class="text-soft text-sm">شماره دانشجویی: ' + escapeHtml(x.studentNumber || 'ثبت نشده') + '</div><div class="text-soft text-sm">' + escapeHtml(x.examTitle) + ' — ارسال ' + (x.submittedAt ? new Date(x.submittedAt).toLocaleString('fa-IR') : 'بدون تاریخ') + '</div><div class="text-soft text-sm">' + (x.score == null ? 'نمره تستی: هنوز ثبت نشده' : 'نمره خودکار تا این مرحله: ' + faNumber(x.score)) + (x.status === 'PartiallyGraded' ? ' — پاسخ تشریحی در انتظار تصحیح' : '') + '</div></div><a class="btn btn-outline btn-sm" href="results.html?attemptId=' + encodeURIComponent(x.id) + '">تصحیح</a></li>').join('') : '<li class="text-soft">برگه‌ای در انتظار تصحیح نیست.</li>';
+      if (count) count.textContent = faNumber(pending.length) + ' مورد باقی‌مانده';
+    }).catch(error => {
+      if (list) list.innerHTML = '<li class="text-soft">دریافت صف تصحیح ناموفق بود: ' + escapeHtml(error.message || 'خطای نامشخص') + '</li>';
+      if (count) count.textContent = 'ناموفق';
+    });
+    const examsTask = request('/canonical/exams').then(exams => {
+      const now = Date.now();
+      const scheduled = (Array.isArray(exams) ? exams : []).filter(x => x.startAt && (parseUtcDate(x.startAt)?.getTime() ?? 0) >= now && (!x.endAt || (parseUtcDate(x.endAt)?.getTime() ?? 0) >= now)).sort((a,b) => (parseUtcDate(a.startAt)?.getTime() ?? 0) - (parseUtcDate(b.startAt)?.getTime() ?? 0));
+      if (upcoming) upcoming.innerHTML = scheduled.length ? scheduled.map(x => '<li class="flex items-center gap-12"><div class="mohr sm"><div class="mohr-inner"><b>' + escapeHtml(String(x.title || '').slice(0,2)) + '</b></div></div><div><b style="font-size:13px">' + escapeHtml(x.title || 'آزمون بدون عنوان') + '</b><div class="text-soft text-sm">' + (parseUtcDate(x.startAt)?.toLocaleString('fa-IR') || '—') + ' — ' + faNumber(x.durationMinutes) + ' دقیقه</div><small class="text-soft">' + (x.isPublished ? 'منتشرشده' : 'پیش‌نویس') + '</small></div></li>').join('') : '<li class="text-soft">آزمون زمان‌بندی‌شده آینده‌ای وجود ندارد.</li>';
+    }).catch(error => {
+      if (upcoming) upcoming.innerHTML = '<li class="text-soft">دریافت آزمون‌های زمان‌بندی‌شده ناموفق بود: ' + escapeHtml(error.message || 'خطای نامشخص') + '</li>';
+    });
+    await Promise.allSettled([attemptsTask, examsTask]);
   }
 
   async function loadStudentPerformance() {
     if (!document.body.matches('[data-active="dashboard"]') || (currentUser()?.role || '').toLowerCase() !== 'student') return;
-    const attempts = await request('/results');
+    const attempts = await request('/canonical/results');
     const scored = attempts.filter(attempt => attempt.score != null).sort((a, b) => new Date(a.submittedAt || a.startedAt) - new Date(b.submittedAt || b.startedAt));
     window.MftChartData = { ...(window.MftChartData || {}), performance: scored.map((attempt, index) => ({ label: attempt.examTitle || `آزمون ${index + 1}`, score: attempt.score })) };
     document.dispatchEvent(new Event('mft:data-ready'));
@@ -246,42 +500,26 @@
     if (!document.body.matches('[data-active="dashboard"]')) return;
     const role = (currentUser()?.role || '').toLowerCase();
     if (role === 'superadmin') {
-      const [activity, notifications] = await Promise.all([request('/dashboard/activity'), request('/notifications').catch(() => [])]);
+      const [activity, departments, notifications] = await Promise.all([
+        request('/dashboard/activity'),
+        request('/reports/departments').catch(() => []),
+        request('/notifications').catch(() => [])
+      ]);
+      window.MftChartData = { ...(window.MftChartData || {}), activity, departments };
+      document.dispatchEvent(new Event('mft:data-ready'));
       const activityList = $('#dashboardRecentActivity');
       if (activityList) activityList.innerHTML = activity.length ? activity.slice(-5).reverse().map(item => `<li><b>${new Date(item.date).toLocaleDateString('fa-IR')}</b><div class="text-soft text-sm">${faNumber(item.count)} تلاش آزمون ثبت شده است.</div></li>`).join('') : '<li class="text-soft">در بازه اخیر فعالیت آزمونی ثبت نشده است.</li>';
       const unreadCount = $('#dashboardUnreadCount');
       if (unreadCount) unreadCount.textContent = `${faNumber(notifications.filter(item => !item.isRead).length)} خوانده‌نشده`;
       const notificationList = $('#dashboardRecentNotifications');
-      if (notificationList) notificationList.innerHTML = notifications.length ? notifications.slice(0, 3).map(item => `<li class="alert alert-info"><b>${escapeHtml(item.title)}</b><div>${escapeHtml(item.message)}</div></li>`).join('') : '<li class="text-soft">اعلانی ثبت نشده است.</li>';
+      if (notificationList) notificationList.innerHTML = notifications.length
+        ? notifications.slice(0, 3).map(item => `<li class="alert alert-info"><b>${escapeHtml(item.title)}</b><div>${escapeHtml(item.message)}</div></li>`).join('')
+        : '<li class="text-soft">اعلانی ثبت نشده است.</li>';
     }
     if (role === 'department') {
-      const exams = await request('/exams');
-      renderRows('#departmentExamsBody', exams, exam => `<tr><td>${escapeHtml(exam.title)}</td><td>—</td><td>${exam.startsAt ? new Date(exam.startsAt).toLocaleDateString('fa-IR') : '—'}</td><td>—</td><td>${exam.isPublished ? 'منتشرشده' : 'پیش‌نویس'}</td><td><a href="results.html?examId=${exam.id}" class="btn btn-ghost btn-sm">نتایج</a></td></tr>`, 6);
+      const exams = await request('/canonical/exams');
+      renderRows('#departmentExamsBody', exams, exam => `<tr><td>${escapeHtml(exam.title)}</td><td>—</td><td>${exam.startAt ? new Date(exam.startAt).toLocaleDateString('fa-IR') : '—'}</td><td>—</td><td>${exam.isPublished ? 'منتشرشده' : 'پیش‌نویس'}</td><td><a href="results.html?examId=${exam.id}" class="btn btn-ghost btn-sm">نتایج</a></td></tr>`, 6);
     }
-  }
-
-  async function openGradeAttempt(id) {
-    const result = await request(`/results/${id}`);
-    const modal = $('#gradeModal');
-    if (!modal) return;
-    modal.dataset.attemptId = String(id);
-    $('#gradeExamTitle', modal).textContent = `${result.exam} — ${result.answers.length} پاسخ`;
-    $('#gradeAnswerDetails', modal).innerHTML = result.answers.map((answer, index) => `<div style="padding:8px 0;border-bottom:1px solid var(--border)"><b>سؤال ${faNumber(index + 1)}:</b> ${escapeHtml(answer.question || '')}<br><span>پاسخ دانشجو: ${escapeHtml(answer.answer || 'بدون پاسخ')}</span><br><span>نمره خودکار: ${faNumber(answer.awardedScore)}</span></div>`).join('') || 'پاسخی برای نمایش وجود ندارد.';
-    const score = $('[data-grade-score]', modal);
-    if (score) { score.max = String(result.maxScore ?? 0); score.value = result.score ?? ''; score.placeholder = `حداکثر ${result.maxScore ?? 0}`; }
-    modal.classList.add('show');
-  }
-
-  async function saveGrade(modal) {
-    const id = modal.dataset.attemptId;
-    const input = $('[data-grade-score]', modal);
-    const score = Number(input?.value);
-    if (!id || !Number.isFinite(score) || score < 0) return notify('نمره معتبر وارد کنید.', 'warn');
-    await safe(async () => {
-      await request(`/results/${id}/grade`, { method: 'PUT', body: JSON.stringify(score) });
-      modal.classList.remove('show');
-      await loadTeacherGrades();
-    }, 'نمره ثبت شد.');
   }
 
   function exportTableCsv() {
@@ -293,22 +531,52 @@
     const link = document.createElement('a'); link.href = url; link.download = 'mft-department-report.csv'; link.click(); URL.revokeObjectURL(url);
   }
 
+  async function loadNotificationIndicators() {
+    const [unread, recent] = await Promise.all([
+      request('/notifications?unread=true').catch(() => []),
+      request('/notifications').catch(() => [])
+    ]);
+    const count = Array.isArray(unread) ? unread.length : 0;
+    document.querySelectorAll('[data-notification-count]').forEach(element => {
+      element.textContent = faNumber(count);
+      element.hidden = count === 0;
+    });
+    const recentBox = $('#topbarRecentNotifications');
+    const recentRows = Array.isArray(recent) ? recent : [];
+    if (recentBox) recentBox.innerHTML = recentRows.length
+      ? recentRows.slice(0, 4).map(item => `<a href="notifications.html" style="display:block;padding:8px 10px;border-bottom:1px solid var(--border);white-space:normal"><b>${escapeHtml(item.title)}</b><div class="text-soft text-sm">${escapeHtml(item.message)}</div></a>`).join('')
+      : '<div class="text-soft">اعلانی وجود ندارد.</div>';
+  }
+
   async function loadNotifications() {
     if (!document.body.matches('[data-active="notifications"]')) return;
     const rows = await request('/notifications');
-    const list = $('[data-notification-list]') || $('.notification-list');
-    if (!list) return;
-    const renderNotification = row => `<article class="notification-item ${row.isRead ? '' : 'unread'}" data-notification-id="${row.id}">
+    const panels = { tAll: rows, tUnread: rows.filter(row => !row.isRead), tRead: rows.filter(row => row.isRead) };
+    const empty = { tAll: 'اعلانی وجود ندارد.', tUnread: 'اعلان خوانده‌نشده‌ای وجود ندارد.', tRead: 'اعلان خوانده‌شده‌ای وجود ندارد.' };
+    const render = row => `<article class="notification-item ${row.isRead ? '' : 'unread'}" data-notification-id="${row.id}">
       <div><b>${escapeHtml(row.title)}</b><p>${escapeHtml(row.message)}</p><small>${new Date(row.createdAt).toLocaleString('fa-IR')}</small></div>
       <div class="flex gap-8"><button class="btn btn-sm" data-notification-read="${row.id}" ${row.isRead ? 'disabled' : ''}>خوانده شد</button>
       <button class="btn btn-sm btn-danger" data-notification-delete="${row.id}">حذف</button></div></article>`;
-    list.innerHTML = rows.length ? rows.map(renderNotification).join('') : '<div class="empty-state">اعلانی وجود ندارد.</div>';
-    const unreadPanel = $('#tUnread');
-    const readPanel = $('#tRead');
-    if (unreadPanel) unreadPanel.innerHTML = rows.some(row => !row.isRead) ? rows.filter(row => !row.isRead).map(renderNotification).join('') : '<div class="empty-state">اعلان خوانده‌نشده‌ای وجود ندارد.</div>';
-    if (readPanel) readPanel.innerHTML = rows.some(row => row.isRead) ? rows.filter(row => row.isRead).map(renderNotification).join('') : '<div class="empty-state">اعلان خوانده‌شده‌ای وجود ندارد.</div>';
+    Object.entries(panels).forEach(([id, items]) => {
+      const panel = document.getElementById(id);
+      if (!panel) return;
+      // Replace the complete panel content so an empty-state from the previous tab
+      // can never remain beside or above the new tab's empty-state.
+      panel.replaceChildren();
+      if (items.length) panel.innerHTML = items.map(render).join('');
+      else {
+        const state = document.createElement('div');
+        state.className = 'empty-state';
+        state.textContent = empty[id];
+        panel.appendChild(state);
+      }
+    });
     const tabs = $$('[data-tabs] .tab-btn');
-    if (tabs.length >= 3) { tabs[0].textContent = `همه (${faNumber(rows.length)})`; tabs[1].textContent = `خوانده‌نشده (${faNumber(rows.filter(row => !row.isRead).length)})`; tabs[2].textContent = `خوانده‌شده (${faNumber(rows.filter(row => row.isRead).length)})`; }
+    if (tabs.length >= 3) {
+      tabs[0].textContent = `همه (${faNumber(rows.length)})`;
+      tabs[1].textContent = `خوانده‌نشده (${faNumber(panels.tUnread.length)})`;
+      tabs[2].textContent = `خوانده‌شده (${faNumber(panels.tRead.length)})`;
+    }
   }
 
   async function loadDashboard() {
@@ -352,19 +620,11 @@
     const save = $('button', form);
     save?.addEventListener('click', event => {
       event.preventDefault();
-      safe(() => request('/users/me/profile', { method: 'PUT', body: JSON.stringify({ fullName: name?.value.trim(), email: email?.value.trim() || null, mobile: mobile?.value.trim() || null }) }), 'اطلاعات پروفایل ذخیره شد.');
+      if (!mobile?.value.trim()) return notify('شماره تماس الزامی است.', 'warn');
+      safe(() => request('/users/me/profile', { method: 'PUT', body: JSON.stringify({ fullName: name?.value.trim(), email: email?.value.trim() || null, mobile: mobile.value.trim() }) }), 'اطلاعات پروفایل ذخیره شد.');
     }, { once: true });
 
-    const passPanel = $('#tPass');
-    const passButton = $('button', passPanel);
-    passButton?.addEventListener('click', event => {
-      event.preventDefault();
-      const fields = $$('input[type="password"]', passPanel);
-      const [currentPassword, newPassword, repeatPassword] = fields.map(field => field.value);
-      if (!currentPassword || !newPassword || newPassword.length < 8) return notify('رمز فعلی و رمز جدید معتبر الزامی است.', 'warn');
-      if (newPassword !== repeatPassword) return notify('تکرار رمز جدید مطابقت ندارد.', 'warn');
-      safe(() => request('/auth/change-password', { method: 'POST', body: JSON.stringify({ currentPassword, newPassword }) }), 'رمز عبور تغییر کرد.');
-    });
+
   }
 
   async function loadSettings() {
@@ -388,23 +648,178 @@
     }, 'تنظیمات ذخیره شد.');
   }
 
+  async function loadRecentAttempts() {
+    const body = $('[data-recent-attempts]');
+    if (!body) return;
+    const params = new URLSearchParams({ take: '100' });
+    const departmentId = $('[data-report-department]')?.value;
+    const search = $('[data-report-search]')?.value.trim();
+    if (departmentId) params.set('departmentId', departmentId);
+    if (search) params.set('search', search);
+    const rows = await request('/reports/recent-attempts?' + params.toString());
+    if (!Array.isArray(rows)) throw new Error('پاسخ تلاش‌های اخیر معتبر نیست.');
+    body.innerHTML = rows.length ? rows.map(row => {
+      const status = row.status === 'Graded' ? 'تصحیح‌شده' : row.status === 'Submitted' ? 'ارسال‌شده' : escapeHtml(row.status);
+      const date = value => value ? new Date(value).toLocaleString('fa-IR') : '—';
+      return `<tr><td>${escapeHtml(row.department)}</td><td>${escapeHtml(row.student)}</td><td>${escapeHtml(row.exam)}</td><td>${date(row.startedAt)}</td><td>${date(row.submittedAt)}</td><td>${status}</td><td>${row.score == null ? 'در انتظار تصحیح' : Number(row.score).toLocaleString('fa-IR')}</td></tr>`;
+    }).join('') : '<tr><td colspan="7" class="text-soft" style="text-align:center;padding:24px">تلاشی برای این فیلتر پیدا نشد.</td></tr>';
+  }
+
   async function loadReports() {
     if (!document.body.matches('[data-active="reports"]')) return;
     const rows = await request('/reports/departments');
-    const table = $('body[data-active="reports"] table tbody');
-    if (table) renderRows('body[data-active="reports"] table tbody', rows, row => `<tr><td>${escapeHtml(row.department)}</td><td>${faNumber(row.exams)}</td><td>${Number(row.averageScore || 0).toLocaleString('fa-IR')}</td><td>${Number(row.passRate || 0).toLocaleString('fa-IR', { maximumFractionDigits: 1 })}%</td><td>${faNumber(row.participation)}</td></tr>`, 5);
+    if (!Array.isArray(rows)) throw new Error('پاسخ گزارش دپارتمان‌ها معتبر نیست.');
+    const table = $('body[data-active="reports"] .card table tbody');
+    if (table) renderRows('body[data-active="reports"] table tbody', rows, row => `<tr><td>${escapeHtml(row.department)}</td><td>${faNumber(row.students)}</td><td>${faNumber(row.teachers)}</td><td>${faNumber(row.exams)}</td><td>${Number(row.averageScore || 0).toLocaleString('fa-IR')}</td><td>${Number(row.passRate || 0).toLocaleString('fa-IR', { maximumFractionDigits: 1 })}%</td><td>${faNumber(row.participation)}</td></tr>`, 7);
     const totalExams = rows.reduce((sum, row) => sum + Number(row.exams || 0), 0);
-    const averagePassRate = rows.length ? rows.reduce((sum, row) => sum + Number(row.passRate || 0), 0) / rows.length : 0;
+    const gradedAttempts = rows.reduce((sum, row) => sum + Number(row.gradedAttempts || 0), 0);
+    const passedAttempts = rows.reduce((sum, row) => sum + Number(row.passedAttempts || 0), 0);
+    const weightedPassRate = gradedAttempts ? passedAttempts * 100 / gradedAttempts : 0;
     const totalStudents = rows.reduce((sum, row) => sum + Number(row.students || 0), 0);
     const totalAttempts = rows.reduce((sum, row) => sum + Number(row.participation || 0), 0);
-    const metrics = { exams: totalExams, passRate: averagePassRate, participation: totalStudents ? Math.min(100, totalAttempts / totalStudents * 100) : 0 };
-    $$('body[data-active="reports"] [data-metric]').forEach(element => {
+    const metrics = { exams: totalExams, passRate: weightedPassRate, participation: totalAttempts, students: totalStudents };
+    document.querySelectorAll('body[data-active="reports"] [data-metric]').forEach(element => {
       const key = element.dataset.metric;
       if (key in metrics) element.textContent = faNumber(Math.round(metrics[key] * 10) / 10);
     });
+    const departmentFilter = $('[data-report-department]');
+    if (departmentFilter) {
+      const selected = departmentFilter.value;
+      departmentFilter.innerHTML = '<option value="">همه دپارتمان‌ها</option>' + rows.filter(row => row.department !== 'بدون دپارتمان' && row.departmentId).map(row => `<option value="${row.departmentId}">${escapeHtml(row.department)}</option>`).join('');
+      departmentFilter.value = selected;
+    }
     const activity = await request('/dashboard/activity').catch(() => []);
     window.MftChartData = { ...(window.MftChartData || {}), activity, departments: rows };
     document.dispatchEvent(new Event('mft:data-ready'));
+    await safe(loadRecentAttempts);
+    const searchInput = $('[data-report-search]');
+    const deptSelect = $('[data-report-department]');
+    const refresh = $('[data-report-refresh]');
+    if (searchInput && !searchInput.dataset.wired) {
+      searchInput.dataset.wired = 'true';
+      let timer;
+      searchInput.addEventListener('input', () => { clearTimeout(timer); timer = setTimeout(() => safe(loadRecentAttempts), 300); });
+    }
+    if (deptSelect && !deptSelect.dataset.wired) {
+      deptSelect.dataset.wired = 'true';
+      deptSelect.addEventListener('change', () => safe(loadRecentAttempts));
+    }
+    if (refresh && !refresh.dataset.wired) {
+      refresh.dataset.wired = 'true';
+      refresh.addEventListener('click', () => safe(loadReports));
+    }
+  }
+
+  async function setupNotificationComposer() {
+    const panel = $('[data-notification-compose]');
+    if (!panel || (currentUser()?.role || '').toLowerCase() !== 'superadmin') return;
+    panel.hidden = false;
+    const [departments, users, classes] = await Promise.all([
+      request('/departments'), request('/users'), request('/classes')
+    ]);
+    const departmentSelect = $('[data-notification-department]');
+    const userSelect = $('[data-notification-user]');
+    const classSelect = $('[data-notification-class]');
+    const classDepartment = $('[data-class-department]');
+    const rosterWrap = $('[data-class-roster-wrap]');
+    const rosterSelect = $('[data-class-roster-members]');
+    const fillDepartments = select => {
+      if (select) select.innerHTML = '<option value="">انتخاب دپارتمان</option>' +
+        departments.map(x => `<option value="${x.id}">${escapeHtml(x.name)}</option>`).join('');
+    };
+    fillDepartments(departmentSelect);
+    fillDepartments(classDepartment);
+    if (userSelect) userSelect.innerHTML = '<option value="">انتخاب کاربر</option>' +
+      users.filter(x => x.isActive !== false).map(x =>
+        `<option value="${x.id}">${escapeHtml(x.fullName || x.username)} — ${escapeHtml(x.role)}</option>`).join('');
+    const renderClasses = selectedId => {
+      if (!classSelect) return;
+      classSelect.innerHTML = '<option value="">انتخاب کلاس</option>' + classes.map(x =>
+        `<option value="${x.id}">${escapeHtml(x.name)} — ${escapeHtml(x.department || '')} (${faNumber(x.memberCount)} نفر)</option>`).join('');
+      if (selectedId) classSelect.value = selectedId;
+    };
+    renderClasses();
+    const audience = $('[data-notification-audience]');
+    const sync = () => {
+      const value = audience?.value;
+      $('[data-notification-department-wrap]').hidden = value !== 'Department';
+      $('[data-notification-user-wrap]').hidden = value !== 'User';
+      $('[data-notification-class-wrap]').hidden = value !== 'Class';
+      $('[data-class-create-wrap]').hidden = value !== 'Class';
+      if (value !== 'Class' && rosterWrap) rosterWrap.hidden = true;
+    };
+    audience?.addEventListener('change', sync);
+    sync();
+
+    const studentsForDepartment = departmentId => users.filter(x =>
+      x.role === 'Student' && x.isActive !== false && String(x.departmentId) === String(departmentId));
+    classDepartment?.addEventListener('change', () => {
+      const members = $('[data-class-members]');
+      if (members) members.innerHTML = studentsForDepartment(classDepartment.value).map(x =>
+        `<option value="${x.id}">${escapeHtml(x.fullName || x.username)}</option>`).join('');
+    });
+
+    classSelect?.addEventListener('change', () => safe(async () => {
+      const classId = classSelect.value;
+      if (!classId) {
+        if (rosterWrap) rosterWrap.hidden = true;
+        return;
+      }
+      const info = await request(`/classes/${classId}/members`);
+      const students = studentsForDepartment(info.departmentId);
+      const selected = new Set((info.members || []).map(x => String(x.id)));
+      if (rosterSelect) rosterSelect.innerHTML = students.map(x =>
+        `<option value="${x.id}" ${selected.has(String(x.id)) ? 'selected' : ''}>${escapeHtml(x.fullName || x.username)}</option>`).join('');
+      const summary = $('[data-class-summary]');
+      if (summary) summary.textContent = `${info.name}: ${faNumber(selected.size)} عضو فعلی`;
+      if (rosterWrap) rosterWrap.hidden = false;
+    }));
+
+    $('[data-class-roster-save]')?.addEventListener('click', () => safe(async () => {
+      const classId = classSelect?.value;
+      if (!classId) throw new Error('ابتدا کلاس را انتخاب کنید.');
+      const studentIds = Array.from(rosterSelect?.selectedOptions || []).map(x => x.value);
+      const result = await request(`/classes/${classId}/members`, {
+        method: 'PUT', body: JSON.stringify({ studentIds })
+      });
+      const selectedClass = classes.find(x => String(x.id) === String(classId));
+      if (selectedClass) selectedClass.memberCount = result.memberCount;
+      renderClasses(classId);
+      const summary = $('[data-class-summary]');
+      if (summary) summary.textContent = `${selectedClass?.name || 'کلاس'}: ${faNumber(result.memberCount)} عضو`;
+      notify('اعضای کلاس به‌روزرسانی شدند.', 'ok');
+    }));
+
+    $('[data-class-create]')?.addEventListener('click', () => safe(async () => {
+      const name = $('[data-class-name]')?.value.trim();
+      const departmentId = classDepartment?.value;
+      const studentIds = Array.from($$('[data-class-members] option:checked')).map(x => x.value);
+      if (!name || !departmentId) throw new Error('نام و دپارتمان کلاس را وارد کنید.');
+      const created = await request('/classes', {
+        method: 'POST', body: JSON.stringify({ name, departmentId, studentIds })
+      });
+      classes.push({ id: created.id, name: created.name, departmentId, memberCount: created.memberCount });
+      renderClasses(created.id);
+      if ($('[data-class-name]')) $('[data-class-name]').value = '';
+      notify('کلاس و اعضای آن ثبت شدند.', 'ok');
+    }));
+  }
+
+  async function sendNotification() {
+    const audience = $('[data-notification-audience]')?.value;
+    const title = $('[data-notification-title]')?.value.trim();
+    const message = $('[data-notification-message]')?.value.trim();
+    if (!title || !message) return notify('عنوان و متن اعلان را وارد کنید.', 'warn');
+    const payload = { audience, title, message };
+    if (audience === 'Department') payload.departmentId = $('[data-notification-department]')?.value;
+    if (audience === 'User') payload.userId = $('[data-notification-user]')?.value;
+    if (audience === 'Class') payload.classId = $('[data-notification-class]')?.value;
+    await safe(async () => {
+      const result = await request('/notifications', { method: 'POST', body: JSON.stringify(payload) });
+      $('[data-notification-title]').value = '';
+      $('[data-notification-message]').value = '';
+      notify(`اعلان برای ${faNumber(result.sent)} نفر ثبت شد.`, 'ok');
+    });
   }
 
   async function openUserEditor(id, role) {
@@ -417,11 +832,17 @@
     if (id) existing = await request(`/users/${id}`);
     if (nameField) nameField.value = existing?.fullName || '';
     const departmentField = $('[data-department-field]', modal);
-    if (departmentField && existing?.departmentId) departmentField.value = String(existing.departmentId);
+    if (departmentField) departmentField.value = existing?.departmentId == null ? '' : String(existing.departmentId);
     const activeField = $('[data-user-active]', modal);
     if (activeField) activeField.checked = existing ? Boolean(existing.isActive) : true;
     const usernameField = fields.find(field => field.hasAttribute('data-username-field'));
-    if (usernameField) usernameField.value = existing?.username || '';
+    if (usernameField) { usernameField.value = existing?.username || ''; usernameField.readOnly = Boolean(id); }
+    const passwordField = fields.find(field => field.type === 'password');
+    if (passwordField) {
+      passwordField.value = '';
+      const passwordWrapper = passwordField.closest('.field');
+      if (passwordWrapper) passwordWrapper.hidden = Boolean(id);
+    }
     const email = fields.find(field => field.type === 'email');
     const mobile = fields.find(field => field.type === 'tel');
     if (email) email.value = existing?.email || '';
@@ -445,12 +866,13 @@
     if (!id && (!password || password.length < 8)) return notify('رمز عبور باید حداقل ۸ کاراکتر باشد.', 'warn');
     await safe(async () => {
       const departmentField = $('[data-department-field]', modal);
-      const departmentId = departmentField?.value || null;
+      const departmentIdValue = departmentField?.value || '';
+      const departmentId = departmentIdValue ? Number(departmentIdValue) : null;
       const isActive = $('[data-user-active]', modal)?.checked ?? true;
       if (id) await request(`/users/${id}`, { method: 'PUT', body: JSON.stringify({ fullName, email, mobile, departmentId, isActive }) });
       else {
         if (!password || password.length < 8) return notify('رمز عبور باید حداقل ۸ کاراکتر باشد.', 'warn');
-        await request('/users', { method: 'POST', body: JSON.stringify({ username, password, fullName, role, email, mobile, departmentId, mustChangePassword: false }) });
+        await request('/users', { method: 'POST', body: JSON.stringify({ username, password, fullName, role, email, mobile, departmentId }) });
       }
       modal.classList.remove('show');
       await loadUsers();
@@ -459,23 +881,80 @@
 
   async function loadExamWizard() {
     if (!document.body.matches('[data-active="exams"]') || !$('#wizardSteps')) return;
-    const [departments, questions] = await Promise.all([
+    const [departments, lookups, questions, me, classes] = await Promise.all([
       request('/departments').catch(() => []),
-      request('/questions').catch(() => [])
+      request('/questions/lookups'),
+      request('/questions'),
+      request('/auth/me').catch(() => null),
+      request('/canonical/classes').catch(() => [])
     ]);
     const departmentWrap = $('#deptChoices');
-    const questionWrap = $('#manualPick');
     if (departmentWrap) {
-      departmentWrap.innerHTML = departments.length ? departments.map((dept, index) => `<div class="choice-card ${index === 0 ? 'selected' : ''}" data-id="${dept.id}" data-value="${escapeHtml(dept.name)}"><div class="mohr sm"><div class="mohr-inner"><b>${escapeHtml(dept.name.slice(0, 2))}</b></div></div><b>${escapeHtml(dept.name)}</b></div>`).join('') : '<p class="text-soft">دپارتمانی ثبت نشده است. از گزینه «ایجاد دپارتمان» استفاده کنید.</p>';
+      const role = String(me?.role || currentUser()?.role || '').toLowerCase();
+      const visibleDepartments = role === 'superadmin' ? departments.filter(x => x.isActive !== false) : departments.filter(x => Number(x.id) === Number(me?.departmentId));
+      departmentWrap.innerHTML = visibleDepartments.length
+        ? visibleDepartments.map((dept, index) => `<div class="choice-card ${index === 0 ? 'selected' : ''}" data-id="${dept.id}" data-value="${escapeHtml(dept.name)}"><div class="mohr sm"><div class="mohr-inner"><b>${escapeHtml(dept.name.slice(0, 2))}</b></div></div><b>${escapeHtml(dept.name)}</b></div>`).join('')
+        : '<p class="text-soft">دپارتمان متصل به حساب شما پیدا نشد؛ ابتدا اتصال حساب به دپارتمان را بررسی کنید.</p>';
     }
-    if (questionWrap) {
-      questionWrap.innerHTML = questions.map(question => `<label class="qpick-row"><input type="checkbox" data-question-type="${escapeHtml(question.type)}" value="${question.id}"><span style="flex:1">${escapeHtml(question.text)}</span><span class="badge badge-info">${escapeHtml(question.type)}</span></label>`).join('') || '<p class="text-soft">ابتدا از بانک سؤال، سؤال ثبت کنید.</p>';
+    const classSelect = $('#examClass');
+    if (classSelect) {
+      classSelect.innerHTML = '<option value="">انتخاب کلاس آزمون</option>' +
+        classes.map(item => `<option value="${item.id}" data-department-id="${item.departmentId}">${escapeHtml(item.name)} — ${escapeHtml(item.department || '')} (${Number(item.memberCount || 0)} نفر)</option>`).join('');
+      if (!classes.length) classSelect.innerHTML = '<option value="">کلاسی ثبت نشده است؛ ابتدا کلاس ایجاد کنید</option>';
+      classSelect.onchange = () => {
+        const selected = classSelect.selectedOptions[0];
+        const deptId = Number(selected?.dataset.departmentId || 0);
+        const departmentCard = $('#deptChoices .choice-card').find(card => Number(card.dataset.id) === deptId);
+        if (departmentCard) {
+          $$('#deptChoices .choice-card').forEach(card => card.classList.toggle('selected', card === departmentCard));
+          const preview = $('#prevDept');
+          if (preview) preview.textContent = departmentCard.dataset.value || departmentCard.textContent.trim();
+        }
+      };
     }
+    const createClassButton = $('[data-create-class]');
+    if (createClassButton && !createClassButton.dataset.bound) {
+      createClassButton.dataset.bound = 'true';
+      createClassButton.addEventListener('click', async () => {
+        const departmentCard = $('#deptChoices .choice-card.selected');
+        if (!departmentCard?.dataset.id) return notify('ابتدا دپارتمان مقصد را انتخاب کنید.', 'warn');
+        const name = prompt('نام کلاس جدید را وارد کنید:');
+        if (!name?.trim()) return;
+        await safe(async () => {
+          await request('/canonical/classes', {
+            method: 'POST',
+            body: JSON.stringify({ name: name.trim(), departmentId: Number(departmentCard.dataset.id) })
+          });
+          await window.MftApi.refresh();
+          const select = $('#examClass');
+          const created = [...(select?.options || [])].find(option =>
+            option.textContent.startsWith(name.trim() + ' — ') &&
+            Number(option.dataset.departmentId) === Number(departmentCard.dataset.id));
+          if (created) select.value = created.value;
+          notify('کلاس ایجاد شد. اکنون اعضای آن را در بخش مدیریت کلاس‌ها تعیین کنید.', 'ok');
+        });
+      });
+    }
+    const categorySelect = $('#examCategory');
+    if (categorySelect) categorySelect.innerHTML = '<option value="">انتخاب دسته‌بندی آزمون</option>' +
+      lookups.categories.map(x => `<option value="${x.id}">${escapeHtml(x.name)}</option>`).join('');
+    const questionWrap = $('#manualPick');
+    const renderQuestions = () => {
+      const categoryId = Number(categorySelect?.value || 0);
+      const skillIds = new Set(lookups.skills.filter(s => !categoryId || Number(s.examCategoryId) === categoryId).map(s => Number(s.id)));
+      const available = questions.filter(q => skillIds.has(Number(q.skillId)));
+      if (questionWrap) questionWrap.innerHTML = available.map(question => {
+        const type = question.questionTypeCode || '';
+        const typeName = ({ MultipleChoice: 'چهارگزینه‌ای', Essay: 'تشریحی', Matching: 'وصل‌کردنی' })[type] || question.questionTypeName || type;
+        return `<label class="qpick-row"><input type="checkbox" data-question-type="${escapeHtml(type)}" data-skill-id="${question.skillId}" value="${question.id}"><span style="flex:1">${escapeHtml(question.text)}</span><span class="badge badge-info">${escapeHtml(question.skillName || 'مهارت')}</span><span class="badge badge-muted">${escapeHtml(typeName)}</span></label>`;
+      }).join('') || '<p class="text-soft">برای این دسته‌بندی هنوز سؤالی در بانک canonical ثبت نشده است.</p>';
+    };
+    if (categorySelect) categorySelect.onchange = renderQuestions;
+    renderQuestions();
     const teacherWrap = $('#teacherChoices');
     if (teacherWrap) {
-      const me = await request('/auth/me').catch(() => null);
-      const teachers = me?.role === 'Teacher' ? [me] : await request('/users?role=Teacher').catch(() => []);
-      teacherWrap.innerHTML = teachers.map((teacher, index) => `<div class="choice-card ${index === 0 ? 'selected' : ''}" data-id="${teacher.id}" data-value="${escapeHtml(teacher.fullName)}"><div class="mohr sm"><div class="mohr-inner"><b>${escapeHtml(teacher.fullName.slice(0, 2))}</b></div></div><b>${escapeHtml(teacher.fullName)}</b></div>`).join('') || '<p class="text-soft">استادی برای انتخاب وجود ندارد. می‌توانید استاد جدید ایجاد کنید.</p>';
+      const name = me?.fullName || currentUser()?.fullName || 'کاربر واردشده';
+      teacherWrap.innerHTML = `<div class="choice-card selected" data-id="${me?.id || ''}" data-value="${escapeHtml(name)}"><div class="mohr sm"><div class="mohr-inner"><b>${escapeHtml(name.slice(0, 2))}</b></div></div><b>${escapeHtml(name)} (حساب فعلی)</b></div>`;
     }
   }
 
@@ -489,6 +968,12 @@
       if (modal.id === 'teacherModal') modal.dataset.editRole = 'Teacher';
       if (modal.id === 'studentModal') modal.dataset.editRole = 'Student';
       $$('input, textarea', modal).forEach(field => { if (!['radio', 'checkbox', 'file'].includes(field.type)) field.value = ''; });
+      $$('[data-username-field]', modal).forEach(field => { field.readOnly = false; });
+      $$('input[type="password"]', modal).forEach(field => {
+        field.value = '';
+        const wrapper = field.closest('.field');
+        if (wrapper) wrapper.hidden = false;
+      });
       $$('input[type="radio"]', modal).forEach((field, index) => { field.checked = index === 0; });
       $$('select', modal).forEach(select => { select.selectedIndex = 0; });
       const activeField = $('[data-user-active]', modal);
@@ -498,21 +983,23 @@
       if ($('#matchingOptions', modal)) $('#matchingOptions', modal).hidden = true;
     });
     document.addEventListener('click', event => {
-      const gradeSave = event.target.closest('[data-grade-save]');
-      if (gradeSave) { event.preventDefault(); saveGrade(gradeSave.closest('.modal-overlay')); return; }
-      const gradeAttempt = event.target.closest('[data-grade-attempt]');
-      if (gradeAttempt) { event.preventDefault(); safe(() => openGradeAttempt(gradeAttempt.dataset.gradeAttempt)); return; }
       if (event.target.closest('[data-export-print]')) { event.preventDefault(); window.print(); return; }
       if (event.target.closest('[data-export-csv]')) { event.preventDefault(); exportTableCsv(); return; }
       if (event.target.closest('[data-backup-unavailable], [data-restore-unavailable]')) { event.preventDefault(); notify('پشتیبان‌گیری و بازیابی دیتابیس هنوز در سمت سرور پیکربندی نشده است؛ این دکمه داده‌ها را تغییر نمی‌دهد.', 'warn'); return; }
       const resetUnavailable = event.target.closest('[data-password-reset-unavailable]');
       if (resetUnavailable) { event.preventDefault(); notify('بازیابی خودکار رمز هنوز به سرویس ایمیل یا پیامک متصل نشده است؛ با مدیر سامانه تماس بگیرید.', 'warn'); return; }
+      const sendNotice = event.target.closest('[data-notification-send]');
+      if (sendNotice) { event.preventDefault(); sendNotification(); return; }
       const readAll = event.target.closest('[data-notification-read-all]');
       if (readAll) { event.preventDefault(); safe(async () => { await request('/notifications/read-all', { method: 'PUT' }); await loadNotifications(); }, 'همه اعلان‌ها خوانده شدند.'); return; }
       const settingsSave = event.target.closest('[data-settings-save]');
       if (settingsSave) { event.preventDefault(); saveSettings(); return; }
       const questionSave = event.target.closest('[data-question-save]');
-      if (questionSave) { event.preventDefault(); saveQuestionFromModal(questionSave.closest('.modal-overlay')); return; }
+      if (questionSave) {
+        event.preventDefault();
+        if (document.body.dataset.active !== 'bank') saveQuestionFromModal(questionSave.closest('.modal-overlay'));
+        return;
+      }
       if (event.target.closest('[data-create-department]')) { event.preventDefault(); safe(createDepartmentInline); return; }
       if (event.target.closest('[data-create-manager]')) { event.preventDefault(); safe(createManagerInline); return; }
       if (event.target.closest('[data-create-teacher]')) { event.preventDefault(); safe(createTeacherInline); return; }
@@ -522,7 +1009,7 @@
       if (userSave) { event.preventDefault(); saveUserFromModal(userSave.closest('.modal-overlay')); return; }
     });
     document.addEventListener('click', async event => {
-      const target = event.target.closest('[data-user-delete], [data-user-edit], [data-question-delete], [data-question-edit], [data-department-delete], [data-department-edit], [data-notification-delete], [data-notification-read], [data-exam-start], [data-result-view]');
+      const target = event.target.closest('[data-user-delete], [data-user-edit], [data-question-delete], [data-question-edit], [data-department-delete], [data-department-edit], [data-notification-delete], [data-notification-read], [data-exam-start], [data-exam-continue], [data-result-view]');
       if (!target) return;
       event.preventDefault();
       await safe(async () => {
@@ -550,12 +1037,25 @@
         } else if (target.dataset.notificationRead) {
           await request(`/notifications/${target.dataset.notificationRead}/read`, { method: 'PUT' });
           await loadNotifications();
+        } else if (target.dataset.examContinue) {
+          location.href = `online-exam.html?examId=${encodeURIComponent(target.dataset.examContinue)}&attemptId=${encodeURIComponent(target.dataset.attemptId)}`;
         } else if (target.dataset.examStart) {
-          const attempt = await request(`/exams/${target.dataset.examStart}/start`, { method: 'POST' });
-          sessionStorage.setItem('mft.activeAttempt', JSON.stringify(attempt));
-          location.href = 'online-exam.html';
+          target.disabled = true;
+          try {
+            const examId = target.dataset.examStart;
+            const attempt = await request(`/canonical/exams/${encodeURIComponent(examId)}/attempt/start`, { method: 'POST' });
+            location.href = `online-exam.html?examId=${encodeURIComponent(examId)}&attemptId=${encodeURIComponent(attempt.attemptId)}`;
+          } catch (error) {
+            target.disabled = false;
+            if (/قبلاً تلاش|شرکت مجدد|تلاش ثبت شده/i.test(error.message)) {
+              notify('برای این آزمون قبلاً تلاش ثبت شده است؛ امکان شرکت مجدد وجود ندارد.', 'warn');
+              await loadExams();
+              return;
+            }
+            throw error;
+          }
         } else if (target.dataset.resultView) {
-          const result = await request(`/results/${target.dataset.resultView}`);
+          const result = await request(`/canonical/results/${target.dataset.resultView}`);
           const answers = result.answers.map(answer => `سؤال ${answer.questionId}: ${escapeHtml(answer.answer || 'بدون پاسخ')} — نمره ${faNumber(answer.awardedScore)}`).join('\n');
           alert(`${result.exam}\nوضعیت: ${result.status}\nنمره: ${result.score ?? 'در انتظار تصحیح'}\n\n${answers}`);
         }
@@ -571,7 +1071,7 @@
     const category = $('[data-question-category]', modal)?.value || 'عمومی';
     const optionFields = $$('[data-question-option]', modal);
     let options = optionFields.map(field => field.value.trim()).filter(Boolean);
-    const correctIndex = $$('input[name="correct"]', modal).findIndex(field => field.checked);
+    const correctIndex = Number($('#correctOption', modal)?.value || 0) - 1;
     let correctAnswer = type === 'MultipleChoice' ? (optionFields[correctIndex]?.value.trim() || null) : null;
     if (type === 'Matching') {
       const left = $$('[data-match-left]', modal).map(field => field.value.trim());
@@ -584,7 +1084,9 @@
     }
     if (!text) return notify('متن سؤال الزامی است.', 'warn');
     if (type === 'MultipleChoice' && (options.length < 2 || !correctAnswer)) return notify('حداقل دو گزینه و پاسخ صحیح را مشخص کنید.', 'warn');
-    const payload = { text, type, difficulty, category, options: ['MultipleChoice','Matching'].includes(type) ? options : [], correctAnswer, score: 1 };
+    const departmentId = $('#questionDepartment', modal)?.value || null;
+    if (!departmentId) return notify('برای ثبت سؤال، یک دپارتمان معتبر انتخاب کنید. اگر فهرست خالی است، مدیر سامانه باید حساب شما را به دپارتمان متصل کند.', 'warn');
+    const payload = { text, departmentId, type, difficulty, category, options: ['MultipleChoice','Matching'].includes(type) ? options : [], correctAnswer, score: 1 };
     await safe(async () => {
       const id = modal.dataset.editId;
       await request(id ? `/questions/${id}` : '/questions', { method: id ? 'PUT' : 'POST', body: JSON.stringify(payload) });
@@ -634,7 +1136,7 @@
       await loadExamWizard();
       const newCard = $$('#deptChoices .choice-card').find(card => card.dataset.id === created.id);
       if (newCard) {
-        $$('#deptChoices .choice-card').forEach(card => card.classList.toggle('selected', card === newCard));
+        $$$('#deptChoices .choice-card').forEach(card => card.classList.toggle('selected', card === newCard));
         $('#prevDept').textContent = newCard.dataset.value || newCard.textContent.trim();
       }
     }
@@ -696,12 +1198,13 @@
     const values = await showQuickCreateModal('ایجاد مدیر دپارتمان', [
       { name: 'fullName', label: 'نام و نام خانوادگی مدیر' },
       { name: 'username', label: 'نام کاربری' },
-      { name: 'password', label: 'رمز عبور (حداقل ۸ کاراکتر)', type: 'password' }
+      { name: 'password', label: 'رمز عبور (حداقل ۸ کاراکتر)', type: 'password' },
+      { name: 'mobile', label: 'شماره تماس (الزامی)' }
     ]);
     if (!values) return;
     const created = await request('/users', {
       method: 'POST',
-      body: JSON.stringify({ username: values.username, password: values.password, fullName: values.fullName, role: 'Department', email: null, mobile: null, departmentId: null, mustChangePassword: false })
+      body: JSON.stringify({ username: values.username, password: values.password, fullName: values.fullName, role: 'Department', email: null, mobile: values.mobile, departmentId: null })
     });
     const select = $('#departmentManagerId');
     if (select) {
@@ -721,16 +1224,17 @@
     const values = await showQuickCreateModal('ایجاد حساب استاد', [
       { name: 'fullName', label: 'نام و نام خانوادگی استاد' },
       { name: 'username', label: 'نام کاربری استاد' },
-      { name: 'password', label: 'رمز عبور (حداقل ۸ کاراکتر)', type: 'password' }
+      { name: 'password', label: 'رمز عبور (حداقل ۸ کاراکتر)', type: 'password' },
+      { name: 'mobile', label: 'شماره تماس (الزامی)' }
     ]);
     if (!values) return;
     const { fullName, username } = values;
     const department = $('#deptChoices .choice-card.selected');
-    const departmentId = department?.dataset.id || null;
+    const departmentId = department?.dataset.id ? Number(department.dataset.id) : null;
     if (role === 'superadmin' && !departmentId) return notify('ابتدا دپارتمان مقصد را انتخاب یا ایجاد کنید.', 'warn');
     const created = await request('/users', {
       method: 'POST',
-      body: JSON.stringify({ username, password: values.password, fullName, role: 'Teacher', email: null, mobile: null, departmentId, mustChangePassword: false })
+      body: JSON.stringify({ username, password: values.password, fullName, role: 'Teacher', email: null, mobile: values.mobile, departmentId })
     });
     await loadExamWizard();
     const newTeacherCard = $$('#teacherChoices .choice-card').find(card => card.dataset.id === created.id);
@@ -742,29 +1246,27 @@
   }
 
   async function editQuestion(id) {
-    const question = await request(`/questions/${id}`);
+    const [question, lookups] = await Promise.all([
+      request(`/questions/${encodeURIComponent(id)}`),
+      request('/questions/lookups')
+    ]);
     const modal = $('#questionModal');
     if (!modal) return;
     modal.dataset.editId = String(id);
-    const fields = $$('textarea, input, select', modal);
-    fields.find(field => field.tagName === 'TEXTAREA').value = question.text || '';
-    $('#qType', modal).value = question.type || 'MultipleChoice';
-    $('[data-question-difficulty]', modal).value = question.difficulty || 'Medium';
-    $('[data-question-category]', modal).value = question.category || 'عمومی';
-    $$('[data-question-option]', modal).forEach((field, index) => field.value = question.type === 'MultipleChoice' ? (question.options?.[index] || '') : '');
-    if (question.type === 'Matching') {
-      let pairs = {};
-      try { pairs = JSON.parse(question.correctAnswer || '{}'); } catch { pairs = {}; }
-      $$('[data-match-left]', modal).forEach((field, index) => { field.value = question.options?.[index] || ''; });
-      $$('[data-match-right]', modal).forEach((field, index) => { field.value = pairs[question.options?.[index]] || ''; });
-      $('#mcqOptions', modal).style.display = 'none';
-      $('#matchingOptions', modal).hidden = false;
-    } else {
-      $('#mcqOptions', modal).style.display = question.type === 'MultipleChoice' ? 'block' : 'none';
-      $('#matchingOptions', modal).hidden = true;
-    }
-    const correctIndex = question.options?.indexOf(question.correctAnswer) ?? -1;
-    $$('input[name="correct"]', modal).forEach((field, index) => field.checked = index === correctIndex);
+    $('[data-question-text]', modal).value = question.text || '';
+    $('#qType', modal).value = lookups.questionTypes.find(x => Number(x.id) === Number(question.questionTypeId))?.code || 'MultipleChoice';
+    $('[data-question-difficulty]', modal).value = ({1:'Easy',2:'Medium',3:'Hard'})[Number(question.difficultyLevel)] || 'Medium';
+    $('#questionSkill', modal).innerHTML = '<option value="">انتخاب مهارت</option>' +
+      lookups.skills.map(x => `<option value="${x.id}">${escapeHtml(x.name)}</option>`).join('');
+    $('#questionSkill', modal).value = String(question.skillId);
+    $('#questionPoints', modal).value = question.points || 1;
+    $$('[data-question-option]', modal).forEach((field, index) => field.value = question.options?.[index]?.optionText || '');
+    $$('[data-match-left]', modal).forEach((field, index) => field.value = question.matchingPairs?.[index]?.leftItem || '');
+    $$('[data-match-right]', modal).forEach((field, index) => field.value = question.matchingPairs?.[index]?.rightItem || '');
+    $('#mcqOptions', modal).style.display = $('#qType', modal).value === 'MultipleChoice' ? 'block' : 'none';
+    $('#matchingOptions', modal).hidden = $('#qType', modal).value !== 'Matching';
+    const correctIndex = question.options?.findIndex(x => x.isCorrect) ?? -1;
+    if ($('#correctOption', modal)) $('#correctOption', modal).value = correctIndex >= 0 ? String(correctIndex + 1) : '';
     modal.classList.add('show');
   }
 
@@ -799,6 +1301,8 @@
     if ($('#departmentExamsBody')) $('#departmentExamsBody').replaceChildren();
     await safe(async () => {
       await loadCurrentUser();
+      await loadNotificationIndicators();
+      if (document.body.dataset.active === 'notifications') await setupNotificationComposer();
       const isSuperAdmin = (currentUser()?.role || '').toLowerCase() === 'superadmin';
       $$('[data-create-department], [data-create-manager]').forEach(button => { button.hidden = !isSuperAdmin; });
       $$('[data-create-teacher]').forEach(button => { button.hidden = !['superadmin', 'department'].includes((currentUser()?.role || '').toLowerCase()); });
@@ -826,15 +1330,67 @@
           $$('[data-department-field]').forEach(select => { select.innerHTML = '<option value="">انتخاب دپارتمان</option>' + departments.map(dept => `<option value="${dept.id}">${escapeHtml(dept.name)}</option>`).join(''); });
         }
       }
-      if (document.body.dataset.active === 'students') attachSearch('body[data-active="students"] .search-box input', loadUsers);
-      if (document.body.dataset.active === 'teachers') attachSearch('body[data-active="teachers"] .search-box input', loadUsers);
-      if (document.body.dataset.active === 'departments') attachSearch('body[data-active="departments"] .search-box input', loadDepartments);
-      if (document.body.dataset.active === 'bank') attachSearch('body[data-active="bank"] .search-box input', loadQuestions);
+      if (document.body.dataset.active === 'students') attachSearch('main .table-toolbar .search-box input', loadUsers);
+      if (document.body.dataset.active === 'teachers') attachSearch('main .table-toolbar .search-box input', loadUsers);
+      if (document.body.dataset.active === 'departments') attachSearch('main .table-toolbar .search-box input', loadDepartments);
+      if (document.body.dataset.active === 'bank') attachSearch('main .table-toolbar .search-box input', loadQuestions);
+      attachGlobalSearch();
     });
+  }
+
+  async function preview(path) {
+    const tab = window.open('about:blank', '_blank');
+    if (!tab) throw new Error('مرورگر بازشدن پنجره جدید را مسدود کرد؛ اجازه Pop-up را فعال کنید.');
+    try {
+      const headers = new Headers();
+      if (token()) headers.set('Authorization', `Bearer ${token()}`);
+      const response = await fetch(`${API_BASE}${path}`, { headers });
+      if (!response.ok) {
+        const payload = await response.json().catch(() => null);
+        throw new Error(payload?.message || `خطای دریافت فایل (${response.status})`);
+      }
+      const blob = await response.blob();
+      const url = URL.createObjectURL(blob);
+      tab.location.href = url;
+      setTimeout(() => URL.revokeObjectURL(url), 60000);
+    } catch (error) { tab.close(); throw error; }
+  }
+
+  async function objectUrl(path) {
+    const headers = new Headers();
+    if (token()) headers.set('Authorization', `Bearer ${token()}`);
+    const response = await fetch(`${API_BASE}${path}`, { headers });
+    if (!response.ok) {
+      const payload = await response.json().catch(() => null);
+      throw new Error(payload?.message || `خطای دریافت فایل (${response.status})`);
+    }
+    return URL.createObjectURL(await response.blob());
+  }
+
+  async function download(path) {
+    const headers = new Headers();
+    if (token()) headers.set('Authorization', `Bearer ${token()}`);
+    const response = await fetch(`${API_BASE}${path}`, { headers });
+    if (!response.ok) {
+      const payload = await response.json().catch(() => null);
+      throw new Error(payload?.message || `خطای دریافت فایل (${response.status})`);
+    }
+    const blob = await response.blob();
+    const disposition = response.headers.get('content-disposition') || '';
+    const encoded = disposition.match(/filename\*=UTF-8''([^;]+)/i);
+    const plain = disposition.match(/filename="?([^";]+)"?/i);
+    const filename = encoded ? decodeURIComponent(encoded[1]) : (plain?.[1] || 'submission.pdf');
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement('a');
+    anchor.href = url; anchor.download = filename; document.body.appendChild(anchor); anchor.click(); anchor.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
   }
 
   window.MftApi = {
     request,
+    download,
+    preview,
+    objectUrl,
     logout() { clearSession(); location.href = 'login.html'; },
     refresh: init
   };

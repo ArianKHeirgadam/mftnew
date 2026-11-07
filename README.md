@@ -55,9 +55,31 @@ to persist MCQ options/correct answers, attempt status, answer correctness and
 department manager IDs. Do not skip this step: the previous schema-compatibility
 mapping intentionally ignored those fields.
 
-Also execute `database/create-attendance-records.sql` on the same development database to enable daily attendance records. Back up the database first.\n\nAfter applying the patches, build the API and run the test sequence in
+Also execute `database/create-attendance-records.sql` on the same development database to enable daily attendance records. Back up the database first.
+
+For class-based notification recipients and class rosters, also execute `database/create-classes-and-members.sql` on the same database. This creates the `Classes` and `ClassMembers` tables if they do not already exist; back up the database first.\n\nAfter applying the patches, build the API and run the test sequence in
 `docs/EXAM-SCORING-VERIFICATION.md`. A 20-question test with 15 correct
 answers should produce 75/100. Live SQL Server verification is still required.
+
+## PDF exam workflow
+
+The PDF exam workflow uses private storage under `src/Mft.API/App_Data/exam-files` (never under `wwwroot`). The folder is excluded from Git. The API validates the PDF extension, size (20 MB maximum), and PDF signature before saving it with a generated server-side filename.
+
+Before using this workflow on an existing database, back up the database and run
+`database/patch-exam-pdf-workflow.sql` against the application database. This is an additive, re-runnable SQL Server patch; it adds per-exam question scores, result publication metadata, manual-grading metadata, and the two PDF metadata tables. It does not delete existing rows or columns. Do not run it against production until it has been tested on a backup copy.
+
+### Workflow endpoints
+
+- `POST /api/exam-files/exams/{examId}`: teacher/department/super-admin uploads the exam PDF.
+- `GET /api/exam-files/exams/{examId}`: authorized exam PDF download; students need the exam to be published and belong to its department.
+- `POST /api/exam-files/attempts/{attemptId}`: student uploads their PDF answer while the attempt is in progress and within its server-side time limit.
+- `GET /api/exam-files/attempts/{attemptId}/info`: authorized submission file metadata.
+- `GET /api/exam-files/attempts/{attemptId}`: student (after result publication) or authorized grader downloads the PDF answer.
+- `PUT /api/results/{attemptId}/answers/{questionId}/grade`: manual grading for one answer; body: `{"score": 2.5, "comment": "..." }`. The score is entered in that question's raw points and normalized to the exam's 100-point result.
+- `POST /api/results/exams/{examId}/publish`: teacher/department/super-admin publishes results after all saved answers needing manual grading have been graded.
+- `POST /api/results/exams/{examId}/unpublish`: authorized manager withdraws publication.
+
+Student result endpoints return no result details until the exam's `ResultsPublished` flag is enabled and that student's attempt has reached `Graded`. Uploads are stored outside the web root and downloaded through authenticated endpoints.
 
 ## Run the frontend
 

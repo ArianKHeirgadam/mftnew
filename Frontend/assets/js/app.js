@@ -38,6 +38,7 @@ const NAV_BY_ROLE = {
       section: "مدیریت آموزشی", items: [
         { key: "departments", label: "دپارتمان‌ها", href: "departments.html", icon: ICON.building },
         { key: "students", label: "دانشجویان", href: "students.html", icon: ICON.students },
+        { key: "classes", label: "کلاس‌ها و اعضا", href: "classes.html", icon: ICON.students },
         { key: "teachers", label: "اساتید", href: "teachers.html", icon: ICON.teacher },
         { key: "bank", label: "بانک سوالات", href: "question-bank.html", icon: ICON.bank },
         { key: "exams", label: "آزمون‌ها", href: "create-exam.html", icon: ICON.exam },
@@ -48,7 +49,7 @@ const NAV_BY_ROLE = {
     {
       section: "سامانه", items: [
         { key: "reports", label: "گزارش‌ها", href: "reports.html", icon: ICON.report },
-        { key: "notifications", label: "اعلان‌ها", href: "notifications.html", icon: ICON.bell, badge: 5 },
+        { key: "notifications", label: "اعلان‌ها", href: "notifications.html", icon: ICON.bell },
         { key: "settings", label: "تنظیمات", href: "settings.html", icon: ICON.settings },
       ]
     },
@@ -62,6 +63,7 @@ const NAV_BY_ROLE = {
     {
       section: "دپارتمان مهندسی کامپیوتر", items: [
         { key: "students", label: "دانشجویان", href: "students.html", icon: ICON.students },
+        { key: "classes", label: "کلاس‌ها و اعضا", href: "classes.html", icon: ICON.students },
         { key: "teachers", label: "اساتید", href: "teachers.html", icon: ICON.teacher },
         { key: "bank", label: "بانک سوالات", href: "question-bank.html", icon: ICON.bank },
         { key: "exams", label: "آزمون‌ها", href: "create-exam.html", icon: ICON.exam },
@@ -85,6 +87,7 @@ const NAV_BY_ROLE = {
     },
     {
       section: "آموزش", items: [
+        { key: "classes", label: "کلاس‌ها و اعضا", href: "classes.html", icon: ICON.students },
         { key: "bank", label: "بانک سوالات", href: "question-bank.html", icon: ICON.bank },
         { key: "exams", label: "ساخت آزمون", href: "create-exam.html", icon: ICON.exam },
         { key: "results", label: "تصحیح و نتایج", href: "results.html", icon: ICON.result },
@@ -134,6 +137,15 @@ function getMftSessionUser() {
   }
 }
 
+function getMftDisplayName(user) {
+  const fullName = String(user?.fullName || user?.displayName || '').trim();
+  const firstLast = [user?.firstName, user?.lastName].map(x => String(x || '').trim()).filter(Boolean).join(' ');
+  return fullName || firstLast || String(user?.username || 'کاربر').trim();
+}
+function escapeMftText(value) {
+  return String(value ?? '').replace(/[&<>"']/g, ch => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' })[ch]);
+}
+
 function renderSidebar() {
   const root = document.getElementById("sidebar-root");
   if (!root) return;
@@ -150,7 +162,7 @@ function renderSidebar() {
         <a class="nav-link ${it.key === active ? "active" : ""}" href="${it.href}">
           ${it.icon}
           <span class="nav-label">${it.label}</span>
-          ${it.badge ? `<span class="badge-count">${it.badge}</span>` : ""}
+          ${it.key === "notifications" ? '<span class="badge-count" data-notification-count hidden>0</span>' : ""}
         </a>
       `).join("")}
     </div>
@@ -216,13 +228,11 @@ function renderTopbar() {
         <button class="icon-btn" data-theme-toggle data-theme-icon aria-label="تغییر پوسته"></button>
         <div class="dropdown">
           <button class="icon-btn" data-dropdown-toggle="notifDrop" aria-label="اعلان‌ها">
-            ${ICON.bell}<span class="dot-ping"></span>
+            ${ICON.bell}<span class="badge-count topbar-notification-count" data-notification-count hidden>0</span>
           </button>
-          <div class="dropdown-menu" id="notifDrop" style="width:300px">
+          <div class="dropdown-menu" id="notifDrop" style="width:min(320px, calc(100vw - 32px))">
             <div style="padding:10px 12px;font-weight:700;font-size:13px">اعلان‌های اخیر</div>
-            <a href="notifications.html">📝 نمره‌ی آزمون میان‌ترم اعلام شد</a>
-            <a href="notifications.html">📅 آزمون ساختمان داده فردا برگزار می‌شود</a>
-            <a href="notifications.html">✅ ثبت‌نام شما تایید شد</a>
+            <div id="topbarRecentNotifications" class="text-soft" style="padding:12px">در حال دریافت...</div>
             <hr>
             <a href="notifications.html" style="justify-content:center;color:var(--primary)">مشاهده همه</a>
           </div>
@@ -230,7 +240,7 @@ function renderTopbar() {
         <div class="dropdown">
           <div class="profile-chip" data-dropdown-toggle="profileDrop" style="cursor:pointer">
             <div class="mohr-avatar" style="width:36px; height:36px;"><span class="initials">${role === "superadmin" ? "مک" : role === "department" ? "مد" : role === "teacher" ? "استا" : "دان"}</span></div>
-            <div class="who"><b>${storedUser?.fullName || storedUser?.username || (role === "superadmin" ? "مدیر سامانه" : role === "department" ? "مدیر دپارتمان" : role === "teacher" ? "استاد" : "دانشجو")}</b><span>${ROLE_LABEL[role] || "کاربر"}</span></div>
+            <div class="who"><b>${escapeMftText(getMftDisplayName(storedUser))}</b><span>${ROLE_LABEL[role] || "کاربر"}</span></div>
           </div>
           <div class="dropdown-menu" id="profileDrop">
             <a href="profile.html">${ICON.profile} پروفایل من</a>
@@ -242,6 +252,7 @@ function renderTopbar() {
       </div>
     </header>
   `;
+  document.querySelectorAll("[data-current-user-name]").forEach(node => { node.textContent = getMftDisplayName(storedUser); });
   document.getElementById("menuToggle")?.addEventListener("click", openMobileSidebar);
 }
 
@@ -285,7 +296,8 @@ function initTabs() {
     btns.forEach((btn) => {
       btn.addEventListener("click", () => {
         btns.forEach((b) => b.classList.remove("active"));
-        wrap.querySelectorAll(".tab-panel").forEach((p) => p.classList.remove("active"));
+        const panelRoot = wrap.parentElement;
+        panelRoot?.querySelectorAll(".tab-panel").forEach((p) => p.classList.remove("active"));
         btn.classList.add("active");
         document.getElementById(btn.dataset.tab)?.classList.add("active");
       });
@@ -359,6 +371,7 @@ window.clearFieldError = clearFieldError;
 document.addEventListener("DOMContentLoaded", () => {
   renderSidebar();
   renderTopbar();
+  document.dispatchEvent(new Event("mft:topbar-ready"));
   initDropdowns();
   initModals();
   initTabs();

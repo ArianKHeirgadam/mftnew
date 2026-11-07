@@ -134,3 +134,50 @@
   .modal-box .field { min-width: 0; }
   .modal-box .btn { max-width: 100%; }
 }
+
+
+/* Super-admin navigation: independently scrollable and viewport-safe */
+.sidebar {
+  height: 100vh;
+  height: 100dvh;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.sidebar .brand,
+.sidebar .collapse-btn,
+.sidebar .sidebar-foot { flex: 0 0 auto; }
+.sidebar nav {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
+  padding-bottom: 16px;
+}
+.sidebar nav::-webkit-scrollbar { width: 6px; }
+.sidebar nav::-webkit-scrollbar-thumb { background: var(--border); border-radius: 8px; }
+.topbar-notification-count {
+  position: absolute;
+  inset-block-start: -4px;
+  inset-inline-end: -4px;
+  min-width: 17px;
+  height: 17px;
+  padding: 0 4px;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 10px;
+  line-height: 1;
+  background: var(--danger);
+  color: #fff;
+}
+.topbar-notification-count[hidden], .badge-count[hidden] { display: none !important; }
+.topbar-right .dropdown > button { position: relative; }
+@media (max-width: 900px) {
+  .sidebar { max-height: 100dvh; }
+  .sidebar nav { -webkit-overflow-scrolling: touch; }
+}
