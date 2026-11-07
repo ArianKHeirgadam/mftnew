@@ -70,3 +70,5 @@ public record DashboardSummary(
 
 public record AttendanceEntryRequest(Guid StudentId, string Status);
 public record SaveAttendanceRequest(DateOnly Date, Guid? DepartmentId, List<AttendanceEntryRequest> Records);
+
+public record ManualGradeRequest(decimal Score, string? Comment = null);

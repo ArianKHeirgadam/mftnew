@@ -65,9 +65,6 @@ public sealed class CanonicalAcademicDbContext(
             e.Property(x => x.DifficultyLevel).HasColumnType("tinyint");
             e.Property(x => x.MetadataJson).HasColumnType("nvarchar(max)");
             e.Property(x => x.CreatedAt).HasColumnType("datetime2").HasDefaultValueSql("sysutcdatetime()");
-            e.Property(x => x.ResultsPublished).HasDefaultValue(false);
-            e.Property(x => x.ResultsPublishedAt).HasColumnType("datetime2");
-            e.HasOne<CanonicalUser>().WithMany().HasForeignKey(x => x.ResultsPublishedByUserId).OnDelete(DeleteBehavior.NoAction);
             e.HasIndex(x => x.CreatedByUserId); e.HasIndex(x => x.QuestionTypeId); e.HasIndex(x => x.SkillId);
             e.HasOne<CanonicalSkill>().WithMany().HasForeignKey(x => x.SkillId).OnDelete(DeleteBehavior.NoAction);
             e.HasOne<CanonicalQuestionType>().WithMany().HasForeignKey(x => x.QuestionTypeId).OnDelete(DeleteBehavior.NoAction);
@@ -126,6 +123,9 @@ public sealed class CanonicalAcademicDbContext(
             e.Property(x => x.StartAt).HasColumnType("datetime2");
             e.Property(x => x.EndAt).HasColumnType("datetime2");
             e.Property(x => x.CreatedAt).HasColumnType("datetime2").HasDefaultValueSql("sysutcdatetime()");
+            e.Property(x => x.ResultsPublished).HasDefaultValue(false);
+            e.Property(x => x.ResultsPublishedAt).HasColumnType("datetime2");
+            e.HasOne<CanonicalUser>().WithMany().HasForeignKey(x => x.ResultsPublishedByUserId).OnDelete(DeleteBehavior.NoAction);
             e.HasIndex(x => x.CreatedByUserId); e.HasIndex(x => x.DepartmentId); e.HasIndex(x => x.ExamCategoryId); e.HasIndex(x => x.ClassId);
             e.HasOne<CanonicalExamCategory>().WithMany().HasForeignKey(x => x.ExamCategoryId).OnDelete(DeleteBehavior.NoAction);
             e.HasOne<CanonicalDepartment>().WithMany().HasForeignKey(x => x.DepartmentId).OnDelete(DeleteBehavior.NoAction);

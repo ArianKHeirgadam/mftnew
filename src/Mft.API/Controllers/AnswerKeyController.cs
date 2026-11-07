@@ -1,4 +1,5 @@
 using System.Globalization;
+using System.Security.Claims;
 using System.Text;
 using System.Text.Json;
 using System.Text.RegularExpressions;
@@ -87,7 +88,7 @@ public sealed class AnswerKeyController(CanonicalAcademicDbContext db) : Control
     }
 
     private long? CurrentUserId =>
-        long.TryParse(User.FindFirstValue(System.Security.Claims.ClaimTypes.NameIdentifier), out var id) ? id : null;
+        long.TryParse(User.FindFirstValue(ClaimTypes.NameIdentifier), out var id) ? id : null;
     private long? CurrentDepartmentId =>
         long.TryParse(User.FindFirstValue("departmentId"), out var id) ? id : null;
 
