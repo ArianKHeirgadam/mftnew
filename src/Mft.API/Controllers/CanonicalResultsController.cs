@@ -34,7 +34,9 @@ public sealed class CanonicalResultsController(
                 (((x.Attempt.StatusId == 2 || x.Attempt.StatusId == 3 || x.Attempt.StatusId == 4) &&
                   (academic.ExamSections.Any(section => section.ExamId == x.Exam.Id) ||
                    academic.StudentAnswers.Any(answer => answer.ExamAttemptId == x.Attempt.Id && answer.IsAutoGraded) ||
-                   x.Attempt.AutoGradedScore != null)) ||
+                   (x.Attempt.AutoGradedScore != null &&
+                    !academic.ExamDocuments.Any(document => document.ExamId == x.Exam.Id) &&
+                    !academic.ExamSubmissionDocuments.Any(document => document.AttemptId == x.Attempt.Id)))) ||
                  (x.Exam.ResultsPublished && x.Attempt.StatusId == 4)));
         else if (User.IsInRole("Teacher"))
             query = query.Where(x => x.Exam.CreatedByUserId == CurrentUserId ||
