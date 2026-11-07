@@ -50,6 +50,7 @@
       <div class="field"><label for="examEnd">پایان مهلت شرکت</label><input class="input" id="examEnd" type="datetime-local" required></div>
       <div class="field wide"><label for="examPdfFile">فایل PDF صورت آزمون (اختیاری، حداکثر ۲۰ مگابایت)</label><input class="input" id="examPdfFile" type="file" accept="application/pdf,.pdf"><small class="text-soft">اگر آزمون فقط برگه PDF است و سؤال آنلاین ندارد، بارگذاری این فایل الزامی است. در آزمون‌های دارای سؤال هم می‌توانید PDF صورت سؤال را پیوست کنید.</small></div>
       <div class="field wide"><label for="essaySectionPdfFile">PDF بخش تشریحی (اختیاری، حداکثر ۲۰ مگابایت)</label><input class="input" id="essaySectionPdfFile" type="file" accept="application/pdf,.pdf"><small class="text-soft">با انتخاب این فایل، یک بخش Essay مستقل و PDFمحور ساخته می‌شود. دانشجو برای این بخش فقط PDF پاسخ بارگذاری می‌کند و کادر پاسخ متنی نخواهد داشت.</small></div>
+      <div class="field"><label for="examMaxPdfSizeMb">حداکثر حجم PDF بخش تشریحی (مگابایت)</label><input class="input" id="examMaxPdfSizeMb" type="number" min="1" max="100" value="20"><small class="text-soft">مقدار پیش‌فرض ۲۰ مگابایت؛ قابل تنظیم بین ۱ تا ۱۰۰ مگابایت.</small></div>
      </div>
      <div class="flex justify-between gap-8 mt-24"><a href="dashboard-teacher.html" class="btn btn-outline">بازگشت</a><button class="btn btn-primary" id="toQuestions">ادامه و افزودن سؤال‌ها</button></div>
     </section>
@@ -123,6 +124,7 @@
   if(!$('examEnd').value||Number.isNaN(end.getTime())||Number.isNaN(start.getTime())||end<=start)return 'زمان پایان باید بعد از زمان شروع باشد.';
   const file=$('examPdfFile').files[0];if(file&&(file.size>20*1024*1024||!(/\.pdf$/i.test(file.name))))return 'فایل صورت آزمون باید PDF و حداکثر ۲۰ مگابایت باشد.';
    const essayFile=$('essaySectionPdfFile').files[0];if(essayFile&&(essayFile.size>20*1024*1024||!(/\.pdf$/i.test(essayFile.name))))return 'فایل بخش تشریحی باید PDF و حداکثر ۲۰ مگابایت باشد.';
+   const maxPdfSizeMb=Number($('examMaxPdfSizeMb').value);if(!Number.isInteger(maxPdfSizeMb)||maxPdfSizeMb<1||maxPdfSizeMb>100)return 'حداکثر حجم PDF باید بین ۱ تا ۱۰۰ مگابایت باشد.';
   return null;
  }
  function showSummary(){
@@ -162,7 +164,7 @@
   try{
    if(!pendingExamId){
     $('createStatus').textContent='در حال ساخت آزمون...';
-    const created=await api.request('/canonical/exams',{method:'POST',body:JSON.stringify({title:$('examTitle').value.trim(),examCategoryId:Number($('examCategory').value),departmentId,classId,startAt:startAt.toISOString(),endAt:endAt.toISOString(),durationMinutes:duration,isPublished:false,pdfOnly:isPdfOnly,sections})});
+    const created=await api.request('/canonical/exams',{method:'POST',body:JSON.stringify({title:$('examTitle').value.trim(),examCategoryId:Number($('examCategory').value),departmentId,classId,startAt:startAt.toISOString(),endAt:endAt.toISOString(),durationMinutes:duration,maxPdfFileSizeBytes:maxPdfSizeMb*1024*1024,isPublished:false,pdfOnly:isPdfOnly,sections})});
     pendingExamId=created.id;
    }
     if(file&&!pendingPdfUploaded){
