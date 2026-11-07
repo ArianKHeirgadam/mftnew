@@ -28,14 +28,15 @@ public sealed class AnswerKeyController(CanonicalAcademicDbContext db) : Control
         if (exam is null) return NotFound();
         var links = await GetExamQuestions(examId, ct);
         var rows = new List<object>();
-        foreach (var link in links)
+        for (var index = 0; index < links.Count; index++)
         {
+            var link = links[index];
             var question = await db.Questions.AsNoTracking().FirstOrDefaultAsync(x => x.Id == link.QuestionId, ct);
             if (question is null) continue;
             var options = await db.MultipleChoiceOptions.AsNoTracking()
                 .Where(x => x.QuestionId == question.Id).OrderBy(x => x.DisplayOrder)
                 .Select(x => new { x.Id, x.OptionText, x.IsCorrect, x.DisplayOrder }).ToListAsync(ct);
-            rows.Add(new { questionId = question.Id, questionNumber = link.DisplayOrder,
+            rows.Add(new { questionId = question.Id, questionNumber = index + 1,
                 question = question.Text, answer = options.Where(x => x.IsCorrect).Select(x => x.OptionText).ToList(),
                 options });
         }
@@ -120,7 +121,7 @@ public sealed class AnswerKeyController(CanonicalAcademicDbContext db) : Control
             .OrderBy(x => x.DisplayOrder).ToListAsync(ct);
         var types = await db.QuestionTypes.ToDictionaryAsync(x => x.Id, x => x.Code, ct);
         var byId = links.GroupBy(x => x.QuestionId).ToDictionary(x => x.Key, x => x.First());
-        var byNumber = links.GroupBy(x => x.DisplayOrder).ToDictionary(x => x.Key, x => x.First());
+        var byNumber = links.Select((link, index) => new { Number = index + 1, Link = link }).ToDictionary(x => x.Number, x => x.Link);
         var seen = new HashSet<long>();
         var updated = 0;
         var errors = new List<string>();
