@@ -23,7 +23,9 @@ public sealed class ExamFilesController(
     private bool CanManage(CanonicalExam exam) =>
         User.IsInRole("SuperAdmin") ||
         User.IsInRole("Department") && exam.DepartmentId == CurrentDepartmentId ||
-        User.IsInRole("Teacher") && exam.CreatedByUserId == CurrentUserId;
+        User.IsInRole("Teacher") && (exam.CreatedByUserId == CurrentUserId ||
+            (exam.ClassId.HasValue && academic.ClassTeachers.Any(x =>
+                x.ClassId == exam.ClassId.Value && x.TeacherUserId == CurrentUserId)));
 
     private async Task<(string Path, string Name)?> SaveFile(
         IFormFile? file, bool pdfOnly, CancellationToken ct)
