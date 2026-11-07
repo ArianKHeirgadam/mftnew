@@ -125,9 +125,19 @@ public sealed class CanonicalResultsController(
                 .Select(x => new { x.Score, x.Feedback, x.GradedAt, x.RowVersion })
                 .FirstOrDefaultAsync(ct)
             : null;
+        var essaySections = await academic.ExamSections.AsNoTracking()
+            .Where(x => x.ExamId == exam.Id && x.SectionType == "Essay")
+            .Select(x => new { x.Id, x.TotalPoints })
+            .ToListAsync(ct);
+        var gradedEssaySectionIds = await academic.ExamSectionManualGrades.AsNoTracking()
+            .Where(x => x.AttemptId == attemptId && essaySections.Select(s => s.Id).Contains(x.ExamSectionId))
+            .Select(x => x.ExamSectionId).ToListAsync(ct);
+        var pendingEssaySections = essaySections.Count(section => !gradedEssaySectionIds.Contains(section.Id));
         var student = await identity.Users.AsNoTracking().Where(x => x.Id == attempt.StudentUserId)
             .Select(x => new { x.FullName, x.Username }).FirstOrDefaultAsync(ct);
-        var maxScore = isPdfOnly ? 100m : answers.Sum(x => x.PointsOverride ?? x.Points);
+        var maxScore = isPdfOnly ? 100m :
+            answers.Sum(x => x.PointsOverride ?? x.Points) +
+            essaySections.Sum(section => section.TotalPoints ?? 100m);
         var payload = answers.Select(x => {
             var code = typeCodes.GetValueOrDefault(x.QuestionTypeId) ?? "Unknown";
             // Correct answers and matching keys are never included in student responses,
@@ -152,7 +162,8 @@ public sealed class CanonicalResultsController(
             };
         }).ToList();
         var hasAutoGradedAnswers = answers.Any(x => x.IsAutoGraded);
-        var pending = isPdfOnly ? (attempt.StatusId == 4 ? 0 : 1) : answers.Count(x => !x.IsAutoGraded && !x.Score.HasValue);
+        var pending = isPdfOnly ? (attempt.StatusId == 4 ? 0 : 1) :
+            answers.Count(x => !x.IsAutoGraded && !x.Score.HasValue) + pendingEssaySections;
         return Ok(new {
             id = attempt.Id, examId = exam.Id, exam = exam.Title, isPdfOnly, examPdfAvailable = hasExamPdf,
             studentName = student?.FullName, studentNumber = student?.Username,
@@ -171,7 +182,8 @@ public sealed class CanonicalResultsController(
                 : (isStudent && !exam.ResultsPublished ? null : attempt.AutoGradedScore),
             maxScore, pendingManualCount = pending,
             status = exam.ResultsPublished ? StatusCodeName(attempt.StatusId) : "AwaitingPublication",
-            resultsPublished = exam.ResultsPublished, answers = payload
+            resultsPublished = exam.ResultsPublished,
+            answers = isStudent ? payload.Where(x => x.isAutoGraded).ToList() : payload
         });
     }
 
@@ -259,32 +271,66 @@ public sealed class CanonicalResultsController(
         var exam = await academic.Exams.FirstOrDefaultAsync(x => x.Id == examId, ct);
         if (exam is null) return NotFound();
         if (!await CanManage(exam, ct)) return Forbid();
+
         var attempts = await academic.ExamAttempts.Where(x => x.ExamId == examId).ToListAsync(ct);
+        if (attempts.Any(x => x.StatusId == 1))
+            return BadRequest(new { message = "هنوز دانشجویی در حال برگزاری این آزمون است." });
+
+        var attemptIds = attempts.Select(x => x.Id).ToArray();
+        var answers = await academic.StudentAnswers
+            .Where(x => attemptIds.Contains(x.ExamAttemptId)).ToListAsync(ct);
+        if (answers.Any(x => !x.IsAutoGraded && !x.Score.HasValue))
+            return BadRequest(new { message = "هنوز پاسخ تشریحی متنی تصحیح‌نشده وجود دارد." });
+
         var hasExamSections = await academic.ExamSections.AnyAsync(x => x.ExamId == examId, ct);
         var hasExamPaper = await academic.ExamDocuments.AnyAsync(x => x.ExamId == examId, ct);
-        var attemptIdsForPdf = attempts.Select(x => x.Id).ToArray();
-        var hasSubmittedPdf = attemptIdsForPdf.Length > 0 &&
-            await academic.ExamSubmissionDocuments.AnyAsync(x => attemptIdsForPdf.Contains(x.AttemptId), ct);
+        var hasSubmittedPdf = attemptIds.Length > 0 &&
+            await academic.ExamSubmissionDocuments.AnyAsync(x => attemptIds.Contains(x.AttemptId), ct);
         var isPdfOnly = !hasExamSections && (hasExamPaper || hasSubmittedPdf);
-        if (isPdfOnly && attempts.Any(x => x.StatusId != 4))
-            return BadRequest(new { message = "برای انتشار نتایج آزمون PDFمحور، باید فایل تمام دانشجویان تصحیح و نمره‌گذاری شده باشد." });
-        if (attempts.Any(x => x.StatusId == 1))
-            return BadRequest(new { message = "هنوز دانشجویی در حال برگزاری آزمون است." });
-        var attemptIds = attempts.Select(x => x.Id).ToArray();
-        var answers = await academic.StudentAnswers.Where(x => attemptIds.Contains(x.ExamAttemptId)).ToListAsync(ct);
-        if (answers.Any(x => !x.IsAutoGraded && !x.Score.HasValue))
-            return BadRequest(new { message = "هنوز پاسخ تشریحی تصحیح‌نشده وجود دارد." });
-        var fully = await academic.ExamAttemptStatuses.SingleAsync(x => x.Id == 4 && x.Code == "FullyGraded", ct);
-        if (!isPdfOnly)
+
+        if (isPdfOnly)
         {
+            if (attempts.Any(x => x.StatusId != 4 || !x.FinalScore.HasValue))
+                return BadRequest(new { message = "برای انتشار نتایج آزمون PDFمحور، باید پاسخ تمام دانشجویان تصحیح و نمره‌گذاری شده باشد." });
+        }
+        else
+        {
+            var essaySectionIds = await academic.ExamSections.AsNoTracking()
+                .Where(x => x.ExamId == examId && x.SectionType == "Essay")
+                .Select(x => x.Id).ToArrayAsync(ct);
+            var sectionGrades = await academic.ExamSectionManualGrades.AsNoTracking()
+                .Where(x => attemptIds.Contains(x.AttemptId) && essaySectionIds.Contains(x.ExamSectionId))
+                .Select(x => new { x.AttemptId, x.ExamSectionId, x.Score })
+                .ToListAsync(ct);
+
             foreach (var attempt in attempts)
             {
+                var gradedIds = sectionGrades.Where(x => x.AttemptId == attempt.Id)
+                    .Select(x => x.ExamSectionId).ToHashSet();
+                var missingSections = essaySectionIds.Where(id => !gradedIds.Contains(id)).ToArray();
+                if (missingSections.Length > 0)
+                    return BadRequest(new {
+                        message = "تا وقتی تمام بخش‌های PDF تشریحی این دانشجو تصحیح نشده‌اند، امکان انتشار نتایج وجود ندارد.",
+                        attemptId = attempt.Id,
+                        missingSectionIds = missingSections
+                    });
+
                 var attemptAnswers = answers.Where(x => x.ExamAttemptId == attempt.Id).ToList();
-                attempt.AutoGradedScore = attemptAnswers.Where(x => x.IsAutoGraded).Sum(x => x.Score ?? 0m);
-                attempt.FinalScore = attemptAnswers.Sum(x => x.Score ?? 0m);
-                attempt.StatusId = fully.Id;
+                var autoScore = attemptAnswers.Where(x => x.IsAutoGraded).Sum(x => x.Score ?? 0m);
+                var manuallyGradedQuestionScore = attemptAnswers
+                    .Where(x => !x.IsAutoGraded).Sum(x => x.Score ?? 0m);
+                var manuallyGradedSectionScore = sectionGrades
+                    .Where(x => x.AttemptId == attempt.Id).Sum(x => x.Score);
+                attempt.AutoGradedScore = decimal.Round(autoScore, 2, MidpointRounding.AwayFromZero);
+                attempt.ManualGradedScore = decimal.Round(
+                    manuallyGradedQuestionScore + manuallyGradedSectionScore, 2, MidpointRounding.AwayFromZero);
+                attempt.FinalScore = decimal.Round(
+                    attempt.AutoGradedScore.Value + attempt.ManualGradedScore.Value, 2, MidpointRounding.AwayFromZero);
+                attempt.GradingStatus = "Final";
+                attempt.StatusId = 4;
             }
         }
+
         exam.ResultsPublished = true;
         exam.IsPublished = false;
         exam.ResultsPublishedAt = DateTime.UtcNow;
