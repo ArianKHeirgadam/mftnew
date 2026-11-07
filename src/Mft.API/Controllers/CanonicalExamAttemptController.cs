@@ -157,8 +157,6 @@ public sealed class CanonicalExamAttemptController(
         var hasExamPdfForSubmission = await academic.ExamDocuments.AnyAsync(x => x.ExamId == examId, ct);
         var hasSubmissionPdfForExam = await academic.ExamSubmissionDocuments.AnyAsync(x => x.AttemptId == attemptId, ct);
         var hasEssayQuestions = examQuestions.Any(q => string.Equals(q.TypeCode, "Essay", StringComparison.OrdinalIgnoreCase));
-        if (examQuestions.Count > 0 && (hasExamPdfForSubmission || hasEssayQuestions) && !hasSubmissionPdfForExam && !request.AutoSubmit)
-            return BadRequest(new { message = "برای پاسخ به سؤال تشریحی، بارگذاری فایل PDF پاسخ‌نامه الزامی است." });
         if (examQuestions.Count == 0)
         {
             if (!hasExamPdfForSubmission) return Conflict(new { message = "فایل PDF صورت آزمون موجود نیست." });
@@ -228,8 +226,6 @@ public sealed class CanonicalExamAttemptController(
             {
                 if (answer.Value.ValueKind != JsonValueKind.Object)
                     return BadRequest(new { message = "ساختار پاسخ سؤال تشریحی معتبر نیست." });
-                if (!hasSubmissionPdfForExam && !request.AutoSubmit)
-                    return BadRequest(new { message = "برای پاسخ به سؤال تشریحی، ابتدا فایل PDF پاسخ‌نامه را بارگذاری کنید." });
                 pendingManual = true;
             }
             else return BadRequest(new { message = "نوع سؤال پشتیبانی نمی‌شود." });
