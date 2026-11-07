@@ -112,9 +112,9 @@
       const rows = await request(`/users?role=Student${search ? `&search=${encodeURIComponent(search)}` : ''}`);
       renderRows('#studentsBody', rows, row => `<tr>
         <td>${escapeHtml(row.fullName)}</td><td>${escapeHtml(row.username)}</td><td>${escapeHtml(row.department || '—')}</td>
-        <td>—</td><td>—</td><td>${row.isActive ? 'فعال' : 'غیرفعال'}</td>
+        <td>${row.isActive ? 'فعال' : 'غیرفعال'}</td>
         <td><button class="btn btn-sm" data-user-edit="${row.id}" data-user-role="Student">ویرایش</button>
-        <button class="btn btn-sm btn-danger" data-user-delete="${row.id}">حذف</button></td></tr>`, 7);
+        <button class="btn btn-sm btn-danger" data-user-delete="${row.id}">حذف</button></td></tr>`, 5);
     }
 
     if (teacherBody && document.body.dataset.active === 'teachers') {
@@ -122,9 +122,9 @@
       const cards = $('#cardView');
       if (cards) cards.innerHTML = rows.length ? rows.map(row => `<div class="card teacher-card"><div class="mohr"><div class="mohr-inner"><b>${escapeHtml(row.fullName.slice(0, 2))}</b></div></div><h4>${escapeHtml(row.fullName)}</h4><div class="spec">${escapeHtml(row.department || 'بدون دپارتمان')}</div><span class="badge ${row.isActive ? 'badge-ok' : 'badge-muted'}">${row.isActive ? 'فعال' : 'غیرفعال'}</span><div class="flex gap-8 mt-16" style="justify-content:center"><button class="btn btn-outline btn-sm" data-user-edit="${row.id}" data-user-role="Teacher">ویرایش</button><button class="btn btn-danger btn-sm" data-user-delete="${row.id}">حذف</button></div></div>`).join('') : '<p class="text-soft">استادی ثبت نشده است.</p>';
       renderRows('body[data-active="teachers"] table tbody', rows, row => `<tr>
-        <td>${escapeHtml(row.fullName)}</td><td>${escapeHtml(row.department || '—')}</td><td>—</td><td>—</td>
+        <td>${escapeHtml(row.fullName)}</td><td>${escapeHtml(row.department || '—')}</td>
         <td>${row.isActive ? 'فعال' : 'غیرفعال'}</td><td><button class="btn btn-sm" data-user-edit="${row.id}" data-user-role="Teacher">ویرایش</button>
-        <button class="btn btn-sm btn-danger" data-user-delete="${row.id}">حذف</button></td></tr>`, 6);
+        <button class="btn btn-sm btn-danger" data-user-delete="${row.id}">حذف</button></td></tr>`, 4);
     }
   }
 
