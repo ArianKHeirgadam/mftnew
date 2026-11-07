@@ -1,4 +1,8 @@
 using System.Globalization;
+using System.IO.Compression;
+using System.Text.RegularExpressions;
+using System.Xml;
+using System.Xml.Linq;
 using System.Security.Claims;
 using System.Text;
 using ClosedXML.Excel;
@@ -51,6 +55,58 @@ public sealed class QuestionImportController(
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
             return BadRequest(new { message = "خواندن فایل ناموفق بود. قالب فایل را بررسی کنید.", detail = ex.Message });
+        }
+    }
+
+
+    [HttpPost("preview/word")]
+    [RequestSizeLimit(MaxFileBytes)]
+    public async Task<IActionResult> PreviewWord(
+        [FromForm] IFormFile? file,
+        [FromForm] string? category,
+        [FromForm] string? skill,
+        [FromForm] string? difficulty,
+        [FromForm] decimal? points,
+        CancellationToken ct)
+    {
+        if (file is null || file.Length == 0)
+            return BadRequest(new { message = "فایل Word انتخاب نشده یا خالی است." });
+        if (file.Length > MaxFileBytes)
+            return BadRequest(new { message = "حداکثر حجم فایل ۵ مگابایت است." });
+        if (!Path.GetExtension(file.FileName).Equals(".docx", StringComparison.OrdinalIgnoreCase))
+            return BadRequest(new { message = "فقط فایل Word با پسوند .docx پذیرفته می‌شود؛ فایل‌های .doc پشتیبانی نمی‌شوند." });
+        if (string.IsNullOrWhiteSpace(category) || string.IsNullOrWhiteSpace(skill))
+            return BadRequest(new { message = "دسته‌بندی و مهارت را برای تمام سؤال‌های فایل Word مشخص کنید." });
+
+        try
+        {
+            await using var stream = file.OpenReadStream();
+            using var archive = new ZipArchive(stream, ZipArchiveMode.Read, leaveOpen: true);
+            var documentEntry = archive.GetEntry("word/document.xml");
+            if (documentEntry is null || documentEntry.Length == 0 || documentEntry.Length > 20 * 1024 * 1024)
+                return BadRequest(new { message = "ساختار فایل Word معتبر نیست یا محتوای آن بیش از حد بزرگ است." });
+
+            XDocument document;
+            await using (var documentStream = documentEntry.Open())
+            using (var reader = XmlReader.Create(documentStream, new XmlReaderSettings
+            {
+                DtdProcessing = DtdProcessing.Prohibit,
+                XmlResolver = null,
+                MaxCharactersInDocument = 20 * 1024 * 1024
+            }))
+            {
+                document = XDocument.Load(reader);
+            }
+
+            var paragraphs = ReadWordParagraphs(document);
+            var rows = ParseWordQuestions(paragraphs, category.Trim(), skill.Trim(),
+                string.IsNullOrWhiteSpace(difficulty) ? "Medium" : difficulty.Trim(),
+                points.GetValueOrDefault(1));
+            return await BuildPreview(rows, ct);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            return BadRequest(new { message = "خواندن فایل Word ناموفق بود. ساختار سند را بررسی کنید.", detail = ex.Message });
         }
     }
 
@@ -300,6 +356,89 @@ public sealed class QuestionImportController(
         if (preview is null) return;
         preview.Errors.Add(message);
         result.Errors.Add(new { rowNumber, Errors = new[] { message } });
+    }
+
+
+    private static List<string> ReadWordParagraphs(XDocument document)
+    {
+        XNamespace word = "http://schemas.openxmlformats.org/wordprocessingml/2006/main";
+        return document.Descendants(word + "p")
+            .Select(paragraph => string.Concat(paragraph.Descendants()
+                .Where(element => element.Name == word + "t" || element.Name == word + "tab" || element.Name == word + "br")
+                .Select(element => element.Name == word + "tab" ? " " : element.Name == word + "br" ? "\\n" : element.Value)))
+            .Select(value => value.Trim())
+            .Where(value => value.Length > 0)
+            .ToList();
+    }
+
+    private static List<ImportQuestionRow> ParseWordQuestions(
+        IReadOnlyList<string> paragraphs, string category, string skill, string difficulty, decimal points)
+    {
+        var rows = new List<ImportQuestionRow>();
+        ImportQuestionRow? current = null;
+        var correctCount = 0;
+
+        void FinishCurrent()
+        {
+            if (current is null) return;
+            if (correctCount != 1) current.CorrectOption = null;
+            rows.Add(current);
+            current = null;
+            correctCount = 0;
+        }
+
+        foreach (var rawParagraph in paragraphs)
+        {
+            foreach (var rawLine in rawParagraph.Split(new[] { '\\r', '\\n' }, StringSplitOptions.RemoveEmptyEntries))
+            {
+                var line = rawLine.Trim();
+                if (line.Length == 0) continue;
+
+                var questionMatch = Regex.Match(line, @"^\\s*[0-9۰-۹٠-٩]+\\s*[.٫)\\-ـ:]\\s*(.+?)\\s*$");
+                if (questionMatch.Success)
+                {
+                    FinishCurrent();
+                    current = new ImportQuestionRow
+                    {
+                        RowNumber = rows.Count + 1,
+                        Category = category,
+                        Skill = skill,
+                        Type = "MultipleChoice",
+                        Text = questionMatch.Groups[1].Value.Trim(),
+                        Points = points,
+                        Difficulty = difficulty
+                    };
+                    continue;
+                }
+
+                if (current is null) continue;
+
+                var isCorrect = Regex.IsMatch(line, @"\\(\\s*صحیح\\s*\\)\\s*$", RegexOptions.IgnoreCase);
+                if (isCorrect)
+                {
+                    line = Regex.Replace(line, @"\\s*\\(\\s*صحیح\\s*\\)\\s*$", "").Trim();
+                    correctCount++;
+                }
+
+                // Optional label support: "گزینه یک: متن گزینه". If no colon exists,
+                // the whole line is treated as the option text (e.g. "گزینه یک").
+                line = Regex.Replace(line,
+                    @"^گزینه\\s*(?:یک|اول|دوم|سوم|چهارم|1|2|3|4|۱|۲|۳|۴)\\s*[:：]\\s*",
+                    "", RegexOptions.IgnoreCase).Trim();
+
+                if (line.Length > 0)
+                {
+                    current.Options.Add(line);
+                    if (isCorrect && correctCount == 1)
+                        current.CorrectOption = current.Options.Count;
+                    else if (isCorrect)
+                        current.CorrectOption = 0;
+                }
+            }
+        }
+
+        FinishCurrent();
+        return rows;
     }
 
     private static List<ImportQuestionRow> ReadWorksheet(IXLWorksheet sheet)
