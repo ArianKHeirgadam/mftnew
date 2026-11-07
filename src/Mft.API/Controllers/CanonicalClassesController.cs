@@ -154,6 +154,8 @@ public sealed class CanonicalClassesController(
 
         var studentIds = request.StudentIds ?? new List<long>();
         var teacherIds = request.TeacherIds ?? new List<long>();
+        if (classInfo.Capacity.HasValue && studentIds.Count > classInfo.Capacity.Value)
+            return BadRequest(new { message = "تعداد دانشجویان انتخاب‌شده از ظرفیت تعریف‌شده کلاس بیشتر است." });
         if (studentIds.Count > 2000 || studentIds.Any(x => x <= 0) || studentIds.Distinct().Count() != studentIds.Count)
             return BadRequest(new { message = "فهرست دانشجویان نامعتبر یا دارای شناسه تکراری است." });
         if (teacherIds.Count > 500 || teacherIds.Any(x => x <= 0) || teacherIds.Distinct().Count() != teacherIds.Count)
@@ -247,6 +249,8 @@ public sealed class CanonicalClassesController(
         if (!CanManageDepartment(entity.DepartmentId)) return Forbid();
 
         var studentIds = request.StudentIds ?? new List<long>();
+        if (entity.Capacity.HasValue && studentIds.Count > entity.Capacity.Value)
+            return BadRequest(new { message = "تعداد دانشجویان انتخاب‌شده از ظرفیت تعریف‌شده کلاس بیشتر است." });
         if (studentIds.Count > 2000 || studentIds.Any(x => x <= 0) ||
             studentIds.Distinct().Count() != studentIds.Count)
             return BadRequest(new { message = "فهرست اعضای کلاس نامعتبر یا دارای شناسه تکراری است." });
