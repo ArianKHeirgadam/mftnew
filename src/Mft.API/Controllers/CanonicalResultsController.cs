@@ -95,7 +95,13 @@ public sealed class CanonicalResultsController(
             .OrderBy(x => x.DisplayOrder).ToListAsync(ct);
         var matching = await academic.MatchingPairs.AsNoTracking().Where(x => questionIds.Contains(x.QuestionId))
             .OrderBy(x => x.DisplayOrder).ToListAsync(ct);
-        var maxScore = answers.Sum(x => x.PointsOverride ?? x.Points);
+        var isPdfOnly = answers.Count == 0 && !await academic.ExamSections.AnyAsync(x => x.ExamId == exam.Id, ct) &&
+            await academic.ExamDocuments.AnyAsync(x => x.ExamId == exam.Id, ct);
+        var submissionDocument = isPdfOnly
+            ? await academic.ExamSubmissionDocuments.AsNoTracking().Where(x => x.AttemptId == attemptId)
+                .Select(x => new { x.OriginalFileName, x.FileSize, x.UploadedAt }).FirstOrDefaultAsync(ct)
+            : null;
+        var maxScore = isPdfOnly ? 100m : answers.Sum(x => x.PointsOverride ?? x.Points);
         var payload = answers.Select(x => {
             var code = typeCodes.GetValueOrDefault(x.QuestionTypeId) ?? "Unknown";
             var reveal = !isStudent || exam.ResultsPublished;
@@ -116,9 +122,10 @@ public sealed class CanonicalResultsController(
                 gradedAt = x.GradedAt
             };
         }).ToList();
-        var pending = answers.Count(x => !x.IsAutoGraded && !x.Score.HasValue);
+        var pending = isPdfOnly ? (attempt.StatusId == 4 ? 0 : 1) : answers.Count(x => !x.IsAutoGraded && !x.Score.HasValue);
         return Ok(new {
-            id = attempt.Id, examId = exam.Id, exam = exam.Title,
+            id = attempt.Id, examId = exam.Id, exam = exam.Title, isPdfOnly,
+            submissionPdf = submissionDocument,
             score = isPdfOnly ? (isStudent && !exam.ResultsPublished ? null : attempt.FinalScore) : (exam.ResultsPublished ? attempt.FinalScore : null),
             autoScore = isStudent && !exam.ResultsPublished ? null : attempt.AutoGradedScore,
             maxScore, pendingManualCount = pending,
@@ -175,6 +182,31 @@ public sealed class CanonicalResultsController(
             status = StatusCodeName(attempt.StatusId) });
     }
 
+    [HttpPut("{attemptId:long}/pdf-grade")]
+    [Authorize(Policy = "TeacherOrAbove")]
+    public async Task<IActionResult> GradePdfAttempt(long attemptId, [FromBody] CanonicalManualGradeRequest request, CancellationToken ct)
+    {
+        if (request.Score < 0 || request.Score > 100) return BadRequest(new { message = "نمره آزمون PDFمحور باید بین ۰ تا ۱۰۰ باشد." });
+        var attempt = await academic.ExamAttempts.FirstOrDefaultAsync(x => x.Id == attemptId, ct);
+        if (attempt is null) return NotFound();
+        var exam = await academic.Exams.FirstOrDefaultAsync(x => x.Id == attempt.ExamId, ct);
+        if (exam is null) return NotFound();
+        if (!CanManage(exam)) return Forbid();
+        if (exam.ResultsPublished) return Conflict(new { message = "برای تغییر نمره، ابتدا انتشار نتایج را لغو کنید." });
+        if (attempt.StatusId == 1) return BadRequest(new { message = "دانشجو هنوز آزمون را ثبت نهایی نکرده است." });
+        var isPdfOnly = !await academic.ExamSections.AnyAsync(x => x.ExamId == exam.Id, ct) &&
+            await academic.ExamDocuments.AnyAsync(x => x.ExamId == exam.Id, ct);
+        if (!isPdfOnly) return BadRequest(new { message = "این تلاش متعلق به آزمون PDFمحور نیست." });
+        if (!await academic.ExamSubmissionDocuments.AnyAsync(x => x.AttemptId == attemptId, ct))
+            return BadRequest(new { message = "فایل پاسخ دانشجو ثبت نشده است." });
+        var fully = await academic.ExamAttemptStatuses.SingleAsync(x => x.Id == 4 && x.Code == "FullyGraded", ct);
+        attempt.AutoGradedScore = 0m;
+        attempt.FinalScore = request.Score;
+        attempt.StatusId = fully.Id;
+        await academic.SaveChangesAsync(ct);
+        return Ok(new { attemptId, awardedScore = attempt.FinalScore, maxScore = 100m, status = StatusCodeName(attempt.StatusId) });
+    }
+
     [HttpPost("exams/{examId:long}/publish")]
     [Authorize(Policy = "TeacherOrAbove")]
     public async Task<IActionResult> Publish(long examId, CancellationToken ct)
@@ -183,6 +215,10 @@ public sealed class CanonicalResultsController(
         if (exam is null) return NotFound();
         if (!CanManage(exam)) return Forbid();
         var attempts = await academic.ExamAttempts.Where(x => x.ExamId == examId).ToListAsync(ct);
+        var isPdfOnly = !await academic.ExamSections.AnyAsync(x => x.ExamId == examId, ct) &&
+            await academic.ExamDocuments.AnyAsync(x => x.ExamId == examId, ct);
+        if (isPdfOnly && attempts.Any(x => x.StatusId != 4))
+            return BadRequest(new { message = "برای انتشار نتایج آزمون PDFمحور، باید فایل تمام دانشجویان تصحیح و نمره‌گذاری شده باشد." });
         if (attempts.Any(x => x.StatusId == 1))
             return BadRequest(new { message = "هنوز دانشجویی در حال برگزاری آزمون است." });
         var attemptIds = attempts.Select(x => x.Id).ToArray();
@@ -190,12 +226,15 @@ public sealed class CanonicalResultsController(
         if (answers.Any(x => !x.IsAutoGraded && !x.Score.HasValue))
             return BadRequest(new { message = "هنوز پاسخ تشریحی تصحیح‌نشده وجود دارد." });
         var fully = await academic.ExamAttemptStatuses.SingleAsync(x => x.Id == 4 && x.Code == "FullyGraded", ct);
-        foreach (var attempt in attempts)
+        if (!isPdfOnly)
         {
-            var attemptAnswers = answers.Where(x => x.ExamAttemptId == attempt.Id).ToList();
-            attempt.AutoGradedScore = attemptAnswers.Where(x => x.IsAutoGraded).Sum(x => x.Score ?? 0m);
-            attempt.FinalScore = attemptAnswers.Sum(x => x.Score ?? 0m);
-            attempt.StatusId = fully.Id;
+            foreach (var attempt in attempts)
+            {
+                var attemptAnswers = answers.Where(x => x.ExamAttemptId == attempt.Id).ToList();
+                attempt.AutoGradedScore = attemptAnswers.Where(x => x.IsAutoGraded).Sum(x => x.Score ?? 0m);
+                attempt.FinalScore = attemptAnswers.Sum(x => x.Score ?? 0m);
+                attempt.StatusId = fully.Id;
+            }
         }
         exam.ResultsPublished = true;
         exam.IsPublished = false;
