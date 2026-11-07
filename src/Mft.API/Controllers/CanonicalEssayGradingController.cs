@@ -59,6 +59,14 @@ public sealed class CanonicalEssayGradingController(
                 attempt.SubmittedAt,
                 attempt.AutoGradedScore,
                 attempt.ManualReviewRequired,
+                IsPdfOnly = !academic.ExamSections.Any(section => section.ExamId == attempt.ExamId),
+                PdfAnswerFileName = academic.ExamSubmissionDocuments
+                    .Where(document => document.AttemptId == attempt.Id)
+                    .Select(document => document.OriginalFileName).FirstOrDefault(),
+                PdfGrade = academic.ExamAttemptManualGrades
+                    .Where(grade => grade.AttemptId == attempt.Id)
+                    .Select(grade => new { grade.Score, grade.Feedback, grade.GradedAt, grade.RowVersion })
+                    .FirstOrDefault(),
                 Sections = academic.ExamSections
                     .Where(section => section.ExamId == attempt.ExamId &&
                         section.SectionType == "Essay")
@@ -95,6 +103,10 @@ public sealed class CanonicalEssayGradingController(
             row.SubmittedAt,
             row.AutoGradedScore,
             row.ManualReviewRequired,
+            row.IsPdfOnly,
+            row.PdfAnswerFileName,
+            HasPdfAnswer = row.PdfAnswerFileName is not null,
+            row.PdfGrade,
             Student = students.GetValueOrDefault(row.StudentUserId) ?? "دانشجوی نامشخص",
             Sections = row.Sections.Select(section => new
             {
@@ -296,6 +308,120 @@ public sealed class CanonicalEssayGradingController(
             gradingStatus = attempt.GradingStatus,
             rowVersion = Convert.ToBase64String(grade.RowVersion)
         });
+    }
+
+    [HttpGet("attempts/{attemptId:long}/pdf-answer")]
+    public async Task<IActionResult> DownloadPdfOnlyAnswer(long attemptId, CancellationToken ct)
+    {
+        var attempt = await LoadAuthorizedPdfOnlyAttempt(attemptId, ct);
+        if (attempt is null) return NotFound();
+        var document = await academic.ExamSubmissionDocuments.AsNoTracking()
+            .FirstOrDefaultAsync(item => item.AttemptId == attemptId, ct);
+        if (document is null) return NotFound();
+        var storedName = document.StoredFileName;
+        if (Path.GetFileName(storedName) != storedName ||
+            !Path.GetExtension(storedName).Equals(".pdf", StringComparison.OrdinalIgnoreCase))
+            return NotFound();
+        var path = Path.Combine(StorageDirectory, storedName);
+        if (!System.IO.File.Exists(path)) return NotFound();
+        Response.Headers["X-Content-Type-Options"] = "nosniff";
+        return PhysicalFile(path, "application/pdf", document.OriginalFileName, enableRangeProcessing: true);
+    }
+
+    [HttpGet("attempts/{attemptId:long}/pdf-history")]
+    public async Task<IActionResult> PdfOnlyHistory(long attemptId, CancellationToken ct)
+    {
+        if (await LoadAuthorizedPdfOnlyAttempt(attemptId, ct) is null) return NotFound();
+        var history = await academic.ExamAttemptManualGradeHistory.AsNoTracking()
+            .Where(item => item.AttemptId == attemptId)
+            .OrderByDescending(item => item.ChangedAt)
+            .Select(item => new { item.Id, item.PreviousScore, item.NewScore, item.PreviousFeedback,
+                item.NewFeedback, item.ChangedByUserId, item.ChangedAt })
+            .ToListAsync(ct);
+        return Ok(history);
+    }
+
+    [HttpPut("attempts/{attemptId:long}/pdf-grade")]
+    public async Task<IActionResult> GradePdfOnly(long attemptId, CanonicalEssayGradeRequest request, CancellationToken ct)
+    {
+        var attempt = await LoadAuthorizedPdfOnlyAttempt(attemptId, ct);
+        if (attempt is null) return NotFound();
+        if (attempt.StatusId == 1 || attempt.SubmittedAt is null)
+            return Conflict(new { message = "فقط پاسخنامه ثبت‌شده قابل تصحیح است." });
+        if (request.Score < 0m || request.Score > 100m)
+            return BadRequest(new { message = "نمره آزمون PDF-only باید بین صفر و ۱۰۰ باشد.", maxScore = 100m });
+        var feedback = request.Feedback?.Trim();
+        if (feedback?.Length > 2000)
+            return BadRequest(new { message = "بازخورد نمی‌تواند بیشتر از ۲۰۰۰ کاراکتر باشد." });
+
+        var grade = await academic.ExamAttemptManualGrades
+            .FirstOrDefaultAsync(item => item.AttemptId == attemptId, ct);
+        var previousScore = grade?.Score;
+        var previousFeedback = grade?.Feedback;
+        if (grade is null)
+        {
+            grade = new CanonicalExamAttemptManualGrade {
+                AttemptId = attemptId, Score = request.Score, Feedback = feedback,
+                GradedByUserId = TeacherId!.Value, GradedAt = DateTime.UtcNow
+            };
+            academic.ExamAttemptManualGrades.Add(grade);
+        }
+        else
+        {
+            if (string.IsNullOrWhiteSpace(request.RowVersion))
+                return BadRequest(new { message = "برای ویرایش نمره، نسخه قبلی رکورد الزامی است." });
+            byte[] expected;
+            try { expected = Convert.FromBase64String(request.RowVersion); }
+            catch (FormatException) { return BadRequest(new { message = "RowVersion معتبر نیست." }); }
+            academic.Entry(grade).Property(item => item.RowVersion).OriginalValue = expected;
+            grade.Score = request.Score;
+            grade.Feedback = feedback;
+            grade.GradedByUserId = TeacherId!.Value;
+            grade.GradedAt = DateTime.UtcNow;
+        }
+
+        academic.ExamAttemptManualGradeHistory.Add(new CanonicalExamAttemptManualGradeHistory {
+            ManualGrade = grade, AttemptId = attemptId, PreviousScore = previousScore,
+            NewScore = request.Score, PreviousFeedback = previousFeedback, NewFeedback = feedback,
+            ChangedByUserId = TeacherId!.Value, ChangedAt = DateTime.UtcNow
+        });
+
+        var finalStatus = await academic.ExamAttemptStatuses.AsNoTracking()
+            .SingleOrDefaultAsync(item => item.Id == 4 && item.Code == "FullyGraded", ct);
+        if (finalStatus is null)
+            return Conflict(new { message = "وضعیت FullyGraded در جدول ExamAttemptStatuses تعریف نشده است." });
+        attempt.ManualGradedScore = decimal.Round(request.Score, 2, MidpointRounding.AwayFromZero);
+        attempt.FinalScore = attempt.ManualGradedScore;
+        attempt.GradingStatus = "Final";
+        attempt.StatusId = finalStatus.Id;
+
+        try
+        {
+            await using var transaction = await academic.Database.BeginTransactionAsync(ct);
+            await academic.SaveChangesAsync(ct);
+            await transaction.CommitAsync(ct);
+        }
+        catch (DbUpdateConcurrencyException)
+        {
+            return Conflict(new { message = "این پاسخنامه هم‌زمان توسط استاد دیگری تغییر کرده است؛ صف را تازه‌سازی کنید." });
+        }
+        catch (DbUpdateException)
+        {
+            return Conflict(new { message = "ثبت نمره هم‌زمان انجام شده است؛ صف را تازه‌سازی و دوباره بررسی کنید." });
+        }
+        return Ok(new { attemptId, score = request.Score, maxScore = 100m, finalScore = attempt.FinalScore,
+            gradingStatus = attempt.GradingStatus, rowVersion = Convert.ToBase64String(grade.RowVersion) });
+    }
+
+    private async Task<CanonicalExamAttempt?> LoadAuthorizedPdfOnlyAttempt(long attemptId, CancellationToken ct)
+    {
+        if (TeacherId is null) return null;
+        var attempt = await academic.ExamAttempts.FirstOrDefaultAsync(item => item.Id == attemptId, ct);
+        if (attempt is null || !attempt.ManualReviewRequired.HasValue) return null;
+        if (await academic.ExamSections.AnyAsync(section => section.ExamId == attempt.ExamId, ct)) return null;
+        var exam = await academic.Exams.AsNoTracking().FirstOrDefaultAsync(item => item.Id == attempt.ExamId, ct);
+        if (exam is null || !await CanAccessExam(exam, ct)) return null;
+        return attempt;
     }
 
     private async Task<(CanonicalExamAttempt Attempt, CanonicalExamSection Section)?> LoadAuthorizedSection(
