@@ -8,6 +8,11 @@
 <link rel="stylesheet" href="assets/css/responsive.css">
 <link rel="stylesheet" href="assets/css/dark.css">
 <style>
+  .question-folder-toolbar{display:flex;gap:10px;align-items:end;flex-wrap:wrap}
+  .question-folder-toolbar .field{margin:0;min-width:180px;flex:1}
+  .question-folder-list{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:10px;margin-top:14px}
+  .question-folder-card{border:1px solid var(--border);border-radius:12px;padding:12px;background:var(--surface);display:grid;gap:8px}
+  .question-folder-card small{color:var(--text-muted)}
   .taxonomy-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px;align-items:stretch}
   .import-folder-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:12px}
   .import-folder-card{border:1px solid var(--border);border-radius:12px;padding:16px;background:var(--surface);display:flex;flex-direction:column;gap:10px;min-width:0}
@@ -65,6 +70,20 @@
         </div>
       </section>
 
+      <section class="card card-pad" id="questionOrganizationPanel" style="margin-bottom:18px">
+        <div class="flex justify-between items-center gap-8" style="flex-wrap:wrap;margin-bottom:12px">
+          <div><h3>پوشه‌بندی و مرتب‌سازی سؤالات</h3><p class="text-soft text-sm mt-8">پوشه‌های مستقل از آزمون بسازید؛ حذف آزمون باعث حذف سؤال‌های بانک نمی‌شود.</p></div>
+          <span class="badge badge-muted" id="questionFolderCount">۰ پوشه</span>
+        </div>
+        <div class="question-folder-toolbar">
+          <div class="field"><label for="newQuestionFolderName">نام پوشه جدید</label><input class="input" id="newQuestionFolderName" maxlength="150" placeholder="مثلاً سطح B1"></div>
+          <div class="field"><label for="newQuestionFolderParent">پوشه والد (اختیاری)</label><select class="select" id="newQuestionFolderParent"><option value="">پوشه اصلی</option></select></div>
+          <button class="btn btn-primary" id="createQuestionFolder" type="button">ایجاد پوشه</button>
+          <button class="btn btn-outline" id="showDuplicateQuestions" type="button">بررسی سؤال‌های تکراری</button>
+        </div>
+        <div class="question-folder-list" id="questionFolderList"><div class="question-empty">در حال دریافت پوشه‌ها...</div></div>
+        <p class="text-soft text-sm mt-12" id="duplicateQuestionSummary" aria-live="polite"></p>
+      </section>
       <section class="card card-pad" id="importFoldersPanel" style="margin-bottom:18px">
         <div class="flex justify-between items-center gap-8" style="flex-wrap:wrap;margin-bottom:14px">
           <div><h3 id="importFoldersTitle">پوشه‌های ورود گروهی</h3><p class="text-soft text-sm mt-8">سؤال‌های هر نوبت ورود گروهی بر اساس عنوان آزمون مرتب شده‌اند.</p></div>
@@ -89,8 +108,8 @@
         <div id="tabAll" class="tab-panel active">
           <div class="table-wrap">
             <table class="dt">
-              <thead><tr><th>متن سوال</th><th>دسته‌بندی</th><th>نوع</th><th>سطح دشواری</th><th>عملیات</th></tr></thead>
-              <tbody id="questionRows"><tr><td colspan="5" style="text-align:center;padding:24px">در حال دریافت سؤال‌ها...</td></tr></tbody>
+              <thead><tr><th>انتخاب</th><th>متن سوال</th><th>دسته‌بندی</th><th>نوع</th><th>سطح دشواری</th><th>عملیات</th></tr></thead>
+              <tbody id="questionRows"><tr><td colspan="6" style="text-align:center;padding:24px">در حال دریافت سؤال‌ها...</td></tr></tbody>
             </table>
           </div>
           <div class="pagination"><button>«</button><button class="active">۱</button><button>۲</button><button>۳</button><button>»</button></div>
@@ -157,25 +176,32 @@
   const term=(searchField?.value||'').trim().toLocaleLowerCase();
   const category=categoryFilter?.value||'';
   const difficulty=difficultyFilter?.value||'';
-  const rows=questionRows.filter(q=>(!q.importBatchId||String(q.id)===editQuestionId)&&(!term||String(q.text||'').toLocaleLowerCase().includes(term))&&
+  const fv=folderFilter?.value||'__unfiled__';
+  const rows=questionRows.filter(q=>(fv==='__all__'||(fv==='__unfiled__'?!q.folderId:Number(q.folderId)===Number(fv)))&&
+   (!term||String(q.text||'').toLocaleLowerCase().includes(term))&&
    (!category||category==='همه دسته‌بندی‌ها'||q.categoryName===category)&&
    (!difficulty||difficulty==='همه سطوح دشواری'||difficultyLabel(q.difficultyLevel)===difficulty));
   document.getElementById('questionRows').innerHTML=rows.length?rows.map(q=>'<tr>'+
+   '<td><input type="checkbox" data-question-select="'+q.id+'" '+(selectedQuestionIds.has(Number(q.id))?'checked':'')+' aria-label="انتخاب سؤال"></td>'+
    '<td style="max-width:340px">'+esc(q.text)+'</td><td>'+esc(q.categoryName||'—')+'</td>'+
    '<td><span class="badge badge-info">'+esc(typeLabel(q.questionTypeCode))+'</span></td>'+
    '<td>'+esc(difficultyLabel(q.difficultyLevel))+'</td><td class="flex gap-8">'+
    '<button class="btn btn-outline btn-sm" data-question-edit="'+q.id+'">ویرایش</button>'+
+   '<button class="btn btn-outline btn-sm" data-question-tags="'+q.id+'">پوشه/برچسب</button>'+
    '<button class="btn btn-danger btn-sm" data-question-delete="'+q.id+'">حذف</button></td></tr>').join(''):
-   '<tr><td colspan="5" style="text-align:center;padding:24px">سؤالی برای نمایش وجود ندارد.</td></tr>';
+   '<tr><td colspan="6" style="text-align:center;padding:24px">سؤالی برای نمایش وجود ندارد.</td></tr>';
+  document.getElementById('selectedQuestionCount').textContent=selectedQuestionIds.size.toLocaleString('fa-IR')+' سؤال انتخاب شده';
  };
  async function loadQuestions(){
-  const [rows,batches,user]=await Promise.all([
+  const [rows,batches,user,orgFolders]=await Promise.all([
    api.request('/questions'),
    api.request('/questions/import/batches'),
-   api.request('/auth/me').catch(()=>null)
+   api.request('/auth/me').catch(()=>null),
+   api.request('/questions/folders').catch(()=>[])
   ]);
   questionRows=Array.isArray(rows)?rows:[];
   const folders=Array.isArray(batches)?batches:[];
+  questionFolders=Array.isArray(orgFolders)?orgFolders:[];
   const title=document.getElementById('importFoldersTitle');
   const isTeacher=String(user?.role||'').toLowerCase()==='teacher';
   if(title)title.textContent=isTeacher&&user?.fullName?'پوشه‌های سؤالات استاد '+user.fullName:'پوشه‌های سؤالات بر اساس استاد';
@@ -193,6 +219,14 @@
     '<a class="btn btn-outline btn-sm folder-open" href="question-bank-folder.html?batchId='+encodeURIComponent(batch.id)+'">نمایش سؤال‌ها</a></article>'
    ).join('')+'</div></section>'
   ).join(''):'<div class="question-empty">هنوز پوشه ورود گروهی ثبت نشده است. هنگام Import، عنوان آزمون را وارد کنید.</div>';
+  const opts=questionFolders.map(x=>'<option value="'+x.id+'">'+esc(x.name)+'</option>').join('');
+  document.getElementById('newQuestionFolderParent').innerHTML='<option value="">پوشه اصلی</option>'+opts;
+  document.getElementById('bulkQuestionFolder').innerHTML='<option value="">انتقال به بدون پوشه</option>'+opts;
+  document.getElementById('questionFolderFilter').innerHTML='<option value="__unfiled__">سؤال‌های بدون پوشه</option><option value="__all__">همه سؤال‌ها</option>'+opts;
+  document.getElementById('questionFolderCount').textContent=questionFolders.length.toLocaleString('fa-IR')+' پوشه';
+  const children=new Map();questionFolders.forEach(x=>{const k=String(x.parentFolderId||'root');if(!children.has(k))children.set(k,[]);children.get(k).push(x);});
+  const tree=(parent=null,depth=0)=>(children.get(String(parent||'root'))||[]).map(x=>'<article class="question-folder-card" style="margin-right:'+Math.min(depth*14,56)+'px"><b>📁 '+esc(x.name)+'</b><small>'+Number(x.questionCount||0).toLocaleString('fa-IR')+' سؤال · '+esc(x.ownerName||'')+'</small><div class="flex gap-8"><button class="btn btn-outline btn-sm" data-folder-filter="'+x.id+'">نمایش سؤال‌ها</button><button class="btn btn-outline btn-sm" data-folder-rename="'+x.id+'">تغییر نام</button><button class="btn btn-danger btn-sm" data-folder-delete="'+x.id+'">حذف</button></div></article>'+tree(x.id,depth+1)).join('');
+  document.getElementById('questionFolderList').innerHTML=tree()||'<div class="question-empty">هنوز پوشه‌ای نساخته‌اید.</div>';
   renderQuestions();
   if(editQuestionId&&!editAutoOpened){editAutoOpened=true;const editButton=[...document.querySelectorAll('[data-question-edit]')].find(button=>button.dataset.questionEdit===editQuestionId);if(editButton){editButton.click();const cleanUrl=new URL(location.href);cleanUrl.searchParams.delete('editQuestion');history.replaceState({},'',cleanUrl);}}
  }
@@ -263,11 +297,48 @@
    notify('مهارت ثبت شد و به فهرست انتخاب سؤال اضافه شد.','ok');
   }catch(e){notify(e.message||'ثبت مهارت ناموفق بود.','danger');}
  });
+ document.getElementById('createQuestionFolder').addEventListener('click',async()=>{
+  const name=document.getElementById('newQuestionFolderName').value.trim(),parent=document.getElementById('newQuestionFolderParent').value;
+  if(!name)return notify('نام پوشه را وارد کنید.','warn');
+  try{await api.request('/questions/folders',{method:'POST',body:JSON.stringify({name,parentFolderId:parent?Number(parent):null})});document.getElementById('newQuestionFolderName').value='';await loadQuestions();notify('پوشه ایجاد شد.','ok');}
+  catch(e){notify(e.message||'ایجاد پوشه ناموفق بود.','danger');}
+ });
+ document.getElementById('questionFolderList').addEventListener('click',async event=>{
+  const filter=event.target.closest('[data-folder-filter]'),rename=event.target.closest('[data-folder-rename]'),del=event.target.closest('[data-folder-delete]');
+  if(filter){folderFilter.value=filter.dataset.folderFilter;renderQuestions();}
+  if(rename){const folder=questionFolders.find(x=>Number(x.id)===Number(rename.dataset.folderRename));const name=prompt('نام جدید پوشه',folder?.name||'');if(name===null||!name.trim())return;try{await api.request('/questions/folders/'+folder.id,{method:'PUT',body:JSON.stringify({name:name.trim()})});await loadQuestions();notify('نام پوشه تغییر کرد.','ok');}catch(e){notify(e.message,'danger');}}
+  if(del){if(!confirm('پوشه حذف شود؟ فقط پوشه خالی قابل حذف است.'))return;try{await api.request('/questions/folders/'+del.dataset.folderDelete,{method:'DELETE'});await loadQuestions();notify('پوشه حذف شد.','ok');}catch(e){notify(e.message,'danger');}}
+ });
+ document.getElementById('moveSelectedQuestions').addEventListener('click',async()=>{
+  const ids=[...selectedQuestionIds];if(!ids.length)return notify('ابتدا سؤال‌ها را انتخاب کنید.','warn');
+  const raw=document.getElementById('bulkQuestionFolder').value;
+  try{await api.request('/questions/folders/move',{method:'POST',body:JSON.stringify({questionIds:ids,folderId:raw?Number(raw):null})});selectedQuestionIds.clear();await loadQuestions();notify(ids.length+' سؤال منتقل شد.','ok');}
+  catch(e){notify(e.message||'انتقال سؤال‌ها ناموفق بود.','danger');}
+ });
+ document.getElementById('showDuplicateQuestions').addEventListener('click',async()=>{
+  try{const d=await api.request('/questions/folders/duplicates');const n=Array.isArray(d)?d.length:0;document.getElementById('duplicateQuestionSummary').textContent=n?n.toLocaleString('fa-IR')+' گروه سؤال تکراری پیدا شد؛ قبل از حذف، هر مورد را بررسی کنید.':'سؤال تکراری بر اساس متن و مهارت پیدا نشد.';}
+  catch(e){notify(e.message||'بررسی تکراری‌ها ناموفق بود.','danger');}
+ });
+ document.getElementById('questionRows').addEventListener('change',event=>{
+  const el=event.target.closest('[data-question-select]');if(!el)return;const id=Number(el.dataset.questionSelect);
+  if(el.checked)selectedQuestionIds.add(id);else selectedQuestionIds.delete(id);
+  document.getElementById('selectedQuestionCount').textContent=selectedQuestionIds.size.toLocaleString('fa-IR')+' سؤال انتخاب شده';
+ });
  if(searchField)searchField.addEventListener('input',renderQuestions);
- [categoryFilter,difficultyFilter].forEach(x=>x?.addEventListener('change',renderQuestions));
+ [categoryFilter,difficultyFilter,folderFilter].forEach(x=>x?.addEventListener('change',renderQuestions));
  document.getElementById('questionRows').addEventListener('click',async event=>{
   const edit=event.target.closest('[data-question-edit]');
   const remove=event.target.closest('[data-question-delete]');
+  const tagButton=event.target.closest('[data-question-tags]');
+  if(tagButton){
+   const q=questionRows.find(x=>Number(x.id)===Number(tagButton.dataset.questionTags));
+   let existing=[];try{existing=JSON.parse(q?.tagsJson||'[]');}catch{}
+   const raw=prompt('برچسب‌ها را با کاما جدا کنید',existing.join(', '));if(raw===null)return;
+   const tags=raw.split(',').map(x=>x.trim()).filter(Boolean);
+   const folderRaw=prompt('شناسه پوشه مقصد را وارد کنید؛ برای بدون پوشه خالی بگذارید',q?.folderId||'');if(folderRaw===null)return;
+   try{await api.request('/questions/folders/questions/'+q.id+'/organization',{method:'PUT',body:JSON.stringify({folderId:folderRaw.trim()?Number(folderRaw):null,tags})});await loadQuestions();notify('پوشه و برچسب‌ها ذخیره شد.','ok');}
+   catch(e){notify(e.message||'ذخیره برچسب‌ها ناموفق بود.','danger');}
+  }
   if(edit){
    try{
     const q=await api.request('/questions/'+encodeURIComponent(edit.dataset.questionEdit));
