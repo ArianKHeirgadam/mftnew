@@ -304,8 +304,11 @@ public sealed class CanonicalExamAttemptController(
             if (submittedStatus is null) return StatusCode(500, new { message = "وضعیت Submitted در جدول مرجع تعریف نشده است." });
             attempt.SubmittedAt = DateTime.UtcNow;
             attempt.StatusId = submittedStatus.Id;
-            attempt.AutoGradedScore = null;
+            attempt.AutoGradedScore = 0m;
+            attempt.ManualGradedScore = null;
             attempt.FinalScore = null;
+            attempt.ManualReviewRequired = true;
+            attempt.GradingStatus = "PendingManual";
             try
             {
                 await using var transaction = await academic.Database.BeginTransactionAsync(ct);
