@@ -832,6 +832,23 @@ textarea:focus-visible,
   transition: border-color .2s, box-shadow .2s;
 }
 
+/* Keep native dropdown options readable in both themes. */
+select {
+  color: var(--text);
+  background-color: var(--surface);
+  color-scheme: light;
+}
+select option,
+select optgroup {
+  color: var(--text);
+  background-color: var(--surface);
+}
+select option:checked,
+select option:hover {
+  color: #fff;
+  background-color: var(--primary);
+}
+
 .input:focus,
 .select:focus,
 .textarea:focus {
@@ -1067,12 +1084,15 @@ table.dt tbody tr:last-child td {
   font-weight: 700;
   color: var(--text-soft);
   border-bottom: 2.5px solid transparent;
-  background-color: #142238;
+  background-color: var(--surface, #fff);
+  color: var(--text-soft, #667085);
+  border-radius: 8px 8px 0 0;
   white-space: nowrap;
 }
 
 .tab-btn.active {
   color: var(--primary);
+  background-color: var(--surface, #fff);
   border-color: var(--primary);
 }
 
@@ -1488,3 +1508,29 @@ table.dt tbody tr:last-child td {
   margin-inline-start: -10px;
   border: 2px solid var(--surface);
 }
+
+/* Notification list tab panels and explicit light-theme surfaces */
+body[data-active="notifications"] .tab-panel { display: none; }
+body[data-active="notifications"] .tab-panel.active { display: block; }
+body[data-active="notifications"] .notification-item { background: var(--surface, #fff); color: var(--text, #202938); border: 1px solid var(--border, #e5e7eb); border-radius: var(--r-md, 12px); padding: 16px; margin: 10px 0; }
+body[data-active="notifications"] .notification-item p { color: var(--text-soft, #667085); }
+body[data-active="notifications"] .empty-state { background: var(--surface, #fff); color: var(--text, #202938); border-radius: var(--r-md, 12px); padding: 24px; text-align: center; }
+body[data-active="notifications"] [data-class-create-wrap] { margin-top: 12px; }
+
+
+/* Notification tabs use theme tokens in both light and dark mode. */
+body[data-active="notifications"] [data-tabs] .tab-btn {
+  background: var(--surface);
+  color: var(--text-soft);
+  border: 1px solid var(--border);
+  border-bottom: 2px solid transparent;
+  border-radius: var(--r-sm) var(--r-sm) 0 0;
+}
+body[data-active="notifications"] [data-tabs] .tab-btn.active {
+  background: var(--surface);
+  color: var(--primary);
+  border-color: var(--border);
+  border-bottom-color: var(--primary);
+}
+body[data-active="notifications"] .tab-panel { color: var(--text); }
+body[data-active="notifications"] .empty-state { background: var(--surface); color: var(--text); border: 1px solid var(--border); }

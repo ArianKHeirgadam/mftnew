@@ -1,4 +1,5 @@
 using System.Globalization;
+using System.Security.Claims;
 using System.Text;
 using System.Text.Json;
 using System.Text.RegularExpressions;
@@ -14,37 +15,56 @@ using UglyToad.PdfPig;
 
 namespace Mft.API.Controllers;
 
-public sealed record AnswerKeyEntry(Guid? QuestionId, int? QuestionNumber, string Answer);
+public sealed record AnswerKeyEntry(long? QuestionId, int? QuestionNumber, string Answer);
 public sealed record AnswerKeyRequest(List<AnswerKeyEntry>? Entries, bool ReplaceExisting = true);
 
 /// <summary>Imports an answer key from direct entry, JSON, XML, CSV, TXT, Excel or text-based PDF.</summary>
-[ApiController, Route("api/exams/{examId:guid}/answer-key"), Authorize(Policy = "TeacherOrAbove")]
-public sealed class AnswerKeyController(AppDbContext db) : ControllerBase
+[ApiController, Route("api/canonical/exams/{examId:long}/answer-key"), Authorize(Policy = "TeacherOrAbove")]
+public sealed class AnswerKeyController(CanonicalAcademicDbContext db) : ControllerBase
 {
     [HttpGet]
-    public async Task<IActionResult> Get(Guid examId, CancellationToken ct)
+    public async Task<IActionResult> Get(long examId, CancellationToken ct)
     {
         var exam = await LoadExam(examId, ct);
         if (exam is null) return NotFound();
-        var rows = await (from link in db.ExamQuestions join question in db.Questions on link.QuestionId equals question.Id where link.ExamId == examId orderby link.Order select new { questionId = link.QuestionId, questionNumber = link.Order, question = question.Text, answer = question.CorrectAnswer }).ToListAsync(ct);
+        if (await IsPdfOnly(examId, ct))
+            return Conflict(new { message = "آزمون PDFمحور پاسخ‌نامه کلیدی ساختاریافته ندارد؛ نمره آن از صفحه نتایج ثبت می‌شود." });
+        var links = await GetExamQuestions(examId, ct);
+        var rows = new List<object>();
+        for (var index = 0; index < links.Count; index++)
+        {
+            var link = links[index];
+            var question = await db.Questions.AsNoTracking().FirstOrDefaultAsync(x => x.Id == link.QuestionId, ct);
+            if (question is null) continue;
+            var options = await db.MultipleChoiceOptions.AsNoTracking()
+                .Where(x => x.QuestionId == question.Id).OrderBy(x => x.DisplayOrder)
+                .Select(x => new { x.Id, x.OptionText, x.IsCorrect, x.DisplayOrder }).ToListAsync(ct);
+            rows.Add(new { questionId = question.Id, questionNumber = index + 1,
+                question = question.Text, answer = options.Where(x => x.IsCorrect).Select(x => x.OptionText).ToList(),
+                options });
+        }
         return Ok(new { examId, examTitle = exam.Title, entries = rows });
     }
 
     [HttpPut]
-    public async Task<IActionResult> SaveDirect( Guid examId, AnswerKeyRequest request, CancellationToken ct)
+    public async Task<IActionResult> SaveDirect(long examId, AnswerKeyRequest request, CancellationToken ct)
     {
         var exam = await LoadExam(examId, ct);
         if (exam is null) return NotFound();
+        if (await IsPdfOnly(examId, ct))
+            return Conflict(new { message = "برای آزمون PDFمحور پاسخ‌نامه کلیدی قابل ثبت نیست؛ نمره کلی از صفحه نتایج ثبت می‌شود." });
         return await ApplyEntries(examId, request.Entries ?? new(), request.ReplaceExisting, "direct", ct);
     }
 
     [HttpPost("import"), RequestSizeLimit(15_000_000)]
-    public async Task<IActionResult> Import(Guid examId, IFormFile? file, [FromForm] bool replaceExisting = true, CancellationToken ct = default)
+    public async Task<IActionResult> Import(long examId, IFormFile? file, [FromForm] bool replaceExisting = true, CancellationToken ct = default)
     {
         if (file is null || file.Length == 0) return BadRequest(new { message = "یک فایل پاسخ‌نامه انتخاب کنید." });
         if (file.Length > 15_000_000) return BadRequest(new { message = "حداکثر حجم فایل ۱۵ مگابایت است." });
         var exam = await LoadExam(examId, ct);
         if (exam is null) return NotFound();
+        if (await IsPdfOnly(examId, ct))
+            return Conflict(new { message = "برای آزمون PDFمحور پاسخ‌نامه کلیدی قابل ثبت نیست؛ نمره کلی از صفحه نتایج ثبت می‌شود." });
         var ext = Path.GetExtension(file.FileName).ToLowerInvariant();
         try
         {
@@ -73,56 +93,80 @@ public sealed class AnswerKeyController(AppDbContext db) : ControllerBase
         }
     }
 
-    private async Task<Exam?> LoadExam(Guid examId, CancellationToken ct)
+    private long? CurrentUserId =>
+        long.TryParse(User.FindFirstValue(ClaimTypes.NameIdentifier), out var id) ? id : null;
+    private long? CurrentDepartmentId =>
+        long.TryParse(User.FindFirstValue("departmentId"), out var id) ? id : null;
+
+    private async Task<CanonicalExam?> LoadExam(long examId, CancellationToken ct)
     {
-        var exam = await db.Exams.Include(x => x.Questions).FirstOrDefaultAsync(x => x.Id == examId, ct);
+        var exam = await db.Exams.AsNoTracking().FirstOrDefaultAsync(x => x.Id == examId, ct);
         if (exam is null) return null;
-        if (User.IsInRole("Department") && exam.DepartmentId != User.DepartmentId()) return null;
-        if (User.IsInRole("Teacher") && exam.CreatedByUserId != User.UserId()) return null;
+        if (User.IsInRole("Department") && exam.DepartmentId != CurrentDepartmentId) return null;
+        if (User.IsInRole("Teacher") && exam.CreatedByUserId != CurrentUserId) return null;
         return exam;
     }
 
-    private async Task<IActionResult> ApplyEntries(Guid examId, List<AnswerKeyEntry> entries, bool replaceExisting, string source, CancellationToken ct)
+    private async Task<bool> IsPdfOnly(long examId, CancellationToken ct) =>
+        !await db.ExamSections.AnyAsync(x => x.ExamId == examId, ct) &&
+        await db.ExamDocuments.AnyAsync(x => x.ExamId == examId, ct);
+
+    private async Task<List<CanonicalExamQuestion>> GetExamQuestions(long examId, CancellationToken ct)
+    {
+        var sectionIds = await db.ExamSections.AsNoTracking()
+            .Where(x => x.ExamId == examId).Select(x => x.Id).ToListAsync(ct);
+        return await db.ExamQuestions.AsNoTracking()
+            .Where(x => sectionIds.Contains(x.ExamSectionId))
+            .OrderBy(x => x.DisplayOrder).ToListAsync(ct);
+    }
+
+    private async Task<IActionResult> ApplyEntries(long examId, List<AnswerKeyEntry> entries,
+        bool replaceExisting, string source, CancellationToken ct)
     {
         if (entries.Count > 5000) return BadRequest(new { message = "حداکثر ۵۰۰۰ پاسخ در هر بار قابل ثبت است." });
-        var links = await db.ExamQuestions.Where(x => x.ExamId == examId).OrderBy(x => x.Order).ToListAsync(ct);
-        var questionIds = links.Select(x => x.QuestionId).ToArray();
-        var questions = await db.Questions.Where(x => questionIds.Contains(x.Id)).ToDictionaryAsync(x => x.Id, ct);
+        var links = await GetExamQuestions(examId, ct);
         if (links.Count == 0) return BadRequest(new { message = "ابتدا سؤال‌ها را به آزمون اضافه کنید." });
-        var byId = links.ToDictionary(x => x.QuestionId);
-        var byNumber = links.ToDictionary(x => x.Order);
-        var seen = new HashSet<Guid>();
+        var questionIds = links.Select(x => x.QuestionId).Distinct().ToArray();
+        var questions = await db.Questions.Where(x => questionIds.Contains(x.Id)).ToDictionaryAsync(x => x.Id, ct);
+        var options = await db.MultipleChoiceOptions.Where(x => questionIds.Contains(x.QuestionId))
+            .OrderBy(x => x.DisplayOrder).ToListAsync(ct);
+        var types = await db.QuestionTypes.ToDictionaryAsync(x => x.Id, x => x.Code, ct);
+        var byId = links.GroupBy(x => x.QuestionId).ToDictionary(x => x.Key, x => x.First());
+        var byNumber = links.Select((link, index) => new { Number = index + 1, Link = link }).ToDictionary(x => x.Number, x => x.Link);
+        var seen = new HashSet<long>();
         var updated = 0;
         var errors = new List<string>();
         foreach (var entry in entries)
         {
             if (string.IsNullOrWhiteSpace(entry.Answer)) { errors.Add("پاسخ خالی نادیده گرفته شد."); continue; }
-            ExamQuestion? link = null;
+            CanonicalExamQuestion? link = null;
             if (entry.QuestionId.HasValue) byId.TryGetValue(entry.QuestionId.Value, out link);
             else if (entry.QuestionNumber.HasValue) byNumber.TryGetValue(entry.QuestionNumber.Value, out link);
             if (link is null) { errors.Add($"شماره سؤال/شناسه نامعتبر: {entry.QuestionNumber?.ToString() ?? entry.QuestionId?.ToString() ?? "نامشخص"}"); continue; }
-            if (!seen.Add(link.QuestionId)) { errors.Add($"پاسخ تکراری برای سؤال شماره {link.Order}؛ آخرین پاسخ اعمال شد."); }
+            if (!seen.Add(link.QuestionId)) errors.Add($"پاسخ تکراری برای سؤال شماره {link.DisplayOrder}؛ آخرین پاسخ اعمال شد.");
+            if (!questions.TryGetValue(link.QuestionId, out var question)) { errors.Add($"سؤال {link.DisplayOrder} پیدا نشد."); continue; }
+            if (!types.TryGetValue(question.QuestionTypeId, out var typeCode) || typeCode != "MultipleChoice")
+            { errors.Add($"ثبت کلید پاسخ خودکار برای سؤال {link.DisplayOrder} فقط برای سؤال چندگزینه‌ای پشتیبانی می‌شود."); continue; }
+
+            var questionOptions = options.Where(x => x.QuestionId == question.Id).OrderBy(x => x.DisplayOrder).ToList();
+            if (questionOptions.Count == 0) { errors.Add($"سؤال {link.DisplayOrder} گزینه‌ای ندارد."); continue; }
             var answer = entry.Answer.Trim();
-            if (!questions.TryGetValue(link.QuestionId, out var question)) { errors.Add($"سؤال {link.Order} پیدا نشد."); continue; }
-            if (!replaceExisting && !string.IsNullOrWhiteSpace(question.CorrectAnswer)) { errors.Add($"پاسخ قبلی سؤال {link.Order} حفظ شد."); continue; }
-            if (question.Type == "MultipleChoice")
+            var matching = questionOptions.FirstOrDefault(x => string.Equals(x.OptionText.Trim(), answer, StringComparison.OrdinalIgnoreCase));
+            if (matching is null)
             {
-                var options = string.IsNullOrWhiteSpace(question.OptionsJson) ? Array.Empty<string>() : JsonSerializer.Deserialize<string[]>(question.OptionsJson) ?? Array.Empty<string>();
-                var matching = options.FirstOrDefault(x => string.Equals(x.Trim(), answer, StringComparison.OrdinalIgnoreCase));
-                if (matching is null)
-                {
-                    var letterIndex = answer.ToUpperInvariant() switch { "A" or "آ" => 0, "B" or "ب" => 1, "C" or "ج" => 2, "D" or "د" => 3, "E" or "ه" => 4, _ => -1 };
-                    if (letterIndex >= 0 && letterIndex < options.Length) matching = options[letterIndex];
-                }
-                if (matching is null) { errors.Add($"پاسخ سؤال {link.Order} با گزینه‌های ثبت‌شده مطابقت ندارد."); continue; }
-                answer = matching;
+                var letterIndex = answer.ToUpperInvariant() switch { "A" or "آ" => 0, "B" or "ب" => 1, "C" or "ج" => 2, "D" or "د" => 3, "E" or "ه" => 4, _ => -1 };
+                if (letterIndex >= 0 && letterIndex < questionOptions.Count) matching = questionOptions[letterIndex];
             }
-            question.CorrectAnswer = answer;
+            if (matching is null) { errors.Add($"پاسخ سؤال {link.DisplayOrder} با گزینه‌های ثبت‌شده مطابقت ندارد."); continue; }
+            if (!replaceExisting && questionOptions.Any(x => x.IsCorrect))
+            { errors.Add($"پاسخ قبلی سؤال {link.DisplayOrder} حفظ شد."); continue; }
+            foreach (var option in questionOptions) option.IsCorrect = option.Id == matching.Id;
             updated++;
         }
         if (updated == 0) return BadRequest(new { message = "هیچ پاسخی ثبت نشد.", errors });
         await db.SaveChangesAsync(ct);
-        return Ok(new { examId, source, updatedCount = updated, skippedCount = errors.Count, errors, message = $"پاسخ‌نامه ثبت شد؛ {updated} پاسخ به‌روزرسانی شد." });
+        return Ok(new { examId, source, updatedCount = updated, skippedCount = errors.Count, errors,
+            message = $"پاسخ‌نامه ثبت شد؛ {updated} پاسخ به‌روزرسانی شد." });
     }
 
     private static async Task<string> ReadText(Stream stream, CancellationToken ct)
@@ -170,7 +214,7 @@ public sealed class AnswerKeyController(AppDbContext db) : ControllerBase
         var result = new List<AnswerKeyEntry>();
         foreach (var item in root.EnumerateArray())
         {
-            Guid? id = TryGuid(item, "questionId", "QuestionId", "id");
+            long? id = TryLong(item, "questionId", "QuestionId", "id");
             int? number = TryInt(item, "questionNumber", "QuestionNumber", "number", "question", "شماره");
             var answer = TryString(item, "answer", "Answer", "correctAnswer", "پاسخ");
             if (!string.IsNullOrWhiteSpace(answer)) result.Add(new(id, number, answer));
@@ -188,14 +232,14 @@ public sealed class AnswerKeyController(AppDbContext db) : ControllerBase
         return null;
     }
 
-    private static Guid? TryGuid(JsonElement item, params string[] names) { foreach (var p in item.EnumerateObject()) if (names.Contains(p.Name, StringComparer.OrdinalIgnoreCase) && Guid.TryParse(p.Value.ToString(), out var v)) return v; return null; }
+    private static long? TryLong(JsonElement item, params string[] names) { foreach (var p in item.EnumerateObject()) if (names.Contains(p.Name, StringComparer.OrdinalIgnoreCase) && long.TryParse(p.Value.ToString(), out var v)) return v; return null; }
     private static string? TryString(JsonElement item, params string[] names) { foreach (var p in item.EnumerateObject()) if (names.Contains(p.Name, StringComparer.OrdinalIgnoreCase)) return p.Value.ValueKind == JsonValueKind.String ? p.Value.GetString() : p.Value.ToString(); return null; }
 
     private static List<AnswerKeyEntry> ReadXml(string text)
     {
         var doc = XDocument.Parse(text);
         return doc.Descendants().Where(x => x.Name.LocalName.Equals("entry", StringComparison.OrdinalIgnoreCase) || x.Name.LocalName.Equals("answer", StringComparison.OrdinalIgnoreCase))
-            .Select(x => { var idText = (string?)x.Attribute("questionId"); var numberText = (string?)x.Attribute("questionNumber") ?? (string?)x.Attribute("number"); var answer = (string?)x.Attribute("value") ?? x.Value; Guid.TryParse(idText, out var id); int.TryParse(numberText, out var number); return new AnswerKeyEntry(idText is not null && Guid.TryParse(idText, out _) ? id : null, numberText is not null && number > 0 ? number : null, answer.Trim()); })
+            .Select(x => { var idText = (string?)x.Attribute("questionId"); var numberText = (string?)x.Attribute("questionNumber") ?? (string?)x.Attribute("number"); var answer = (string?)x.Attribute("value") ?? x.Value; long.TryParse(idText, out var id); int.TryParse(numberText, out var number); return new AnswerKeyEntry(idText is not null && long.TryParse(idText, out _) ? id : null, numberText is not null && number > 0 ? number : null, answer.Trim()); })
             .Where(x => !string.IsNullOrWhiteSpace(x.Answer)).ToList();
     }
 

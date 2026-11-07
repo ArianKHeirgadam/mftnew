@@ -1,18 +1,8 @@
-IF OBJECT_ID(N'dbo.AttendanceRecords', N'U') IS NULL
-BEGIN
-    CREATE TABLE dbo.AttendanceRecords
-    (
-        Id UNIQUEIDENTIFIER NOT NULL CONSTRAINT PK_AttendanceRecords PRIMARY KEY,
-        StudentUserId UNIQUEIDENTIFIER NOT NULL,
-        DepartmentId UNIQUEIDENTIFIER NOT NULL,
-        RecordedByUserId UNIQUEIDENTIFIER NOT NULL,
-        AttendanceDate DATE NOT NULL,
-        Status NVARCHAR(20) NOT NULL,
-        CreatedAt DATETIME2 NOT NULL CONSTRAINT DF_AttendanceRecords_CreatedAt DEFAULT SYSUTCDATETIME(),
-        CONSTRAINT CK_AttendanceRecords_Status CHECK (Status IN (N'Present', N'Absent', N'Deleted')),
-        CONSTRAINT FK_AttendanceRecords_Student FOREIGN KEY (StudentUserId) REFERENCES dbo.Users(Id) ON DELETE CASCADE,
-        CONSTRAINT FK_AttendanceRecords_Department FOREIGN KEY (DepartmentId) REFERENCES dbo.Departments(Id) ON DELETE CASCADE
-    );
-    CREATE UNIQUE INDEX UX_AttendanceRecords_Student_Date ON dbo.AttendanceRecords(StudentUserId, AttendanceDate);
-    CREATE INDEX IX_AttendanceRecords_Department_Date ON dbo.AttendanceRecords(DepartmentId, AttendanceDate);
-END;
+/*
+  DEPRECATED — DO NOT EXECUTE.
+  This legacy script defines UNIQUEIDENTIFIER keys, while the canonical MFT
+  database uses bigint identity keys for Users and Departments.
+  Use database/patch-bigint-feature-tables.sql only after the API/EF Core
+  bigint migration is complete. Back up and test on a restored database first.
+*/
+THROW 52020, 'Deprecated GUID schema script. Use patch-bigint-feature-tables.sql after application cutover.', 1;

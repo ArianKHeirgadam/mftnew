@@ -7,7 +7,7 @@
 <link rel="stylesheet" href="assets/css/style.css">
 <link rel="stylesheet" href="assets/css/responsive.css">
 <link rel="stylesheet" href="assets/css/dark.css">
-<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.4/chart.umd.min.js"></script>
+
 </head>
 <body data-role="student" data-active="results">
 <div class="app-shell">
@@ -17,60 +17,20 @@
     <main class="content fade-in">
       <div class="page-head no-print">
         <div>
-          <div class="breadcrumb">سامانه سنجش <span>/</span> <b>نتیجه آزمون</b></div>
-          <h1>ساختمان داده و الگوریتم — میان‌ترم</h1>
+          <div class="breadcrumb">سامانه سنجش <span>/</span> <b>نتایج آزمون</b></div>
+          <h1>نتایج آزمون</h1>
+          <p class="text-soft text-sm mt-8">نمره بخش تستی پس از ثبت نهایی نمایش داده می‌شود؛ پاسخ‌های صحیح و نمره نهایی پس از انتشار رسمی استاد یا مدیر دپارتمان قابل مشاهده است.</p>
         </div>
-        <div class="flex gap-8">
-          <button class="btn btn-outline" onclick="window.print()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9V3h12v6M6 18H4a1 1 0 0 1-1-1v-5a1 1 0 0 1 1-1h16a1 1 0 0 1 1 1v5a1 1 0 0 1-1 1h-2M6 14h12v7H6z"/></svg> چاپ</button>
-          <button class="btn btn-primary" onclick="window.print()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3v12m0 0 4-4m-4 4-4-4M4 21h16"/></svg> دانلود PDF</button>
-        </div>
+        <div class="flex gap-8"><button class="btn btn-primary" id="publishExamResults" hidden>انتشار نتایج برای دانشجویان</button><button class="btn btn-outline" id="unpublishExamResults" hidden>لغو انتشار نتایج</button><button class="btn btn-outline" onclick="window.print()">چاپ / ذخیره PDF</button></div>
       </div>
-
-      <div class="grid-2">
-        <div class="card card-pad" style="display:flex;align-items:center;gap:24px;flex-wrap:wrap">
-          <div class="mohr lg"><div class="mohr-inner"><b>۱۷</b><span>از ۲۰</span></div></div>
-          <div>
-            <span class="badge badge-ok" style="font-size:13px;padding:7px 14px">قبول ✅</span>
-            <h2 style="font-size:20px;margin-top:12px">تبریک! نمره‌ی شما ۸۵٪ است</h2>
-            <p class="text-soft text-sm mt-8">دانشجو: سارا محمدی — شماره دانشجویی: ۹۹۱۲۳۴۵۶۷۸</p>
-            <p class="text-soft text-sm">تاریخ آزمون: ۱۴۰۴/۰۵/۱۲ — مدت زمان صرف‌شده: ۳۸ دقیقه از ۴۵ دقیقه</p>
-          </div>
-        </div>
-        <div class="card card-pad">
-          <div class="section-title"><h3>تفکیک پاسخ‌ها</h3></div>
-          <div style="height:200px"><canvas id="chartResult"></canvas></div>
-        </div>
-      </div>
-
-      <div class="stat-grid mt-24">
-        <div class="card stat-card" style="--stat-tint:var(--ok)">
-          <div class="stat-ring" style="--p:80"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="m8 12 3 3 5-6"/></svg></div>
-          <div class="stat-body"><b>۱۶</b><span>پاسخ صحیح</span></div>
-        </div>
-        <div class="card stat-card" style="--stat-tint:var(--danger)">
-          <div class="stat-ring" style="--p:15"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M6 6l12 12M18 6 6 18"/></svg></div>
-          <div class="stat-body"><b>۳</b><span>پاسخ نادرست</span></div>
-        </div>
-        <div class="card stat-card" style="--stat-tint:var(--muted)">
-          <div class="stat-ring" style="--p:5"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="9"/></svg></div>
-          <div class="stat-body"><b>۱</b><span>بی‌پاسخ</span></div>
-        </div>
-        <div class="card stat-card" style="--stat-tint:var(--gold-500)">
-          <div class="stat-ring" style="--p:85"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 3a9 9 0 1 0 9 9"/><path d="M21 3v6h-6"/></svg></div>
-          <div class="stat-body"><b>۸۵٪</b><span>درصد نمره</span></div>
-        </div>
-      </div>
-
-      <div class="card card-pad mt-24 no-print">
-        <div class="section-title"><h3>مرور سوال به سوال</h3></div>
+      <div id="resultStudentInfo" class="text-soft text-sm mt-16" hidden></div>
+      <div id="submissionPdfBox" class="card card-pad mt-24" hidden></div>
+      <div class="card card-pad mt-24">
+        <div class="section-title"><h3>سوابق و جزئیات نتایج</h3></div>
         <div class="table-wrap">
           <table class="dt">
-            <thead><tr><th>#</th><th>متن سوال</th><th>پاسخ شما</th><th>پاسخ صحیح</th><th>نتیجه</th></tr></thead>
-            <tbody>
-              <tr><td>۱</td><td>پیچیدگی زمانی کویک‌سورت در بدترین حالت؟</td><td>O(n²)</td><td>O(n²)</td><td><span class="badge badge-ok">صحیح</span></td></tr>
-              <tr><td>۲</td><td>کدام ساختار داده برای صف اولویت مناسب است؟</td><td>آرایه</td><td>هیپ (Heap)</td><td><span class="badge badge-danger">نادرست</span></td></tr>
-              <tr><td>۳</td><td>پیچیدگی جستجوی دودویی چیست؟</td><td>O(log n)</td><td>O(log n)</td><td><span class="badge badge-ok">صحیح</span></td></tr>
-            </tbody>
+            <thead><tr><th>#</th><th>آزمون</th><th>دانشجو</th><th>وضعیت</th><th>نمره</th></tr></thead>
+            <tbody><tr><td colspan="5" style="text-align:center;padding:28px">در حال دریافت اطلاعات...</td></tr></tbody>
           </table>
         </div>
       </div>

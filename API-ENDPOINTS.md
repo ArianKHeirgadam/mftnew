@@ -30,9 +30,9 @@ Base URL: `https://localhost:7081/api` (ASP.NET launch profile). All routes requ
 | GET | `/questions?search=&type=&category=` | Teacher sees only their own questions; Department/SuperAdmin can view all current question records |
 | GET | `/questions/{id}` | Question detail, scoped for teachers |
 | POST / PUT / DELETE | `/questions[/{id}]` | Create/edit/delete questions; teacher ownership enforced; MCQ options/correct answer validated |
-| POST | `/questions/import-pdf/preview` | TeacherOrAbove; parses a text-based PDF and returns a preview without saving |\n| POST | `/questions/import-pdf` | TeacherOrAbove; imports confirmed MCQ, essay and matching questions from text-based PDF into the question bank (15 MB max; no OCR) |\n| GET | `/exams` | Student sees published exams; Teacher sees owned exams; Department sees department exams; SuperAdmin sees all |
+| GET | `/exams` | Student sees published exams; Teacher sees owned exams; Department sees department exams; SuperAdmin sees all |
 | GET | `/exams/{id}` | Exam detail within role scope |
-| POST / PUT / DELETE | `/exams[/{id}]` | Create/update/delete exams; title, duration, pass mark (0–20), navigation setting, teacher ownership and selected question ownership validated; exam question points are normalized to a total of 20 |
+| POST / PUT / DELETE | `/exams[/{id}]` | SuperAdmin, Department and Teacher can create/update/delete within role scope; creator is a Users identity, department scope is enforced, and selected question ownership is validated; exam question points are normalized to a total of 100 |
 | POST | `/exams/{id}/start` | Student starts or resumes a published exam within its schedule; correct answers are not returned |
 | PUT | `/exams/attempts/{attemptId}/answers` | Save answers for the authenticated student's active attempt while its server-side duration remains valid |
 | POST | `/exams/attempts/{attemptId}/submit` | Finalize an active attempt; objective questions are auto-scored, essay answers remain pending manual grading, and expired attempts cannot submit new answers |
@@ -54,6 +54,24 @@ Base URL: `https://localhost:7081/api` (ASP.NET launch profile). All routes requ
 | GET | `/reports/departments` | SuperAdmin or Department; scoped department-level exam, score, pass-rate, participation, student and teacher aggregates |
 | GET | `/health` | API health check (outside `/api`) |
 
+## Canonical single-attempt exam workflow
+
+These routes use bigint IDs and the supplied canonical tables; they are separate from the legacy GUID-based `/exams` routes above.
+
+| Method | Route | Access / purpose |
+|---|---|---|
+| GET | `/canonical/exams` | Student list includes whether a single attempt already exists and its active attempt ID/status; other roles see their scoped canonical exams |
+| GET | `/canonical/exams/{examId}` | Canonical exam structure and question references |
+| POST / PUT | `/canonical/exams` and `/canonical/exams/{id}` | Create/update canonical exam sections and questions; structure becomes immutable once any student attempt exists |
+| POST | `/canonical/exams/{examId}/attempt/start` | Create the student's only attempt; unique (ExamId, StudentUserId) constraint rejects any second attempt |
+| GET | `/canonical/exams/{examId}/attempt/{attemptId}` | Load the active attempt, deadline, questions, and previously saved answers; only the owner can access it |
+| PUT | `/canonical/exams/{examId}/attempt/{attemptId}/answers` | Autosave the active attempt before its server-side deadline |
+| POST | `/canonical/exams/{examId}/attempt/{attemptId}/submit` | Finalize once; unanswered MCQ/matching items receive zero, objective answers are auto-graded, essays await manual grading |
+
+The student dashboard and `online-exam.html` now use this canonical attempt workflow. An in-progress attempt can be resumed by opening the same attempt ID; that is a continuation, not a second attempt. A submitted attempt is shown as completed and cannot be restarted.
+
+**Remaining integration:** the teacher question-bank and exam-creation pages still call legacy GUID-based endpoints. They must be migrated to canonical bigint question/skill/category/exam APIs before the full teacher-to-student workflow is end-to-end. Do not mix legacy GUID IDs with canonical bigint IDs.
+
 ## Schema requirements for exam grading
 
 Run `database/patch-exam-grading-and-department-manager.sql` on a backed-up
@@ -67,7 +85,7 @@ not be converted to JavaScript numbers.
 - Login uses API authentication and role-driven navigation; no role picker.
 - User lists, create/edit/delete actions, department management, question CRUD, exam creation, exam start/autosave/submit, results review, notifications, profile/password update, settings key/value save, dashboard metrics, and department reports use the API.
 - Report charts are populated only when API data is returned; hardcoded sample chart series were removed.
-- Password reset by email/SMS, SMS delivery, actual database backup/restore, PDF/Excel report export, image uploads, and a full audit trail are not implemented because the necessary provider/storage/export workflow is not configured. The UI must not report those operations as successful.
+- Password reset by email/SMS, SMS delivery, actual database backup/restore, PDF/Excel report export, generic profile image uploads, and a full audit trail are not implemented because the necessary provider/storage/export workflow is not configured. The UI must not report those operations as successful.
 
 The API's live Swagger document is the source of truth. These routes describe code, not a claim of successful SQL Server integration testing.
 
@@ -77,4 +95,86 @@ The API's live Swagger document is the source of truth. These routes describe co
 - `POST /api/exams/{examId}/answer-key/import` — multipart upload field `file`, optional `replaceExisting` (`true` by default). Supported: `.xlsx`, `.xlsm`, text-based `.pdf`, `.csv`, `.tsv`, `.json`, `.xml`, `.txt`.
 - For CSV/TSV/Excel, use two columns: question number in the exam order, then answer. Headers are optional. JSON accepts an array or `{ "entries": [...] }`; XML accepts `<entry questionNumber="1" value="A" />`; TXT and PDF lines use `1,A` or `Question 1: A` style.
 - For multiple-choice items, an answer may be the exact option text or a letter A-E (also Persian alef/b/j/d forms) matching the option's order. The endpoint validates the exam scope and caller's role/ownership. PDF files must contain selectable text; scanned PDFs require OCR before upload. Maximum upload size is 15 MB.
-- UI: `Frontend/answer-key-upload.html`.\n- Question PDF import: `Frontend/question-import.html`; format uses `Q1:`, `A)`, `ANSWER:`, and `PAIR: left => right` markers. Scanned PDFs need OCR outside the app before upload. Matching questions are automatically graded proportionally per correct pair.
+- UI: `Frontend/answer-key-upload.html`.\n- PDF question import and OCR are not part of the supported workflow. The uploaded exam PDF is stored and served as-is; the application does not scan, parse, or extract questions from it.
+
+
+## PDF exam, manual grading and result publication workflow
+
+- PDF-only exams can be created with zero question-bank entries; the teacher must upload the exam paper PDF before a student can start the exam.
+- The exam PDF is delivered as the original file. The exam workflow does not run OCR, parse pages, scan for questions, or import its contents.
+- `POST /api/exam-files/exams/{examId}` — teacher/department/super-admin uploads the exam PDF as multipart field `file` (20 MB maximum).
+- `GET /api/exam-files/exams/{examId}` — authenticated download. Students can download only a published exam in their department; its owner and authorized department/super admins can download it.
+- `POST /api/exam-files/attempts/{attemptId}` — student uploads/replaces a PDF, JPG, JPEG, or PNG answer sheet while the attempt is in progress and before the server-side deadline (20 MB maximum).
+- `POST /api/exams/attempts/{attemptId}/submit` — in PDF-only mode, finalizes the attempt only after an answer-sheet file has been uploaded; the attempt remains pending until a teacher enters a score.
+- `PUT /api/results/{id}/grade` — teacher enters the PDF-only attempt's final score from 0 to 100. Publication is blocked until each PDF-only submission is graded.
+- `GET /api/exam-files/attempts/{attemptId}/info` — returns metadata to the authorized grader or the student who owns the attempt.
+- `GET /api/exam-files/attempts/{attemptId}` — authenticated preview/download of the student's PDF or image answer sheet; students can access only their own file, while authorized graders can access the attempt's file.
+- `PUT /api/results/{attemptId}/answers/{questionId}/grade` — per-question manual grade. JSON body: `{ "score": 2.5, "comment": "..." }`. The score is entered in the question's configured raw points; it is normalized to the exam's 100-point scale. Teacher ownership and department scope are checked.
+- `POST /api/results/exams/{examId}/publish` — publish results after all persisted answers requiring manual grading are graded.
+- `POST /api/results/exams/{examId}/unpublish` — withdraw publication.
+- Student result list/detail endpoints intentionally hide unpublished results and answer keys. The teacher's result detail page exposes manual-grading inputs and the protected PDF download control.
+
+The SQL Server patch is `database/patch-exam-pdf-workflow.sql`. Back up the database and test the additive patch on a development copy before applying it. PDFs are stored under the API's private `App_Data/exam-files` directory, outside `wwwroot`, using generated filenames. The application must have write access to this directory, and deployment backups must include it.
+
+
+## Canonical teacher question bank and exam creation
+
+The teacher-facing question bank and exam wizard now use the canonical bigint academic API instead of the legacy GUID question/exam routes.
+
+- `GET /api/canonical/questions/lookups` — returns canonical exam categories, skills, and question types.
+- `GET /api/canonical/questions?search={text}&skillId={id}&questionTypeId={id}` — lists questions visible to the caller, including their skill/category and question-type metadata.
+- `GET /api/canonical/questions/{id}` — loads a question and its options, matching pairs, and essay criteria for editing.
+- `POST /api/canonical/questions` / `PUT /api/canonical/questions/{id}` — creates or updates a question using `skillId`, `questionTypeId`, `text`, `points`, `difficultyLevel`, `options`, `matchingPairs`, and `criteria`.
+- `DELETE /api/canonical/questions/{id}` — deletes an unused question; questions already included in an exam cannot be deleted.
+- `POST /api/canonical/exams` — creates a canonical exam with `title`, `examCategoryId`, `departmentId` (required for SuperAdmin; other roles use their authenticated department), `startAt`, `endAt`, `durationMinutes`, `isPublished`, and `sections`. Each section contains `skillId`, `durationMinutes`, `weightPercent`, and `questionIds`; section weights must total 100%.
+- `PUT /api/canonical/exams/{id}` — updates a canonical exam only before any student attempt exists. After the first attempt, exam structure is immutable.
+- The question type lookup IDs are SQL Server `tinyint`; canonical question, skill, category, exam, section, and question IDs are `bigint`.
+- The current canonical teacher wizard creates structured bank-based exams. PDF-only creation/upload remains a separate legacy workflow and is not offered by this canonical wizard.
+- The student canonical workflow enforces one attempt per student per exam. An in-progress attempt may be resumed using its existing attempt ID; a submitted attempt cannot be started again.
+
+These routes and UI changes have been checked for JavaScript syntax, but have not been built against .NET or exercised against SQL Server in this environment.
+
+## Canonical classes, membership, and exam audience
+
+Canonical exams are assigned to one canonical class. Student access is checked against the class membership table; belonging to the same department alone is not sufficient.
+
+- `GET /api/canonical/classes` — lists classes available to the current academic role. SuperAdmin can see all classes; DepartmentAdmin and Teacher are limited to their own department.
+- `POST /api/canonical/classes` — creates a class with `name` and `departmentId`. For non-SuperAdmin roles, the authenticated department is authoritative.
+- `GET /api/canonical/classes/{id}/members` — returns the selected class and its enrolled students.
+- `PUT /api/canonical/classes/{id}/members` — replaces the class roster using `studentIds` (canonical bigint user IDs). Every member must be an active Student in the same department.
+- `POST /api/canonical/exams` now requires `classId` in addition to the exam fields. The class must belong to the exam department.
+- `POST /api/canonical/exams/{id}/assign-class` — assigns a previously unassigned exam to `{ "classId": 123 }`. Allowed only when the caller can manage the exam, the class belongs to the same department, and the exam has no attempts. The operation is transactional and serialized against concurrent attempt creation. It does not alter questions or exam structure.
+- Student `GET /api/canonical/exams` returns only published exams whose assigned class contains that student.
+- Student `GET /api/canonical/exams/{id}` and `POST /api/canonical/exams/{id}/attempt/start` also enforce class membership on the server. Hiding an exam in the UI is not the security boundary.
+- Existing canonical exams with a null `ClassId` are preserved by the additive database patch, but are not exposed to students through the new class-scoped workflow.
+- Use `database/audit-unassigned-canonical-exams.sql` for a read-only inventory of unassigned exams and candidate-class coverage. Exams with attempts are deliberately rejected by the API assignment endpoint; consider a separate controlled database operation only after confirming every historical attempt owner belongs to the intended class (`MissingAttemptedStudents = 0`) and reviewing the impact on access to historical work. Do not bulk-assign these exams automatically.
+- Run `database/patch-canonical-exam-class-targeting.sql` after canonical `Users`, `Departments`, and `Exams` exist with bigint keys. It creates the isolated `CanonicalClasses` and `CanonicalClassMembers` tables, then adds nullable `Exams.ClassId`, its foreign key, and an index without deleting or rewriting existing exam records. The separate names intentionally avoid collision with the legacy GUID-based `Classes` and `ClassMembers` tables.
+- `Frontend/classes.html` provides class creation and roster management; the class-management link is available to SuperAdmin, DepartmentAdmin, and Teacher roles.
+
+## Bulk question import
+
+The canonical question bank supports a preview-first bulk import for MultipleChoice and Matching questions. Essay questions are deliberately excluded.
+
+- `POST /api/questions/import/preview/file` — multipart form upload with field `file`; accepts `.xlsx` and `.csv` files up to 5 MB.
+- `POST /api/questions/import/preview/paste` — JSON body `{ "content": "..." }`; accepts tab-separated content copied from a spreadsheet or comma-separated CSV text.
+- `POST /api/questions/import/confirm` — JSON body `{ "rows": [...] }` using the normalized rows returned by preview. The server validates them again and inserts the batch in one transaction. If any row is invalid or duplicates an existing question, the batch is rejected.
+- Each import is limited to 500 rows. The first row must contain headers. Required shared headers: `Skill`, `Type`, and `Text`; optional shared headers: `Category`, `Points`, and `Difficulty`.
+- MultipleChoice columns: `Option1` through `Option4`, and `CorrectOption` (1-based index among non-empty options).
+- Matching columns: `Left1`/`Right1` through `Left10`/`Right10`.
+- `Type` values: `MultipleChoice` (or `MCQ`) and `Matching`. `Difficulty`: `Easy`, `Medium`, or `Hard`.
+- Skill names must match an existing skill. Include `Category` when skill names are not unique.
+- The teacher question bank links to `Frontend/question-import.html`. The preview does not write to the database; confirmation revalidates all rows before committing.
+
+
+## Essay section PDF workflow (stage 3)
+
+New exams can contain an explicit `SectionType = "Essay"` section with no text questions. The teacher uploads one PDF question paper for that section; each student uploads one PDF answer for each Essay section in their attempt. Legacy exams and legacy text Essay questions are not rewritten.
+
+- `POST /api/exam-files/sections/{sectionId}/question-paper` — teacher/department/super-admin uploads or replaces the section's question PDF (multipart field `file`).
+- `GET /api/exam-files/sections/{sectionId}/question-paper?attemptId={attemptId}` — student downloads/views the paper for their own attempt; authorized teachers/managers may omit `attemptId`.
+- `POST /api/exam-files/sections/{sectionId}/attempts/{attemptId}/answer` — student uploads or replaces their PDF answer for that Essay section (multipart field `file`).
+- `GET /api/exam-files/sections/{sectionId}/attempts/{attemptId}/answer` — student downloads their own answer; authorized teachers/managers can download the submission for grading.
+- Section PDF uploads are stored under `App_Data/exam-files`, outside `wwwroot`, use random server-side names, and validate the PDF signature. The exam's nullable `MaxPdfFileSizeBytes` controls the limit (default 20 MiB, bounded to 1–100 MiB).
+- Publishing is blocked until every Essay section has its question PDF. Manual submission is blocked until the student has uploaded an answer PDF for every Essay section. At the server deadline, auto-submit still locks the attempt if an answer PDF is missing; the attempt remains flagged for manual review.
+- The existing exam-level `ExamDocuments` and `ExamSubmissionDocuments` routes remain available for legacy PDF-only exams.
+- Apply `database/patch-essay-section-pdf-submissions.sql` before deploying this version. It adds `ExamSectionSubmissionDocuments`; it does not migrate or delete legacy documents.

@@ -19,9 +19,23 @@ builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
-builder.Services.AddDbContext<AppDbContext>(options =>
-    options.UseSqlServer(
-        builder.Configuration.GetConnectionString("DefaultConnection")));
+var canonicalConnectionString = builder.Configuration.GetConnectionString("CanonicalConnection")
+    ?? throw new InvalidOperationException(
+        "Configure ConnectionStrings:CanonicalConnection for the canonical bigint database.");
+
+
+// Canonical identity mappings use bigint IDs and normalized UserRoles/Roles.
+builder.Services.AddDbContext<CanonicalIdentityDbContext>(options =>
+    options.UseSqlServer(canonicalConnectionString));
+
+// Canonical question-bank and exam tables use bigint identity keys and the
+// normalized relational schema. Exam, attempt, and results endpoints use this context.
+builder.Services.AddDbContext<CanonicalAcademicDbContext>(options =>
+    options.UseSqlServer(canonicalConnectionString));
+
+ // Operational feature tables also use canonical bigint identifiers.
+builder.Services.AddDbContext<CanonicalOperationsDbContext>(options =>
+    options.UseSqlServer(canonicalConnectionString));
 
 builder.Services.AddScoped<IAuthService, AuthService>();
 builder.Services.AddScoped<ITokenService, TokenService>();
@@ -136,116 +150,128 @@ app.MapGet("/health", () => Results.Ok(new
 }));
 
 // --------------------------------------------------
-// Database & SuperAdmin Bootstrap
 // --------------------------------------------------
+// Canonical database bootstrap
+// --------------------------------------------------
+
+if (builder.Configuration.GetValue<bool>("Database:ApplyMigrationsOnStartup"))
+{
+    throw new InvalidOperationException(
+        "Automatic EF migrations are disabled for the canonical database. " +
+        "Apply reviewed SQL changes explicitly to a restored database copy.");
+}
 
 using (var scope = app.Services.CreateScope())
 {
     var db = scope.ServiceProvider
-        .GetRequiredService<AppDbContext>();
+        .GetRequiredService<CanonicalIdentityDbContext>();
 
-    // Apply migrations if enabled
-    if (builder.Configuration.GetValue<bool>(
-        "Database:ApplyMigrationsOnStartup"))
+    if (builder.Configuration.GetValue<bool>("Bootstrap:CreateSuperAdmin"))
     {
-        await db.Database.MigrateAsync();
-    }
-
-    // Create first SuperAdmin
-    if (builder.Configuration.GetValue<bool>(
-        "Bootstrap:CreateSuperAdmin"))
-    {
-        var username =
-            builder.Configuration["Bootstrap:Username"]
-            ?? "admin";
-
-        var existingAdmin = await db.Users
-            .AnyAsync(user => user.Username == username);
+        var username = (builder.Configuration["Bootstrap:Username"] ?? "admin").Trim();
+        var existingAdmin = await db.Users.AnyAsync(user => user.Username == username);
 
         if (!existingAdmin)
         {
-            var password =
-                builder.Configuration["Bootstrap:Password"];
+            var password = builder.Configuration["Bootstrap:Password"];
+            var phoneNumber = builder.Configuration["Bootstrap:Mobile"]?.Trim();
 
+            var minimumBootstrapPasswordLength = app.Environment.IsDevelopment() ? 8 : 12;
             if (string.IsNullOrWhiteSpace(password) ||
-                password.Length < 12)
-            {
+                password.Length < minimumBootstrapPasswordLength)
                 throw new InvalidOperationException(
-                    "Bootstrap:Password must be at least 12 characters.");
-            }
+                    $"Bootstrap:Password must contain at least {minimumBootstrapPasswordLength} characters.");
 
-            db.Users.Add(new User
+            if (!string.IsNullOrWhiteSpace(phoneNumber) &&
+                await db.Users.AnyAsync(user => user.PhoneNumber == phoneNumber))
+                throw new InvalidOperationException(
+                    "Bootstrap:Mobile is already assigned to another user.");
+
+            var role = await db.Roles.SingleOrDefaultAsync(item => item.Id == 1);
+            if (role is null || role.Name != CanonicalRoleNames.SuperAdmin)
+                throw new InvalidOperationException(
+                    "Canonical Roles must contain Id=1, Name=SuperAdmin before bootstrap.");
+
+            var user = new CanonicalUser
             {
                 Username = username,
-                PasswordHash =
-                    BCrypt.Net.BCrypt.HashPassword(password),
+                PasswordHash = BCrypt.Net.BCrypt.HashPassword(password),
+                FullName = builder.Configuration["Bootstrap:FullName"] ?? "System Administrator",
+                Email = builder.Configuration["Bootstrap:Email"] ?? "admin@local",
+                PhoneNumber = phoneNumber,
+                IsActive = true,
+                CreatedAt = DateTime.UtcNow
+            };
 
-                FullName =
-                    builder.Configuration["Bootstrap:FullName"]
-                    ?? "System Administrator",
-
-                Email =
-                    builder.Configuration["Bootstrap:Email"]
-                    ?? "admin@local",
-
-                Mobile =
-                    builder.Configuration["Bootstrap:Mobile"]
-                    ?? "",
-
-                Role = UserRole.SuperAdmin,
-                MustChangePassword = false,
-                IsActive = true
-            });
-
+            user.UserRoles.Add(new CanonicalUserRole { RoleId = role.Id, Role = role });
+            db.Users.Add(user);
             await db.SaveChangesAsync();
         }
     }
 
-    // Create second SuperAdmin
-    if (builder.Configuration.GetValue<bool>(
-        "Bootstrap:SecondSuperAdmin:Enabled"))
+    if (builder.Configuration.GetValue<bool>("Bootstrap:SecondSuperAdmin:Enabled"))
     {
-        var secondUsername =
-            builder.Configuration[
-                "Bootstrap:SecondSuperAdmin:Username"]
-            ?? "admin2";
-
-        var existingSecondAdmin = await db.Users
-            .AnyAsync(user =>
-                user.Username == secondUsername);
-
-        if (!existingSecondAdmin)
+        var username = (builder.Configuration["Bootstrap:SecondSuperAdmin:Username"] ?? "admin2").Trim();
+        if (!await db.Users.AnyAsync(user => user.Username == username))
         {
-            var secondPassword =
-                builder.Configuration[
-                    "Bootstrap:SecondSuperAdmin:Password"];
+            var password = builder.Configuration["Bootstrap:SecondSuperAdmin:Password"];
+            var phoneNumber = builder.Configuration["Bootstrap:SecondSuperAdmin:Mobile"]?.Trim();
 
-            if (string.IsNullOrWhiteSpace(secondPassword) ||
-                secondPassword.Length < 12)
-            {
+            if (string.IsNullOrWhiteSpace(password) || password.Length < 12)
                 throw new InvalidOperationException(
-                    "Second SuperAdmin password must be at least 12 characters.");
-            }
+                    "Bootstrap:SecondSuperAdmin:Password must contain at least 12 characters.");
+            if (!string.IsNullOrWhiteSpace(phoneNumber) &&
+                await db.Users.AnyAsync(user => user.PhoneNumber == phoneNumber))
+                throw new InvalidOperationException(
+                    "Bootstrap:SecondSuperAdmin:Mobile is already assigned to another user.");
 
-            db.Users.Add(new User
+            var role = await db.Roles.SingleOrDefaultAsync(item => item.Id == 1);
+            if (role is null || role.Name != CanonicalRoleNames.SuperAdmin)
+                throw new InvalidOperationException(
+                    "Canonical Roles must contain Id=1, Name=SuperAdmin before bootstrap.");
+
+            var user = new CanonicalUser
             {
-                Username = secondUsername,
-
-                PasswordHash =
-                    BCrypt.Net.BCrypt.HashPassword(
-                        secondPassword),
-
+                Username = username,
+                PasswordHash = BCrypt.Net.BCrypt.HashPassword(password),
                 FullName = "Second System Administrator",
                 Email = "admin2@local",
-                Mobile = "",
-
-                Role = UserRole.SuperAdmin,
-                MustChangePassword = false,
-                IsActive = true
-            });
-
+                PhoneNumber = phoneNumber,
+                IsActive = true,
+                CreatedAt = DateTime.UtcNow
+            };
+            user.UserRoles.Add(new CanonicalUserRole { RoleId = role.Id, Role = role });
+            db.Users.Add(user);
             await db.SaveChangesAsync();
         }
+    }
+
+    // Explicit, development-only recovery for an existing canonical SuperAdmin.
+    // Supply both settings through .NET User Secrets; never commit the password.
+    if (app.Environment.IsDevelopment() &&
+        builder.Configuration.GetValue<bool>("Bootstrap:ResetExistingSuperAdminPassword"))
+    {
+        var resetUsername = (builder.Configuration["Bootstrap:Username"] ?? "admin").Trim();
+        var resetPassword = builder.Configuration["Bootstrap:ResetPassword"];
+        if (string.IsNullOrWhiteSpace(resetPassword) || resetPassword.Length < 8)
+            throw new InvalidOperationException(
+                "Bootstrap:ResetPassword must contain at least 8 characters.");
+
+        var admin = await db.Users.Include(user => user.UserRoles)
+            .SingleOrDefaultAsync(user => user.Username == resetUsername);
+        if (admin is null)
+            throw new InvalidOperationException(
+                $"Cannot reset password: user '{resetUsername}' was not found.");
+
+        if (!admin.UserRoles.Any(item => item.RoleId == 1))
+            throw new InvalidOperationException(
+                "Password reset refused: the target user is not assigned the SuperAdmin role.");
+
+        admin.PasswordHash = BCrypt.Net.BCrypt.HashPassword(resetPassword);
+        await db.SaveChangesAsync();
+        app.Logger.LogWarning(
+            "Development-only password reset applied for canonical SuperAdmin '{Username}'. Disable Bootstrap:ResetExistingSuperAdminPassword now.",
+            resetUsername);
     }
 }
 
