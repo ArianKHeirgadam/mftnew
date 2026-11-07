@@ -336,16 +336,16 @@
 
   async function loadTeacherGrades() {
     if (!document.body.matches('[data-active="dashboard"]') || (currentUser()?.role || '').toLowerCase() !== 'teacher') return;
-    const attempts = await request('/results');
-    const pending = attempts.filter(attempt => attempt.status === 'Submitted');
+    const attempts = await request('/canonical/results');
+    const pending = attempts.filter(attempt => ['Submitted', 'PartiallyGraded'].includes(attempt.status));
     const list = $('#teacherPendingPlaceholder');
-    if (list) list.innerHTML = pending.length ? pending.map(attempt => `<li class="flex items-center justify-between" style="padding:10px 0;border-bottom:1px solid var(--border)"><div><b>${escapeHtml(attempt.studentName || 'دانشجو')}</b><div class="text-soft text-sm">${escapeHtml(attempt.examTitle)} — ارسال ${attempt.submittedAt ? new Date(attempt.submittedAt).toLocaleString('fa-IR') : 'بدون تاریخ'}</div></div><button class="btn btn-outline btn-sm" data-grade-attempt="${attempt.id}">تصحیح</button></li>`).join('') : '<li class="text-soft">برگه‌ای در انتظار تصحیح نیست.</li>';
+    if (list) list.innerHTML = pending.length ? pending.map(attempt => `<li class="flex items-center justify-between" style="padding:10px 0;border-bottom:1px solid var(--border)"><div><b>${escapeHtml(attempt.studentName || 'دانشجو')}</b><div class="text-soft text-sm">${escapeHtml(attempt.examTitle)} — ارسال ${attempt.submittedAt ? new Date(attempt.submittedAt).toLocaleString('fa-IR') : 'بدون تاریخ'}</div></div><a class="btn btn-outline btn-sm" href="results.html?attemptId=${encodeURIComponent(attempt.id)}">تصحیح</a></li>`).join('') : '<li class="text-soft">برگه‌ای در انتظار تصحیح نیست.</li>';
     const count = $('#mftPendingGradeCount');
     if (count) count.textContent = `${faNumber(pending.length)} مورد باقی‌مانده`;
 
-    const exams = await request('/exams');
+    const exams = await request('/canonical/exams');
     const upcoming = $('#mftUpcomingExams');
-    if (upcoming) upcoming.innerHTML = exams.length ? exams.map(exam => `<li class="flex items-center gap-12"><div class="mohr sm"><div class="mohr-inner"><b>${escapeHtml(exam.title.slice(0, 2))}</b></div></div><div><b style="font-size:13px">${escapeHtml(exam.title)}</b><div class="text-soft text-sm">${exam.startsAt ? new Date(exam.startsAt).toLocaleString('fa-IR') : 'زمان‌بندی نشده'} — ${faNumber(exam.durationMinutes)} دقیقه</div></div></li>`).join('') : '<li class="text-soft">هنوز آزمونی ثبت نشده است.</li>';
+    if (upcoming) upcoming.innerHTML = exams.length ? exams.map(exam => `<li class="flex items-center gap-12"><div class="mohr sm"><div class="mohr-inner"><b>${escapeHtml(exam.title.slice(0, 2))}</b></div></div><div><b style="font-size:13px">${escapeHtml(exam.title)}</b><div class="text-soft text-sm">${exam.startAt ? new Date(exam.startAt).toLocaleString('fa-IR') : 'زمان‌بندی نشده'} — ${faNumber(exam.durationMinutes)} دقیقه</div></div></li>`).join('') : '<li class="text-soft">هنوز آزمونی ثبت نشده است.</li>';
   }
 
   async function loadStudentPerformance() {
@@ -380,49 +380,6 @@
       const exams = await request('/canonical/exams');
       renderRows('#departmentExamsBody', exams, exam => `<tr><td>${escapeHtml(exam.title)}</td><td>—</td><td>${exam.startAt ? new Date(exam.startAt).toLocaleDateString('fa-IR') : '—'}</td><td>—</td><td>${exam.isPublished ? 'منتشرشده' : 'پیش‌نویس'}</td><td><a href="results.html?examId=${exam.id}" class="btn btn-ghost btn-sm">نتایج</a></td></tr>`, 6);
     }
-  }
-
-  async function openGradeAttempt(id) {
-    const result = await request(`/results/${id}`);
-    const modal = $('#gradeModal');
-    if (!modal) return;
-    modal.dataset.attemptId = String(id);
-    $('#gradeExamTitle', modal).textContent = `${result.exam} — ${result.answers.length} پاسخ`;
-    const answerDetails = $('#gradeAnswerDetails', modal);
-    answerDetails.innerHTML = result.answers.map((answer, index) => `<div style="padding:8px 0;border-bottom:1px solid var(--border)"><b>سؤال ${faNumber(index + 1)}:</b> ${escapeHtml(answer.question || '')}<br><span>پاسخ دانشجو: ${escapeHtml(answer.answer || 'بدون پاسخ')}</span><br><span>نمره خودکار: ${faNumber(answer.awardedScore)}</span></div>`).join('') || 'پاسخ متنی ثبت نشده است؛ برگه دست‌نویس را از دکمه زیر بررسی کنید.';
-    const submissionActions = document.createElement('div');
-    submissionActions.className = 'flex gap-8 mt-8';
-    const submissionPreview = document.createElement('button');
-    submissionPreview.type = 'button'; submissionPreview.className = 'btn btn-primary';
-    submissionPreview.textContent = 'مشاهده برگه پاسخ';
-    submissionPreview.addEventListener('click', async () => {
-      try { await window.MftApi.preview(`/exam-files/attempts/${encodeURIComponent(id)}`); }
-      catch (error) { notify(error.message || 'پیش‌نمایش پاسخ دانشجو در دسترس نیست.', 'danger'); }
-    });
-    const submissionDownload = document.createElement('button');
-    submissionDownload.type = 'button'; submissionDownload.className = 'btn btn-outline';
-    submissionDownload.textContent = 'دانلود برگه پاسخ';
-    submissionDownload.addEventListener('click', async () => {
-      try { await window.MftApi.download(`/exam-files/attempts/${encodeURIComponent(id)}`); }
-      catch (error) { notify(error.message || 'فایل پاسخ دانشجو در دسترس نیست.', 'danger'); }
-    });
-    submissionActions.append(submissionPreview, submissionDownload);
-    answerDetails.append(submissionActions);
-    const score = $('[data-grade-score]', modal);
-    if (score) { score.max = String(result.maxScore ?? 0); score.value = result.score ?? ''; score.placeholder = `حداکثر ${result.maxScore ?? 0}`; }
-    modal.classList.add('show');
-  }
-
-  async function saveGrade(modal) {
-    const id = modal.dataset.attemptId;
-    const input = $('[data-grade-score]', modal);
-    const score = Number(input?.value);
-    if (!id || !Number.isFinite(score) || score < 0) return notify('نمره معتبر وارد کنید.', 'warn');
-    await safe(async () => {
-      await request(`/results/${id}/grade`, { method: 'PUT', body: JSON.stringify(score) });
-      modal.classList.remove('show');
-      await loadTeacherGrades();
-    }, 'نمره ثبت شد.');
   }
 
   function exportTableCsv() {
@@ -874,10 +831,6 @@
       if ($('#matchingOptions', modal)) $('#matchingOptions', modal).hidden = true;
     });
     document.addEventListener('click', event => {
-      const gradeSave = event.target.closest('[data-grade-save]');
-      if (gradeSave) { event.preventDefault(); saveGrade(gradeSave.closest('.modal-overlay')); return; }
-      const gradeAttempt = event.target.closest('[data-grade-attempt]');
-      if (gradeAttempt) { event.preventDefault(); safe(() => openGradeAttempt(gradeAttempt.dataset.gradeAttempt)); return; }
       if (event.target.closest('[data-export-print]')) { event.preventDefault(); window.print(); return; }
       if (event.target.closest('[data-export-csv]')) { event.preventDefault(); exportTableCsv(); return; }
       if (event.target.closest('[data-backup-unavailable], [data-restore-unavailable]')) { event.preventDefault(); notify('پشتیبان‌گیری و بازیابی دیتابیس هنوز در سمت سرور پیکربندی نشده است؛ این دکمه داده‌ها را تغییر نمی‌دهد.', 'warn'); return; }

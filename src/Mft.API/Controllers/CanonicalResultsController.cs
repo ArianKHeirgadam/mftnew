@@ -58,7 +58,7 @@ public sealed class CanonicalResultsController(
             studentName = names.GetValueOrDefault(x.StudentUserId),
             startedAt = x.StartedAt, submittedAt = x.SubmittedAt,
             score = isStudent ? x.FinalScore : x.FinalScore ?? x.AutoGradedScore,
-            status = x.ResultsPublished ? StatusCodeName(x.StatusId) : "AwaitingPublication",
+            status = isStudent && !x.ResultsPublished ? "AwaitingPublication" : StatusCodeName(x.StatusId),
             resultsPublished = x.ResultsPublished
         }));
     }
