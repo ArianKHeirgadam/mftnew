@@ -68,7 +68,8 @@ public sealed class CanonicalExamAttemptController(
         if (inProgress is null) return StatusCode(500, new { message = "وضعیت InProgress در ExamAttemptStatuses تعریف نشده است." });
 
         var attempt = new CanonicalExamAttempt {
-            ExamId = examId, StudentUserId = StudentId.Value, StartedAt = now, StatusId = inProgress.Id
+            ExamId = examId, StudentUserId = StudentId.Value, StartedAt = now,
+            StatusId = inProgress.Id, ManualReviewRequired = false
         };
         await using var startTransaction = await academic.Database.BeginTransactionAsync(ct);
         academic.ExamAttempts.Add(attempt);
