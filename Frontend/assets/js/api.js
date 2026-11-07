@@ -540,7 +540,7 @@
               const status = document.createElement('p');
               status.className = 'text-soft text-sm mt-8';
               status.textContent = grade
-                ? 'آخرین تصحیح: ' + new Date(grade.gradedAt).toLocaleString('fa-IR') + ' — نمره ' + faNumber(grade.score) + ' از ' + faNumber(maxScore)
+                ? 'آخرین تصحیح: ' + (parseUtcDate(grade.gradedAt)?.toLocaleString('fa-IR') || '—') + ' — نمره ' + faNumber(grade.score) + ' از ' + faNumber(maxScore)
                 : 'این بخش هنوز نمره‌گذاری نشده است.';
               article.append(status);
               essayGradingBox.append(article);
@@ -644,7 +644,7 @@
     const list = $('#teacherPendingPlaceholder'), count = $('#mftPendingGradeCount'), upcoming = $('#mftUpcomingExams');
     const attemptsTask = request('/canonical/results').then(attempts => {
       const pending = (Array.isArray(attempts) ? attempts : []).filter(x => ['Submitted','PartiallyGraded'].includes(x.status));
-      if (list) list.innerHTML = pending.length ? pending.map(x => '<li class="flex items-center justify-between" style="padding:10px 0;border-bottom:1px solid var(--border)"><div><b>' + escapeHtml(x.studentName || 'دانشجو') + '</b><div class="text-soft text-sm">شماره دانشجویی: ' + escapeHtml(x.studentNumber || 'ثبت نشده') + '</div><div class="text-soft text-sm">' + escapeHtml(x.examTitle) + ' — ارسال ' + (x.submittedAt ? new Date(x.submittedAt).toLocaleString('fa-IR') : 'بدون تاریخ') + '</div><div class="text-soft text-sm">' + (x.isPdfOnly ? 'پاسخنامه PDF — در انتظار تصحیح استاد' : (x.score == null ? 'نمره تستی: هنوز ثبت نشده' : 'نمره خودکار تا این مرحله: ' + faNumber(x.score)) + (x.status === 'PartiallyGraded' ? ' — پاسخ تشریحی در انتظار تصحیح' : '')) + '</div></div><a class="btn btn-outline btn-sm" href="results.html?attemptId=' + encodeURIComponent(x.id) + '">تصحیح</a></li>').join('') : '<li class="text-soft">برگه‌ای در انتظار تصحیح نیست.</li>';
+      if (list) list.innerHTML = pending.length ? pending.map(x => '<li class="flex items-center justify-between" style="padding:10px 0;border-bottom:1px solid var(--border)"><div><b>' + escapeHtml(x.studentName || 'دانشجو') + '</b><div class="text-soft text-sm">شماره دانشجویی: ' + escapeHtml(x.studentNumber || 'ثبت نشده') + '</div><div class="text-soft text-sm">' + escapeHtml(x.examTitle) + ' — ارسال ' + (x.submittedAt ? (parseUtcDate(x.submittedAt)?.toLocaleString('fa-IR') || '—') : 'بدون تاریخ') + '</div><div class="text-soft text-sm">' + (x.isPdfOnly ? 'پاسخنامه PDF — در انتظار تصحیح استاد' : (x.score == null ? 'نمره تستی: هنوز ثبت نشده' : 'نمره خودکار تا این مرحله: ' + faNumber(x.score)) + (x.status === 'PartiallyGraded' ? ' — پاسخ تشریحی در انتظار تصحیح' : '')) + '</div></div><a class="btn btn-outline btn-sm" href="results.html?attemptId=' + encodeURIComponent(x.id) + '">تصحیح</a></li>').join('') : '<li class="text-soft">برگه‌ای در انتظار تصحیح نیست.</li>';
       if (count) count.textContent = faNumber(pending.length) + ' مورد باقی‌مانده';
     }).catch(error => {
       if (list) list.innerHTML = '<li class="text-soft">دریافت صف تصحیح ناموفق بود: ' + escapeHtml(error.message || 'خطای نامشخص') + '</li>';
@@ -708,8 +708,51 @@
         : '<li class="text-soft">اعلانی ثبت نشده است.</li>';
     }
     if (role === 'department') {
-      const exams = await request('/canonical/exams');
-      renderRows('#departmentExamsBody', exams, exam => `<tr><td>${escapeHtml(exam.title)}</td><td>—</td><td>${exam.startAt ? new Date(exam.startAt).toLocaleDateString('fa-IR') : '—'}</td><td>—</td><td>${exam.isPublished ? 'منتشرشده' : 'پیش‌نویس'}</td><td><a href="results.html?examId=${exam.id}" class="btn btn-ghost btn-sm">نتایج</a></td></tr>`, 6);
+      const [exams, attempts, classes, summary, departmentReports] = await Promise.all([
+        request('/canonical/exams'),
+        request('/canonical/results'),
+        request('/canonical/classes'),
+        request('/dashboard/summary').catch(() => ({})),
+        request('/reports/departments').catch(() => [])
+      ]);
+      const departmentId = currentUser()?.departmentId ?? currentUser()?.DepartmentId;
+      const ownReport = Array.isArray(departmentReports)
+        ? departmentReports.find(item => Number(item.departmentId) === Number(departmentId)) || departmentReports.find(item => item.department === currentUser()?.department)
+        : null;
+      renderRows('#departmentExamsBody', exams, exam => `<tr><td>${escapeHtml(exam.title)}</td><td>—</td><td>${exam.startAt ? (parseUtcDate(exam.startAt)?.toLocaleDateString('fa-IR') || '—') : '—'}</td><td>—</td><td>${exam.isPublished ? 'منتشرشده' : 'پیش‌نویس'}</td><td><a href="results.html?examId=${exam.id}" class="btn btn-ghost btn-sm">نتایج</a></td></tr>`, 6);
+
+      const setMetric = (key, value, note, percentage) => {
+        const item = document.querySelector('[data-department-metric="' + key + '"]');
+        if (!item) return;
+        const valueNode = item.querySelector('[data-metric-value]');
+        const noteNode = item.querySelector('[data-metric-note]');
+        const bar = item.querySelector('[data-metric-bar]');
+        if (valueNode) valueNode.textContent = value;
+        if (noteNode) noteNode.textContent = note || '';
+        if (bar) bar.style.width = Number.isFinite(percentage) ? Math.max(0, Math.min(100, percentage)) + '%' : '0%';
+      };
+
+      // The current canonical class schema stores members, but has no seat-capacity
+      // field. Never present enrollment counts as a capacity-completion percentage.
+      const capacityValue = summary?.capacityCompletion ?? summary?.admissionCapacityCompletion;
+      setMetric('capacity',
+        Number.isFinite(Number(capacityValue)) ? faNumber(Number(capacityValue)) + '%' : 'تعریف نشده',
+        Number.isFinite(Number(capacityValue)) ? 'بر اساس ظرفیت ثبت‌شده دپارتمان' : 'برای کلاس‌ها/دپارتمان هنوز ظرفیت پذیرش در سامانه تعریف نشده است.',
+        Number.isFinite(Number(capacityValue)) ? Number(capacityValue) : NaN);
+
+      const passRate = ownReport?.passRate;
+      setMetric('passRate',
+        Number.isFinite(Number(passRate)) ? faNumber(Number(passRate).toFixed(1)) + '%' : '—',
+        Number.isFinite(Number(passRate)) ? 'بر اساس گزارش قبولی آزمون‌های همین دپارتمان' : 'داده نرخ قبولی از سرویس گزارش دپارتمان دریافت نشد.',
+        Number.isFinite(Number(passRate)) ? Number(passRate) : NaN);
+
+      const submitted = Array.isArray(attempts) ? attempts.filter(item => item.status !== 'InProgress') : [];
+      const graded = submitted.filter(item => item.status === 'FullyGraded' || item.status === 'Graded' || item.resultsPublished === true);
+      const progress = submitted.length ? graded.length * 100 / submitted.length : 0;
+      setMetric('grading',
+        submitted.length ? faNumber(progress.toFixed(1)) + '%' : '—',
+        submitted.length ? faNumber(graded.length) + ' از ' + faNumber(submitted.length) + ' پاسخنامه ارسال‌شده نهایی/منتشر شده است.' : 'هنوز پاسخنامه ارسال‌شده‌ای برای تصحیح وجود ندارد.',
+        progress);
     }
   }
 
@@ -745,7 +788,7 @@
     const panels = { tAll: rows, tUnread: rows.filter(row => !row.isRead), tRead: rows.filter(row => row.isRead) };
     const empty = { tAll: 'اعلانی وجود ندارد.', tUnread: 'اعلان خوانده‌نشده‌ای وجود ندارد.', tRead: 'اعلان خوانده‌شده‌ای وجود ندارد.' };
     const render = row => `<article class="notification-item ${row.isRead ? '' : 'unread'}" data-notification-id="${row.id}">
-      <div><b>${escapeHtml(row.title)}</b><p>${escapeHtml(row.message)}</p><small>${new Date(row.createdAt).toLocaleString('fa-IR')}</small></div>
+      <div><b>${escapeHtml(row.title)}</b><p>${escapeHtml(row.message)}</p><small>${(parseUtcDate(row.createdAt)?.toLocaleString('fa-IR') || '—')}</small></div>
       <div class="flex gap-8"><button class="btn btn-sm" data-notification-read="${row.id}" ${row.isRead ? 'disabled' : ''}>خوانده شد</button>
       <button class="btn btn-sm btn-danger" data-notification-delete="${row.id}">حذف</button></div></article>`;
     Object.entries(panels).forEach(([id, items]) => {
@@ -851,7 +894,7 @@
     if (!Array.isArray(rows)) throw new Error('پاسخ تلاش‌های اخیر معتبر نیست.');
     body.innerHTML = rows.length ? rows.map(row => {
       const status = row.status === 'Graded' ? 'تصحیح‌شده' : row.status === 'Submitted' ? 'ارسال‌شده' : escapeHtml(row.status);
-      const date = value => value ? new Date(value).toLocaleString('fa-IR') : '—';
+      const date = value => value ? (parseUtcDate(value)?.toLocaleString('fa-IR') || '—') : '—';
       return `<tr><td>${escapeHtml(row.department)}</td><td>${escapeHtml(row.student)}</td><td>${escapeHtml(row.exam)}</td><td>${date(row.startedAt)}</td><td>${date(row.submittedAt)}</td><td>${status}</td><td>${row.score == null ? 'در انتظار تصحیح' : Number(row.score).toLocaleString('fa-IR')}</td></tr>`;
     }).join('') : '<tr><td colspan="7" class="text-soft" style="text-align:center;padding:24px">تلاشی برای این فیلتر پیدا نشد.</td></tr>';
   }
