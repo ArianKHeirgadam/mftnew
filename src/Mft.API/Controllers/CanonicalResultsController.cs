@@ -31,9 +31,12 @@ public sealed class CanonicalResultsController(
 
         if (isStudent)
             query = query.Where(x => x.Attempt.StudentUserId == CurrentUserId &&
-                x.Exam.ResultsPublished && x.Attempt.StatusId == 4);
+                ((x.Attempt.StatusId == 2 || x.Attempt.StatusId == 3) ||
+                 (x.Exam.ResultsPublished && x.Attempt.StatusId == 4)));
         else if (User.IsInRole("Teacher"))
-            query = query.Where(x => x.Exam.CreatedByUserId == CurrentUserId);
+            query = query.Where(x => x.Exam.CreatedByUserId == CurrentUserId ||
+                (x.Exam.ClassId.HasValue && academic.ClassTeachers.Any(t =>
+                    t.ClassId == x.Exam.ClassId.Value && t.TeacherUserId == CurrentUserId)));
         else if (User.IsInRole("Department"))
             query = query.Where(x => x.Exam.DepartmentId == CurrentDepartmentId);
         else if (!User.IsInRole("SuperAdmin")) return Forbid();
@@ -57,8 +60,10 @@ public sealed class CanonicalResultsController(
             studentId = x.StudentUserId,
             studentName = names.GetValueOrDefault(x.StudentUserId),
             startedAt = x.StartedAt, submittedAt = x.SubmittedAt,
-            score = isStudent ? x.FinalScore : x.FinalScore ?? x.AutoGradedScore,
-            status = isStudent && !x.ResultsPublished ? "AwaitingPublication" : StatusCodeName(x.StatusId),
+            score = isStudent
+                ? (x.StatusId == 4 ? (x.ResultsPublished ? x.FinalScore : null) : x.AutoGradedScore)
+                : x.FinalScore ?? x.AutoGradedScore,
+            status = StatusCodeName(x.StatusId),
             resultsPublished = x.ResultsPublished
         }));
     }
@@ -72,9 +77,10 @@ public sealed class CanonicalResultsController(
         var exam = await academic.Exams.AsNoTracking().FirstOrDefaultAsync(x => x.Id == attempt.ExamId, ct);
         if (exam is null) return NotFound();
         var isStudent = User.IsInRole("Student");
-        if (isStudent && (attempt.StudentUserId != CurrentUserId || !exam.ResultsPublished || attempt.StatusId != 4))
+        if (isStudent && (attempt.StudentUserId != CurrentUserId ||
+            !((attempt.StatusId == 2 || attempt.StatusId == 3) || (exam.ResultsPublished && attempt.StatusId == 4))))
             return NotFound();
-        if (!isStudent && !CanManage(exam)) return Forbid();
+        if (!isStudent && !await CanManage(exam, ct)) return Forbid();
 
         var answers = await (from answer in academic.StudentAnswers.AsNoTracking()
             join examQuestion in academic.ExamQuestions.AsNoTracking() on answer.ExamQuestionId equals examQuestion.Id
@@ -115,7 +121,7 @@ public sealed class CanonicalResultsController(
                 matchingKey = reveal && code == "Matching"
                     ? matching.Where(p => p.QuestionId == x.QuestionId).Select(p => new { p.LeftItem, p.RightItem }).ToList()
                     : null,
-                awardedScore = reveal ? x.Score : null,
+                awardedScore = reveal || (isStudent && x.IsAutoGraded) ? x.Score : null,
                 maxScore = x.PointsOverride ?? x.Points,
                 isAutoGraded = x.IsAutoGraded,
                 isManuallyGraded = !x.IsAutoGraded && x.Score.HasValue,
@@ -126,8 +132,14 @@ public sealed class CanonicalResultsController(
         return Ok(new {
             id = attempt.Id, examId = exam.Id, exam = exam.Title, isPdfOnly,
             submissionPdf = submissionDocument,
-            score = isPdfOnly ? (isStudent && !exam.ResultsPublished ? null : attempt.FinalScore) : (exam.ResultsPublished ? attempt.FinalScore : null),
-            autoScore = isStudent && !exam.ResultsPublished ? null : attempt.AutoGradedScore,
+            score = isPdfOnly
+                ? (isStudent && !exam.ResultsPublished ? null : attempt.FinalScore)
+                : (isStudent && (attempt.StatusId == 2 || attempt.StatusId == 3)
+                    ? attempt.AutoGradedScore
+                    : (exam.ResultsPublished ? attempt.FinalScore : null)),
+            autoScore = isStudent && (attempt.StatusId == 2 || attempt.StatusId == 3)
+                ? attempt.AutoGradedScore
+                : (isStudent && !exam.ResultsPublished ? null : attempt.AutoGradedScore),
             maxScore, pendingManualCount = pending,
             status = exam.ResultsPublished ? StatusCodeName(attempt.StatusId) : "AwaitingPublication",
             resultsPublished = exam.ResultsPublished, answers = payload
@@ -144,7 +156,7 @@ public sealed class CanonicalResultsController(
         if (attempt is null) return NotFound();
         var exam = await academic.Exams.FirstOrDefaultAsync(x => x.Id == attempt.ExamId, ct);
         if (exam is null) return NotFound();
-        if (!CanManage(exam)) return Forbid();
+        if (!await CanManage(exam, ct)) return Forbid();
         if (exam.ResultsPublished) return Conflict(new { message = "برای تغییر نمره، ابتدا انتشار نتایج را لغو کنید." });
         if (attempt.StatusId == 1) return BadRequest(new { message = "آزمون هنوز ارسال نشده است." });
 
@@ -191,7 +203,7 @@ public sealed class CanonicalResultsController(
         if (attempt is null) return NotFound();
         var exam = await academic.Exams.FirstOrDefaultAsync(x => x.Id == attempt.ExamId, ct);
         if (exam is null) return NotFound();
-        if (!CanManage(exam)) return Forbid();
+        if (!await CanManage(exam, ct)) return Forbid();
         if (exam.ResultsPublished) return Conflict(new { message = "برای تغییر نمره، ابتدا انتشار نتایج را لغو کنید." });
         if (attempt.StatusId == 1) return BadRequest(new { message = "دانشجو هنوز آزمون را ثبت نهایی نکرده است." });
         var isPdfOnly = !await academic.ExamSections.AnyAsync(x => x.ExamId == exam.Id, ct) &&
@@ -213,7 +225,7 @@ public sealed class CanonicalResultsController(
     {
         var exam = await academic.Exams.FirstOrDefaultAsync(x => x.Id == examId, ct);
         if (exam is null) return NotFound();
-        if (!CanManage(exam)) return Forbid();
+        if (!await CanManage(exam, ct)) return Forbid();
         var attempts = await academic.ExamAttempts.Where(x => x.ExamId == examId).ToListAsync(ct);
         var isPdfOnly = !await academic.ExamSections.AnyAsync(x => x.ExamId == examId, ct) &&
             await academic.ExamDocuments.AnyAsync(x => x.ExamId == examId, ct);
@@ -250,7 +262,7 @@ public sealed class CanonicalResultsController(
     {
         var exam = await academic.Exams.FirstOrDefaultAsync(x => x.Id == examId, ct);
         if (exam is null) return NotFound();
-        if (!CanManage(exam)) return Forbid();
+        if (!await CanManage(exam, ct)) return Forbid();
         exam.ResultsPublished = false;
         exam.ResultsPublishedAt = null;
         exam.ResultsPublishedByUserId = null;
@@ -258,10 +270,12 @@ public sealed class CanonicalResultsController(
         return NoContent();
     }
 
-    private bool CanManage(CanonicalExam exam) =>
+    private async Task<bool> CanManage(CanonicalExam exam, CancellationToken ct) =>
         User.IsInRole("SuperAdmin") ||
         User.IsInRole("Department") && exam.DepartmentId == CurrentDepartmentId ||
-        User.IsInRole("Teacher") && exam.CreatedByUserId == CurrentUserId;
+        User.IsInRole("Teacher") && (exam.CreatedByUserId == CurrentUserId ||
+            (exam.ClassId.HasValue && await academic.ClassTeachers.AnyAsync(
+                x => x.ClassId == exam.ClassId.Value && x.TeacherUserId == CurrentUserId, ct)));
 
     private static string StatusCodeName(byte id) => id switch {
         1 => "InProgress", 2 => "Submitted", 3 => "PartiallyGraded", 4 => "FullyGraded", _ => "Unknown"
