@@ -39,9 +39,10 @@ BEGIN TRY
         ALTER TABLE dbo.ExamSections ADD NegativeMarkingPoints decimal(6,2) NULL;
 
     /* Normalize only the newly introduced flag; legacy sections remain legacy (SectionType NULL). */
-    UPDATE dbo.ExamSections
+    /* Dynamic SQL defers column binding until after the conditional ADD has run. */
+    EXEC sys.sp_executesql N'UPDATE dbo.ExamSections
        SET NegativeMarkingEnabled = 0
-     WHERE NegativeMarkingEnabled IS NULL;
+     WHERE NegativeMarkingEnabled IS NULL;';
     IF EXISTS (
         SELECT 1 FROM sys.columns
         WHERE object_id = OBJECT_ID(N'dbo.ExamSections')
