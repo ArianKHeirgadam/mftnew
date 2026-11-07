@@ -269,6 +269,35 @@ CREATE TABLE dbo.AttendanceRecords (
 CREATE UNIQUE INDEX UX_AttendanceRecords_Student_Date ON dbo.AttendanceRecords(StudentUserId, AttendanceDate);
 CREATE INDEX IX_AttendanceRecords_Department_Date ON dbo.AttendanceRecords(DepartmentId, AttendanceDate);
 
+-- Private PDF metadata tables. Binary files remain outside wwwroot in protected storage.
+CREATE TABLE dbo.ExamDocuments (
+    Id bigint IDENTITY(1,1) NOT NULL CONSTRAINT PK_ExamDocuments PRIMARY KEY,
+    ExamId bigint NOT NULL,
+    StoredFileName nvarchar(100) NOT NULL,
+    OriginalFileName nvarchar(255) NOT NULL,
+    FileSize bigint NOT NULL,
+    UploadedByUserId bigint NOT NULL,
+    UploadedAt datetime2 NOT NULL CONSTRAINT DF_ExamDocuments_UploadedAt DEFAULT SYSUTCDATETIME(),
+    CONSTRAINT FK_ExamDocuments_Exams FOREIGN KEY (ExamId) REFERENCES dbo.Exams(Id) ON DELETE CASCADE,
+    CONSTRAINT FK_ExamDocuments_Users FOREIGN KEY (UploadedByUserId) REFERENCES dbo.Users(Id) ON DELETE NO ACTION
+);
+CREATE UNIQUE INDEX UX_ExamDocuments_ExamId ON dbo.ExamDocuments(ExamId);
+CREATE INDEX IX_ExamDocuments_UploadedByUserId ON dbo.ExamDocuments(UploadedByUserId);
+
+CREATE TABLE dbo.ExamSubmissionDocuments (
+    Id bigint IDENTITY(1,1) NOT NULL CONSTRAINT PK_ExamSubmissionDocuments PRIMARY KEY,
+    AttemptId bigint NOT NULL,
+    StoredFileName nvarchar(100) NOT NULL,
+    OriginalFileName nvarchar(255) NOT NULL,
+    FileSize bigint NOT NULL,
+    UploadedByUserId bigint NOT NULL,
+    UploadedAt datetime2 NOT NULL CONSTRAINT DF_ExamSubmissionDocuments_UploadedAt DEFAULT SYSUTCDATETIME(),
+    CONSTRAINT FK_ExamSubmissionDocuments_ExamAttempts FOREIGN KEY (AttemptId) REFERENCES dbo.ExamAttempts(Id) ON DELETE CASCADE,
+    CONSTRAINT FK_ExamSubmissionDocuments_Users FOREIGN KEY (UploadedByUserId) REFERENCES dbo.Users(Id) ON DELETE NO ACTION
+);
+CREATE UNIQUE INDEX UX_ExamSubmissionDocuments_AttemptId ON dbo.ExamSubmissionDocuments(AttemptId);
+CREATE INDEX IX_ExamSubmissionDocuments_UploadedByUserId ON dbo.ExamSubmissionDocuments(UploadedByUserId);
+
 INSERT dbo.Roles(Id, Name) VALUES
     (1, N'SuperAdmin'),
     (2, N'DepartmentAdmin'),
