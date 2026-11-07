@@ -69,7 +69,7 @@ public sealed class CanonicalExamsController(
             return Forbid();
         var sections = await academic.ExamSections.AsNoTracking().Where(x => x.ExamId == id)
             .OrderBy(x => x.DisplayOrder).Select(x => new {
-                x.Id, x.SkillId, x.DurationMinutes, x.DisplayOrder, x.WeightPercent,
+                x.Id, x.SkillId, x.DurationMinutes, x.DisplayOrder, x.WeightPercent, x.SectionType, x.TotalPoints,
                 Questions = academic.ExamQuestions.Where(q => q.ExamSectionId == x.Id)
                     .OrderBy(q => q.DisplayOrder).Select(q => new { q.Id, q.QuestionId, q.DisplayOrder, q.PointsOverride }).ToList()
             }).ToListAsync(ct);
@@ -133,6 +133,13 @@ public sealed class CanonicalExamsController(
         var sectionCount = await academic.ExamSections.CountAsync(x => x.ExamId == id, ct);
         if (sectionCount == 0 && !await academic.ExamDocuments.AnyAsync(x => x.ExamId == id, ct))
             return BadRequest(new { message = "برای انتشار آزمون PDFمحور، ابتدا فایل PDF صورت آزمون را بارگذاری کنید." });
+        var essaySectionIds = await academic.ExamSections.Where(x => x.ExamId == id && x.SectionType == "Essay")
+            .Select(x => x.Id).ToListAsync(ct);
+        var essayPapers = await academic.ExamSectionDocuments.Where(x => essaySectionIds.Contains(x.ExamSectionId))
+            .Select(x => x.ExamSectionId).ToListAsync(ct);
+        var missingEssayPapers = essaySectionIds.Except(essayPapers).ToArray();
+        if (missingEssayPapers.Length > 0)
+            return BadRequest(new { message = "برای انتشار، PDF صورت سؤال تمام بخش‌های Essay باید بارگذاری شود.", missingSectionIds = missingEssayPapers });
         exam.IsPublished = true;
         await academic.SaveChangesAsync(ct);
         return Ok(new { examId = id, isPublished = true });
@@ -198,15 +205,21 @@ public sealed class CanonicalExamsController(
         if (!departmentId.HasValue || !await academic.Classes.AnyAsync(x =>
             x.Id == r.ClassId && x.DepartmentId == departmentId.Value, ct))
             return BadRequest(new { message = "کلاس انتخاب‌شده معتبر نیست یا به دپارتمان آزمون تعلق ندارد." });
-        if (!r.PdfOnly && r.Sections.Any(x => x.SkillId <= 0 || x.DurationMinutes < 1 || x.QuestionIds.Count == 0 || x.WeightPercent <= 0))
-            return BadRequest(new { message = "هر بخش باید مهارت، زمان، وزن و حداقل یک سؤال معتبر داشته باشد." });
+        if (!r.PdfOnly && r.Sections.Any(x =>
+            x.SkillId <= 0 || x.DurationMinutes < 1 || x.WeightPercent <= 0 ||
+            (string.Equals(x.SectionType ?? "Online", "Essay", StringComparison.OrdinalIgnoreCase)
+                ? x.QuestionIds.Count != 0
+                : x.QuestionIds.Count == 0 || !string.Equals(x.SectionType ?? "Online", "Online", StringComparison.OrdinalIgnoreCase))))
+            return BadRequest(new { message = "بخش آنلاین باید سؤال داشته باشد و بخش Essay باید بدون سؤال متنی و با PDF تعریف شود؛ مهارت، زمان و وزن هر بخش نیز الزامی است." });
         if (!r.PdfOnly && Math.Abs(r.Sections.Sum(x => x.WeightPercent) - 100m) > 0.01m)
             return BadRequest(new { message = "مجموع وزن بخش‌های آزمون باید دقیقاً ۱۰۰ درصد باشد." });
         if (r.PdfOnly) return null;
         var skillIds = r.Sections.Select(x => x.SkillId).Distinct().ToArray();
         if (await academic.Skills.CountAsync(x => skillIds.Contains(x.Id) && x.ExamCategoryId == r.ExamCategoryId, ct) != skillIds.Length)
             return BadRequest(new { message = "یک یا چند مهارت به دسته‌بندی انتخاب‌شده تعلق ندارد." });
-        var questionIds = r.Sections.SelectMany(x => x.QuestionIds).Distinct().ToArray();
+        var questionIds = r.Sections
+            .Where(x => !string.Equals(x.SectionType ?? "Online", "Essay", StringComparison.OrdinalIgnoreCase))
+            .SelectMany(x => x.QuestionIds).Distinct().ToArray();
         if (await academic.Questions.CountAsync(x => questionIds.Contains(x.Id) && skillIds.Contains(x.SkillId), ct) != questionIds.Length)
             return BadRequest(new { message = "یک یا چند سؤال معتبر نیست یا با مهارت بخش آزمون تطابق ندارد." });
         if (User.IsInRole("Teacher") && await academic.Questions.AnyAsync(x => questionIds.Contains(x.Id) && x.CreatedByUserId != CurrentUserId, ct))
@@ -236,7 +249,8 @@ public sealed class CanonicalExamsController(
             var section = new CanonicalExamSection {
                 ExamId = examId, SkillId = input.SkillId,
                 DurationMinutes = input.DurationMinutes, DisplayOrder = i + 1,
-                WeightPercent = input.WeightPercent
+                WeightPercent = input.WeightPercent,
+                SectionType = string.IsNullOrWhiteSpace(input.SectionType) ? "Online" : input.SectionType.Trim()
             };
             academic.ExamSections.Add(section);
             await academic.SaveChangesAsync(ct);
@@ -278,6 +292,7 @@ public sealed class ExamSectionInput
     public long SkillId { get; set; }
     public int DurationMinutes { get; set; }
     public decimal WeightPercent { get; set; }
+    public string? SectionType { get; set; }
     public List<long> QuestionIds { get; set; } = new();
 }
 
