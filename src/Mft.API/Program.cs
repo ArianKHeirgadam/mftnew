@@ -247,4 +247,31 @@ using (var scope = app.Services.CreateScope())
     }
 }
 
+    // Explicit, development-only recovery for an existing canonical SuperAdmin.
+    // Supply both settings through .NET User Secrets; never commit the password.
+    if (app.Environment.IsDevelopment() &&
+        builder.Configuration.GetValue<bool>("Bootstrap:ResetExistingSuperAdminPassword"))
+    {
+        var resetUsername = (builder.Configuration["Bootstrap:Username"] ?? "admin").Trim();
+        var resetPassword = builder.Configuration["Bootstrap:ResetPassword"];
+        if (string.IsNullOrWhiteSpace(resetPassword) || resetPassword.Length < 8)
+            throw new InvalidOperationException(
+                "Bootstrap:ResetPassword must contain at least 8 characters.");
+
+        var admin = await db.Users.SingleOrDefaultAsync(user => user.Username == resetUsername);
+        if (admin is null)
+            throw new InvalidOperationException(
+                $"Cannot reset password: user '{resetUsername}' was not found.");
+
+        if (!admin.UserRoles.Any(item => item.RoleId == 1))
+            throw new InvalidOperationException(
+                "Password reset refused: the target user is not assigned the SuperAdmin role.");
+
+        admin.PasswordHash = BCrypt.Net.BCrypt.HashPassword(resetPassword);
+        await db.SaveChangesAsync();
+        app.Logger.LogWarning(
+            "Development-only password reset applied for canonical SuperAdmin '{Username}'. Disable Bootstrap:ResetExistingSuperAdminPassword now.",
+            resetUsername);
+    }
+
 app.Run();
