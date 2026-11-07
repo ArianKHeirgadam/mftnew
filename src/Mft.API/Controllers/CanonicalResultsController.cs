@@ -57,6 +57,12 @@ public sealed class CanonicalResultsController(
                 IsPdfOnly = !academic.ExamSections.Any(section => section.ExamId == x.Exam.Id) &&
                     (academic.ExamDocuments.Any(document => document.ExamId == x.Exam.Id) ||
                      academic.ExamSubmissionDocuments.Any(document => document.AttemptId == x.Attempt.Id)),
+                MaxScore = !academic.ExamSections.Any(section => section.ExamId == x.Exam.Id)
+                    ? 100m
+                    : (academic.StudentAnswers.Where(answer => answer.ExamAttemptId == x.Attempt.Id)
+                        .Sum(answer => (decimal?)(answer.PointsOverride ?? answer.Points)) ?? 0m)
+                      + (academic.ExamSections.Where(section => section.ExamId == x.Exam.Id && section.SectionType == "Essay")
+                        .Sum(section => (decimal?)(section.TotalPoints ?? 100m)) ?? 0m),
                 x.Exam.ResultsPublished,
                 HasAutoGradedAnswers = academic.StudentAnswers.Any(answer => answer.ExamAttemptId == x.Attempt.Id && answer.IsAutoGraded)
             }).ToListAsync(ct);
@@ -70,6 +76,7 @@ public sealed class CanonicalResultsController(
             studentName = studentDetails.GetValueOrDefault(x.StudentUserId)?.FullName,
             studentNumber = studentDetails.GetValueOrDefault(x.StudentUserId)?.Username,
             startedAt = x.StartedAt, submittedAt = x.SubmittedAt,
+            maxScore = x.MaxScore,
             score = isStudent
                 ? (x.ResultsPublished && x.StatusId == 4 ? x.FinalScore : x.AutoGradedScore)
                 : x.FinalScore ?? x.AutoGradedScore,
