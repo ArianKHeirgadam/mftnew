@@ -157,7 +157,6 @@
     });
   }
   function selectedManualQuestions() {
-    syncSelectedQuestions();
     return [...selectedQuestionIds];
   }
   function renderSteps() {
@@ -182,9 +181,9 @@
       const previewList = document.getElementById("prevSelectedQuestions");
       if (previewList) {
         const selectedSet = new Set(selectedManualQuestions());
-        const titles = [...document.querySelectorAll('#manualPick input[type="checkbox"][value]')]
-          .filter(input => selectedSet.has(String(input.value)))
-          .map(input => input.closest('.qpick-row')?.querySelector('span')?.textContent?.trim())
+        const titles = examQuestionRows
+          .filter(question => selectedSet.has(String(question.id)))
+          .map(question => question.text)
           .filter(Boolean);
         previewList.innerHTML = randomMode
           ? '<span class="text-soft">سؤال‌ها هنگام انتشار به‌صورت تصادفی از بانک انتخاب می‌شوند.</span>'
@@ -229,19 +228,27 @@
     if (!classId || !departmentId) return showToast("کلاس معتبر برای آزمون انتخاب نشده است.", "warn");
 
     const selectedIds = new Set(selectedManualQuestions());
-    let selected = [...document.querySelectorAll('#manualPick input[type="checkbox"][value]')]
-      .filter(input => selectedIds.has(String(input.value)));
+    const categorySkillIds = new Set((examLookups?.skills || [])
+      .filter(skill => Number(skill.examCategoryId) === categoryId)
+      .map(skill => Number(skill.id)));
+    const toSelection = question => ({
+      value: question.id,
+      dataset: { skillId: String(question.skillId), questionType: question.questionTypeCode || '' }
+    });
+    let selected = examQuestionRows
+      .filter(question => selectedIds.has(String(question.id)) && categorySkillIds.has(Number(question.skillId)))
+      .map(toSelection);
     if (document.getElementById("randomToggle").checked) {
-      const pool = [...document.querySelectorAll('#manualPick input[type="checkbox"]')];
+      const pool = examQuestionRows.filter(question => categorySkillIds.has(Number(question.skillId)));
       const mcqCount = Math.max(0, Number(document.getElementById("randomMcqCount").value) || 0);
       const essayCount = Math.max(0, Number(document.getElementById("randomEssayCount").value) || 0);
       const matchingCount = Math.max(0, Number(document.getElementById("randomMatchingCount").value) || 0);
       const pickRandom = items => [...items].sort(() => Math.random() - 0.5);
       selected = [
-        ...pickRandom(pool.filter(input => input.dataset.questionType === 'MultipleChoice')).slice(0, mcqCount),
-        ...pickRandom(pool.filter(input => input.dataset.questionType === 'Essay')).slice(0, essayCount),
-        ...pickRandom(pool.filter(input => input.dataset.questionType === 'Matching')).slice(0, matchingCount)
-      ];
+        ...pickRandom(pool.filter(question => question.questionTypeCode === 'MultipleChoice')).slice(0, mcqCount),
+        ...pickRandom(pool.filter(question => question.questionTypeCode === 'Essay')).slice(0, essayCount),
+        ...pickRandom(pool.filter(question => question.questionTypeCode === 'Matching')).slice(0, matchingCount)
+      ].map(toSelection);
     }
     if (!selected.length) return showToast("حداقل یک سؤال انتخاب کنید.", "warn");
 
