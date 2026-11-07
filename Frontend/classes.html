@@ -179,14 +179,13 @@
   async function loadClassMembers(id) {
     currentClass = classes.find(item => Number(item.id) === id) || null;
     if (!currentClass) return;
-    const [memberResult, allStudents, teacherResult, allTeachers] = await Promise.all([
+    const [memberResult, teacherResult, eligible] = await Promise.all([
       api().request('/canonical/classes/' + id + '/members'),
-      api().request('/users?role=Student'),
       api().request('/canonical/classes/' + id + '/teachers'),
-      api().request('/users?role=Teacher')
+      api().request('/canonical/classes/' + id + '/available-members')
     ]);
-    students = allStudents.filter(item => item.isActive !== false);
-    teachers = allTeachers.filter(item => item.isActive !== false);
+    students = (eligible.students || []).filter(item => item.isActive !== false);
+    teachers = (eligible.teachers || []).filter(item => item.isActive !== false);
     selectedIds = new Set((memberResult.members || []).map(item => Number(item.id)));
     selectedTeacherIds = new Set((teacherResult.teachers || []).map(item => Number(item.id)));
     $('#classSummary').textContent = currentClass.name + ' — ' +
