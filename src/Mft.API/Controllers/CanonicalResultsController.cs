@@ -238,7 +238,10 @@ public sealed class CanonicalResultsController(
             return BadRequest(new { message = "فایل پاسخ دانشجو ثبت نشده است." });
         var fully = await academic.ExamAttemptStatuses.SingleAsync(x => x.Id == 4 && x.Code == "FullyGraded", ct);
         attempt.AutoGradedScore = 0m;
+        attempt.ManualGradedScore = request.Score;
         attempt.FinalScore = request.Score;
+        attempt.GradingStatus = "Final";
+        attempt.ManualReviewRequired = false;
         attempt.StatusId = fully.Id;
         await academic.SaveChangesAsync(ct);
         return Ok(new { attemptId, awardedScore = attempt.FinalScore, maxScore = 100m, status = StatusCodeName(attempt.StatusId) });
