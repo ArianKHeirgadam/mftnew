@@ -38,21 +38,21 @@
   function valueFor(q) {
     if (answers.has(q.examQuestionId)) return answers.get(q.examQuestionId);
     if (/multiplechoice/i.test(q.type)) return { selectedOptionId: null };
-    if (/matching/i.test(q.type)) return { pairs: q.leftItems.map(leftItem => ({ leftItem, rightItem: '' })) };
+    if (/matching/i.test(q.type)) return { pairs: q.leftItems.map(leftItem => ({ leftItemId: Number(leftItem.id), rightItemId: null })) };
     if (/essay/i.test(q.type)) return {};
     return { text: '' };
   }
   function answerText(q) {
     const value=valueFor(q);
     if (/multiplechoice/i.test(q.type)) return value.selectedOptionId ? (q.options.find(o=>o.id===value.selectedOptionId)?.optionText || '—') : 'بدون پاسخ';
-    if (/matching/i.test(q.type)) return (value.pairs || []).filter(p=>p.rightItem).length ? 'جفت‌ها انتخاب شده‌اند' : 'بدون پاسخ';
+    if (/matching/i.test(q.type)) return (value.pairs || []).some(p=>p.rightItemId != null || p.rightItem?.id != null) ? 'جفت‌ها انتخاب شده‌اند' : 'بدون پاسخ';
     if (/essay/i.test(q.type)) return String(value.text || '').trim() || 'بدون پاسخ';
     return value.text || 'بدون پاسخ';
   }
   function answered(q) {
     const v=valueFor(q);
     if (/multiplechoice/i.test(q.type)) return !!v.selectedOptionId;
-    if (/matching/i.test(q.type)) return (v.pairs || []).some(p=>p.rightItem);
+    if (/matching/i.test(q.type)) return (v.pairs || []).some(p=>p.rightItemId != null || p.rightItem?.id != null);
     if (/essay/i.test(q.type)) return !!String(v.text || '').trim();
     return !!String(v.text || '').trim() || (!!exam?.examPdfAvailable && uploadedPdf);
   }
@@ -82,17 +82,31 @@
         label.append(radio,letter,text);add(label);
       });
     } else if(/matching/i.test(q.type)) {
-      const selected=new Map((v.pairs||[]).map(p=>[p.leftItem,p.rightItem]));
+      // Matching items are API objects ({ id, text }), never DOM string values.
+      const selected=new Map((v.pairs||[]).map(p=>[
+        Number(p.leftItemId ?? p.leftItem?.id),
+        p.rightItemId ?? p.rightItem?.id ?? null
+      ]));
       q.leftItems.forEach(left=>{
         const wrap=document.createElement('div');wrap.className='field';wrap.style.marginBottom='12px';
-        const label=document.createElement('label');label.textContent=left;
+        const label=document.createElement('label');label.textContent=left.text ?? '';
         const select=document.createElement('select');select.className='input';select.style.width='100%';
         const empty=document.createElement('option');empty.value='';empty.textContent='انتخاب مورد مرتبط';select.append(empty);
-        q.rightItems.forEach(right=>{const option=document.createElement('option');option.value=right;option.textContent=right;select.append(option);});
-        select.value=selected.get(left)||'';
+        q.rightItems.forEach(right=>{
+          const option=document.createElement('option');
+          option.value=String(right.id);
+          option.textContent=right.text ?? '';
+          select.append(option);
+        });
+        const selectedId=selected.get(Number(left.id));
+        select.value=selectedId == null ? '' : String(selectedId);
         select.addEventListener('change',()=>{
-          selected.set(left,select.value);
-          const pairs=q.leftItems.map(item=>({leftItem:item,rightItem:selected.get(item)||''}));
+          const rightId=select.value ? Number(select.value) : null;
+          selected.set(Number(left.id),rightId);
+          const pairs=q.leftItems.map(item=>({
+            leftItemId:Number(item.id),
+            rightItemId:selected.get(Number(item.id)) ?? null
+          })).filter(pair=>pair.rightItemId != null);
           answers.set(q.examQuestionId,{pairs});changed();
         });
         wrap.append(label,select);add(wrap);
